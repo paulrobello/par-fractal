@@ -23,10 +23,10 @@ use winit::window::Window;
 use crate::video_recorder::{VideoFormat, VideoRecorder};
 
 /// Stub video recorder for web builds
-#[cfg(feature = "web")]
+#[cfg(target_arch = "wasm32")]
 pub struct VideoRecorder;
 
-#[cfg(feature = "web")]
+#[cfg(target_arch = "wasm32")]
 impl VideoRecorder {
     pub fn is_recording(&self) -> bool {
         false
@@ -68,7 +68,7 @@ pub struct App {
     smooth_transitions_enabled: bool,
     #[cfg(feature = "native")]
     video_recorder: VideoRecorder,
-    #[cfg(feature = "web")]
+    #[cfg(target_arch = "wasm32")]
     video_recorder: VideoRecorder,
     screenshot_delay: Option<f32>, // CLI option: take screenshot after N seconds
     exit_delay: Option<f32>,       // CLI option: exit after N seconds
@@ -189,7 +189,7 @@ impl App {
     }
 
     /// Create a new App instance (web version with error handling)
-    #[cfg(feature = "web")]
+    #[cfg(target_arch = "wasm32")]
     pub async fn new_async(
         window: Window,
         screenshot_delay: Option<f32>,
@@ -199,7 +199,11 @@ impl App {
         let window = Arc::new(window);
         let size = window.inner_size();
 
-        log::info!("Initializing renderer with size {}x{}", size.width, size.height);
+        log::info!(
+            "Initializing renderer with size {}x{}",
+            size.width,
+            size.height
+        );
 
         // Create renderer (no GPU preference on web - browser handles this)
         let renderer = Renderer::new(window.clone(), size).await;

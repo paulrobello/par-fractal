@@ -8,11 +8,11 @@ pub mod platform;
 pub mod renderer;
 pub mod ui;
 
-#[cfg(feature = "native")]
+#[cfg(not(target_arch = "wasm32"))]
 pub mod video_recorder;
 
 // Web entry point
-#[cfg(feature = "web")]
+#[cfg(target_arch = "wasm32")]
 pub mod web_main;
 
 // Re-export commonly used types

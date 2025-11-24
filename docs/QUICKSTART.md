@@ -39,21 +39,21 @@ $ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 ## Installation
 
-### Option 1: Install from Crates.io (Coming Soon)
+### Option 1: Install from Crates.io (Recommended)
 
-The package will be available on crates.io after the first release:
+Install directly from crates.io:
 
 ```bash
-# Once published, install with:
+# Install the latest version
 $ cargo install par-fractal
 
 # Run from anywhere
 $ par-fractal
 ```
 
-**Note:** Currently in development. Use source build below.
+Requires Rust 1.70+ and Cargo. Install from [rustup.rs](https://rustup.rs/).
 
-### Option 2: Build from Source (Recommended)
+### Option 2: Build from Source
 
 ```bash
 # Clone the repository
@@ -121,10 +121,10 @@ When Par Fractal launches, you'll see:
 
 ```mermaid
 graph TD
-    Window[Main Window]
-    Fractal[Mandelbrot Fractal<br/>Black background with colors]
-    UI[UI Panel<br/>Parameter Controls]
-    FPS[FPS Display<br/>Top Left Corner]
+    Window[Main Window<br/>960×540 default]
+    Fractal[Fractal Rendering<br/>Default: Mandelbrot 2D]
+    UI[UI Panel<br/>Right Side - Parameter Controls]
+    FPS[FPS Display<br/>Top Left - Toggle with F key]
 
     Window --> Fractal
     Window --> UI
@@ -147,27 +147,39 @@ graph TD
 | **F12** | Screenshot | Capture current view as PNG |
 | **F** | Toggle FPS | Show/hide FPS counter |
 | **/** | Command Palette | Quick access to all features |
-| **Ctrl/Cmd+K** | Command Palette | Alternative command palette shortcut |
+| **Ctrl/Cmd+K** | Command Palette | Alternative shortcut (VS Code style) |
 | **Esc** | Close/Cancel | Close dialogs or exit fullscreen |
 
 ### Quick Fractal Switching
 
-| Key | Fractal | Type |
-|-----|---------|------|
-| **1** | Mandelbrot | 2D |
-| **2** | Julia Set | 2D |
-| **3** | Sierpinski | 2D |
-| **4** | Burning Ship | 2D |
-| **F1** | Mandelbulb | 3D |
-| **F2** | Menger Sponge | 3D |
-| **F3** | Sierpinski Pyramid | 3D |
+**2D Fractals (Digit keys 0-9):**
+
+| Key | Fractal | Key | Fractal |
+|-----|---------|-----|---------|
+| **1** | Mandelbrot | **6** | Phoenix |
+| **2** | Julia Set | **7** | Celtic |
+| **3** | Sierpinski | **8** | Newton |
+| **4** | Burning Ship | **9** | Lyapunov |
+| **5** | Tricorn | **0** | Nova |
+
+**3D Fractals (Function keys F1-F11):**
+
+| Key | Fractal | Key | Fractal |
+|-----|---------|-----|---------|
+| **F1** | Mandelbulb | **F7** | Octahedral IFS |
+| **F2** | Menger Sponge | **F8** | Icosahedral IFS |
+| **F3** | Sierpinski Pyramid | **F9** | Apollonian Gasket |
+| **F4** | Julia Set 3D | **F10** | Kleinian |
+| **F5** | Mandelbox | **F11** | Hybrid Mandelbulb-Julia |
+| **F6** | Tglad Formula | | |
+
+**Note:** Magnet 2D, Collatz 2D, Quaternion Cubic 3D, and Sierpinski Gasket 3D are accessible via UI or command palette only.
 
 ### Color Palette Cycling
 
 | Key | Action |
 |-----|--------|
 | **P** | Next palette |
-| **Shift+P** | Previous palette |
 
 ## Your First Fractal
 
@@ -261,10 +273,11 @@ Mouse Wheel → Adjust camera speed
    - Keyboard: `-` to decrease by 32 (2D) or 10 (3D), `+/=` to increase
 
 2. **Color Palette** - Choose visual style
-   - Fire: Warm colors
-   - Ocean: Cool blues
-   - Rainbow: Full spectrum
-   - Keyboard: `P` to cycle through palettes
+   - 21 built-in palettes: Fire, Ocean, Rainbow, Forest, Sunset, Grayscale, and more
+   - Scientific visualization: Viridis, Plasma, Inferno, Magma, Copper, Cool, Hot
+   - Artistic palettes: Neon, Purple Dream, Earth, Ice, Lava, Galaxy, Mint, Cherry
+   - Custom palette support via YAML or .pal file import
+   - Keyboard: `P` to cycle forward through palettes
 
 **Performance Tip:**
 - Start with default settings
@@ -444,9 +457,10 @@ Save favorite views:
 
 **Try These:**
 1. **Command Palette** (`/` or `Ctrl/Cmd+K`)
-   - Quick access to all features
-   - Search for commands
-   - Keyboard-driven workflow
+   - Quick access to all 26 fractal types
+   - Toggle effects (AO, shadows, DoF, fog, bloom, FXAA)
+   - Switch color modes and LOD profiles
+   - Fuzzy search matching for fast command filtering
 
 2. **Preset System**
    - Load built-in presets

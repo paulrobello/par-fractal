@@ -126,7 +126,8 @@ impl App {
             }
         }
 
-        // Auto-save camera position after 1 second of inactivity
+        // Auto-save camera position after 1 second of inactivity (native only)
+        #[cfg(not(target_arch = "wasm32"))]
         if self.camera_needs_save
             && self.camera_last_moved.elapsed() >= std::time::Duration::from_secs(1)
         {
@@ -134,7 +135,8 @@ impl App {
             self.camera_needs_save = false;
         }
 
-        // Auto-save settings after 1 second of inactivity
+        // Auto-save settings after 1 second of inactivity (native only)
+        #[cfg(not(target_arch = "wasm32"))]
         if self.settings_need_save
             && self.settings_last_changed.elapsed() >= std::time::Duration::from_secs(1)
         {
@@ -142,7 +144,8 @@ impl App {
             self.settings_need_save = false;
         }
 
-        // Handle high-resolution render request
+        // Handle high-resolution render request (native only)
+        #[cfg(not(target_arch = "wasm32"))]
         if let Some((width, height)) = self.save_hires_render.take() {
             println!("Starting high-resolution render at {}x{}...", width, height);
             if let Err(e) = self.render_high_resolution(width, height) {
@@ -150,6 +153,10 @@ impl App {
             } else {
                 println!("High-resolution render completed!");
             }
+        }
+        #[cfg(target_arch = "wasm32")]
+        if self.save_hires_render.take().is_some() {
+            log::warn!("High-resolution rendering not yet supported on web");
         }
 
         // Update palette animation

@@ -9,6 +9,7 @@ Complete guide to all 3D fractals in Par Fractal, including ray marching techniq
 - [Mandelbulb](#mandelbulb)
 - [Menger Sponge](#menger-sponge)
 - [Sierpinski Pyramid](#sierpinski-pyramid)
+- [Sierpinski Gasket](#sierpinski-gasket)
 - [Julia Set 3D](#julia-set-3d)
 - [Mandelbox](#mandelbox)
 - [Tglad Formula](#tglad-formula)
@@ -362,6 +363,79 @@ Similar to removing the center pyramid from a tetrahedron, then repeating for ea
 - Enable AO to emphasize depth
 - Wireframe mode can reveal internal structure
 - Each iteration doubles complexity
+
+## Sierpinski Gasket
+
+### Description
+
+The Sierpinski Gasket is a tetrahedral IFS (Iterated Function System) fractal that combines tetrahedral folding with sphere inversion to create intricate "gasket" structures with holes. Unlike the Sierpinski Pyramid which uses pure tetrahedral folding, the Gasket variant adds sphere folding to create more complex sphere-packing patterns.
+
+**Mathematical Approach:**
+- Tetrahedral folding operations (same as Sierpinski Pyramid):
+  - If x+y < 0: fold
+  - If x+z < 0: fold
+  - If y+z < 0: fold
+- Sphere inversion folding creates "gasket" holes:
+  - Inverts points inside minimum radius sphere
+  - Creates recursive hole patterns
+- Iterative scaling and translation
+- Creates tetrahedral structure with sphere-packed features
+
+**Key Features:**
+- Perfect tetrahedral (4-fold) base symmetry
+- Sphere packing patterns create holes and voids
+- Combines geometric and organic characteristics
+- More complex than pure Sierpinski Pyramid
+- Self-similar at all scales
+- Beautiful interplay between tetrahedral and spherical geometry
+
+### How to Explore
+
+**UI Parameters:**
+- **Fractal Scale** (0.5-5.0): Overall size control
+  - Higher values = larger fractal
+  - Default: 1.5
+- **Fractal Fold** (0.5-3.0): Controls scaling intensity
+  - Base scale factor = 2.0 + fold × 0.5
+  - Range: 2.0-3.0 effective scale
+  - Higher values = tighter, more complex structure
+  - Default: 1.0 (effective scale 2.25)
+- **Fractal Min Radius** (0.1-2.0): Sphere folding parameter
+  - Controls size of gasket holes
+  - Lower values = smaller holes, more delicate structure
+  - Higher values = larger holes, more open structure
+  - Default: 0.5
+- **Max Iterations** (1-10): Recursion depth
+  - More iterations = finer detail
+  - 6-8 iterations recommended for good detail
+  - Default: 8
+
+**Start Position:**
+- Camera: (3.5, 3.0, 3.5)
+- Target: (0, 0, 0)
+
+**Recommended Settings:**
+- **Delicate Structure**: Scale = 1.5, Fold = 1.0, Min Radius = 0.3, Iterations = 8
+- **Balanced**: Scale = 1.5, Fold = 1.0, Min Radius = 0.5, Iterations = 8
+- **Open Holes**: Scale = 1.5, Fold = 1.0, Min Radius = 0.8, Iterations = 6
+- **Dense Complex**: Scale = 1.8, Fold = 1.5, Min Radius = 0.4, Iterations = 10
+
+**Exploration Tips:**
+- Adjust Min Radius to see dramatic structural changes
+- Compare with Sierpinski Pyramid to see sphere folding effects
+- Enable AO with high intensity (1.3-1.5) to emphasize holes
+- Use soft shadows to reveal depth in gasket voids
+- Look for both tetrahedral and spherical patterns
+- Zoom into hole boundaries to see recursive structure
+- Close-ups reveal how spheres pack into tetrahedral framework
+- PBR shading works well with low roughness (0.3-0.5)
+- Try different Fold values to vary complexity
+
+**Comparison with Sierpinski Pyramid:**
+- Pyramid: Pure tetrahedral folding, sharp edges
+- Gasket: Adds sphere inversion, creates holes and organic features
+- Gasket has three adjustable parameters vs Pyramid's two
+- Gasket structure is generally more intricate and varied
 
 ## Julia Set 3D
 

@@ -214,3 +214,59 @@ jobs:
         with:
           args: 'A new release v${{ steps.get_version.outputs.version }} has been created for {{ EVENT_PAYLOAD.repository.full_name }}.'
         continue-on-error: true
+
+  # Build and deploy web version to GitHub Pages
+  deploy-web:
+    name: Deploy Web Version
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [github-release]
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-web-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-web-
+
+      - name: Install trunk
+        run: |
+          if ! command -v trunk &> /dev/null; then
+            cargo install trunk
+          fi
+
+      - name: Build WASM
+        run: trunk build --release --public-url /
+
+      - name: Add CNAME for custom domain
+        run: echo "par-fractal.pardev.net" > dist/CNAME
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -157,11 +157,11 @@ GPU Buffer Upload → WGSL Shader → Fractal Computation → Frame Output
 
 ## Supported Fractals
 
-**2D Fractals (12 types):**
-Mandelbrot2D, Julia2D, BurningShip2D, Tricorn2D, Phoenix2D, Celtic2D, Newton2D, Lyapunov2D, Nova2D, Magnet2D, Collatz2D, Sierpinski2D
+**2D Fractals (13 types):**
+Mandelbrot2D, Julia2D, Sierpinski2D, SierpinskiTriangle2D, BurningShip2D, Tricorn2D, Phoenix2D, Celtic2D, Newton2D, Lyapunov2D, Nova2D, Magnet2D, Collatz2D
 
-**3D Fractals (12 types):**
-Mandelbulb3D, MengerSponge3D, JuliaSet3D, Mandelbox3D, TgladFormula3D, OctahedralIFS3D, IcosahedralIFS3D, ApollonianGasket3D, Kleinian3D, SierpinskiPyramid3D, HybridMandelbulbJulia3D, QuaternionCubic3D
+**3D Fractals (13 types):**
+Mandelbulb3D, MengerSponge3D, SierpinskiPyramid3D, SierpinskiGasket3D, JuliaSet3D, Mandelbox3D, TgladFormula3D, OctahedralIFS3D, IcosahedralIFS3D, ApollonianGasket3D, Kleinian3D, HybridMandelbulbJulia3D, QuaternionCubic3D
 
 ## Testing Guidelines
 

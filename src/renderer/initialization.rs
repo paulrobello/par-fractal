@@ -3,6 +3,7 @@ use wgpu::util::DeviceExt;
 
 /// GPU initialization and setup methods
 impl Renderer {
+    #[cfg(not(target_arch = "wasm32"))]
     pub async fn enumerate_gpus() -> Vec<GpuInfo> {
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
             backends: wgpu::Backends::all(),
@@ -23,6 +24,12 @@ impl Renderer {
             .collect()
     }
 
+    #[cfg(target_arch = "wasm32")]
+    pub async fn enumerate_gpus() -> Vec<GpuInfo> {
+        // GPU enumeration not available on web - browser handles GPU selection
+        Vec::new()
+    }
+
     pub async fn new(
         window: std::sync::Arc<winit::window::Window>,
         size: winit::dpi::PhysicalSize<u32>,
@@ -30,6 +37,7 @@ impl Renderer {
         Self::new_with_gpu_preference(window, size, None).await
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub async fn new_with_gpu_preference(
         window: std::sync::Arc<winit::window::Window>,
         size: winit::dpi::PhysicalSize<u32>,
@@ -81,6 +89,40 @@ impl Renderer {
                 .unwrap()
         };
 
+        Self::initialize_with_adapter(surface, adapter, size).await
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub async fn new_with_gpu_preference(
+        window: std::sync::Arc<winit::window::Window>,
+        size: winit::dpi::PhysicalSize<u32>,
+        _preferred_gpu_index: Option<usize>,
+    ) -> Self {
+        // On web, browser handles GPU selection - ignore preference
+        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::BROWSER_WEBGPU,
+            ..Default::default()
+        });
+
+        let surface = instance.create_surface(window).unwrap();
+
+        let adapter = instance
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::HighPerformance,
+                compatible_surface: Some(&surface),
+                force_fallback_adapter: false,
+            })
+            .await
+            .expect("Failed to find an appropriate adapter");
+
+        Self::initialize_with_adapter(surface, adapter, size).await
+    }
+
+    async fn initialize_with_adapter(
+        surface: wgpu::Surface<'static>,
+        adapter: wgpu::Adapter,
+        size: winit::dpi::PhysicalSize<u32>,
+    ) -> Self {
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: None,

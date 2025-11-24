@@ -1,20 +1,21 @@
 # 2D Fractals Guide
 
-Complete guide to all 12 2D fractals available in Par Fractal, including mathematical background, usage, and exploration tips.
+Complete guide to all 13 2D fractals available in Par Fractal, including mathematical background, usage, and exploration tips.
 
 **Available 2D Fractals:**
 1. Mandelbrot Set - The iconic fractal with infinite self-similar detail
 2. Julia Set - Dynamic fractal that morphs with parameter C
-3. Sierpinski Carpet - Classic geometric fractal with perfect self-similarity
-4. Burning Ship - Ship-shaped fractal using absolute values
-5. Tricorn (Mandelbar) - Complex conjugate variant with three-fold symmetry
-6. Phoenix - Two-step iteration creating flowing organic patterns
-7. Celtic - Celtic knot-like patterns with vertical symmetry
-8. Newton - Root-finding visualization showing basins of attraction
-9. Lyapunov - Population dynamics stability visualization
-10. Nova - Hybrid Newton-Mandelbrot fractal
-11. Magnet - Physics-inspired rational iteration formula
-12. Collatz - Experimental complex number extension of 3n+1 problem
+3. Sierpinski Carpet - Classic square-based geometric fractal with perfect self-similarity
+4. Sierpinski Triangle - Triangular geometric fractal using barycentric subdivision
+5. Burning Ship - Ship-shaped fractal using absolute values
+6. Tricorn (Mandelbar) - Complex conjugate variant with three-fold symmetry
+7. Phoenix - Two-step iteration creating flowing organic patterns
+8. Celtic - Celtic knot-like patterns with vertical symmetry
+9. Newton - Root-finding visualization showing basins of attraction
+10. Lyapunov - Population dynamics stability visualization
+11. Nova - Hybrid Newton-Mandelbrot fractal
+12. Magnet - Physics-inspired rational iteration formula
+13. Collatz - Experimental complex number extension of 3n+1 problem
 
 ## Table of Contents
 - [Overview](#overview)
@@ -22,6 +23,8 @@ Complete guide to all 12 2D fractals available in Par Fractal, including mathema
 - [Escape-Time Algorithm](#escape-time-algorithm)
 - [Mandelbrot Set](#mandelbrot-set)
 - [Julia Set](#julia-set)
+- [Sierpinski Carpet](#sierpinski-carpet)
+- [Sierpinski Triangle](#sierpinski-triangle)
 - [Burning Ship](#burning-ship)
 - [Tricorn (Mandelbar)](#tricorn-mandelbar)
 - [Phoenix](#phoenix)
@@ -31,7 +34,6 @@ Complete guide to all 12 2D fractals available in Par Fractal, including mathema
 - [Nova Fractal](#nova-fractal)
 - [Magnet Fractal](#magnet-fractal)
 - [Collatz Fractal](#collatz-fractal)
-- [Sierpinski Carpet](#sierpinski-carpet)
 - [Color Techniques](#color-techniques)
 - [Exploration Tips](#exploration-tips)
 - [Related Documentation](#related-documentation)
@@ -62,8 +64,9 @@ Par Fractal implements emulated double-precision arithmetic on the GPU to enable
 **Supported Fractals:**
 - Mandelbrot (fractal_type 0)
 - Julia (fractal_type 1)
-- Burning Ship (fractal_type 3)
-- Tricorn (fractal_type 4)
+- Sierpinski Carpet (fractal_type 2)
+- Sierpinski Triangle (fractal_type 3)
+- Burning Ship (fractal_type 4)
 
 **How It Works:**
 - Each coordinate is stored as a pair of floats (hi, lo) representing value = hi + lo
@@ -111,12 +114,12 @@ High-precision mode is more computationally intensive than standard mode, but th
 - **Orbit Trap Scale** - Scale factor for orbit trap coloring modes
 
 **Color Modes:**
-- **Palette** - Standard palette-based coloring (default)
-- **Orbit Trap XYZ** - Color based on coordinate components during iteration
-- **Orbit Trap Radial** - Color based on distance from origin during iteration
-- **Position-Based** - Color from fractal-space coordinates
-- **Iterations** - Visualize iteration counts directly
-- **Grayscale** - Simple grayscale iteration visualization
+- **Palette** (mode 0) - Standard palette-based coloring (default)
+- **Iteration Visualization** (mode 1) - Color-coded iteration count (similar to ray steps in 3D)
+- **Grayscale** (mode 2) - Simple grayscale iteration visualization
+- **Orbit Trap XYZ** (mode 3) - Color based on coordinate components during iteration using palette
+- **Orbit Trap Radial** (mode 4) - Color based on distance from origin during iteration using palette
+- **Position-Based** (modes 5 & 6) - Color from fractal-space coordinates (x, y, x+y)
 
 **Fractal-Specific Parameters:**
 - **Julia sets:** Julia constant C (real: -2.0 to 2.0, imaginary: -2.0 to 2.0)
@@ -388,78 +391,108 @@ zₙ₊₁ = zₙ² + c + p·zₙ₋₁
 
 ### Description
 
-The Celtic fractal uses absolute value of the real part in its iteration.
+The Celtic fractal uses absolute value of the real part of z² in its iteration, creating patterns reminiscent of Celtic knots and interlacing designs.
 
 **Mathematical Definition:**
 ```
 z₀ = 0
-zₙ₊₁ = (|Re(zₙ)| + i·Im(zₙ))² + c
+zₙ₊₁ = (|Re(z²)| + i·Im(z²)) + c
 ```
+Where z² is computed first, then the real part is made absolute, and finally c is added.
 
 **Key Features:**
-- Celtic knot-like patterns
-- Vertical symmetry
-- Intricate interlacing structures
+- Celtic knot-like patterns and interlacing structures
+- Vertical symmetry due to absolute value operation
+- Smooth escape-time coloring
+- Different from Burning Ship (which uses |Re(z)| + i|Im(z)|)
 
 ### How to Explore
 
 **Start Position:**
 - Center: (0.0, 0.0)
 - Zoom: 1.0
+- Max Iterations: 80
 
 **Tips:**
-- Look for knot patterns
-- Explore vertical structures
+- Look for intricate knot-like patterns
+- Explore vertical structures created by the symmetry
+- Compare with Burning Ship to see the difference in abs() application
+- Higher iterations reveal finer detail in the interlacing patterns
 
 ## Newton Fractal
 
 ### Description
 
-Newton fractals visualize the basins of attraction for Newton's root-finding method applied to polynomials.
+Newton fractals visualize the basins of attraction for Newton's root-finding method applied to the polynomial z³ - 1. Each pixel shows which root the iteration converges to and how quickly.
 
 **Mathematical Definition:**
 ```
+f(z) = z³ - 1
+f'(z) = 3z²
 zₙ₊₁ = zₙ - f(zₙ)/f'(zₙ)
 ```
 
+**The Three Roots:**
+- Root 1: (1.0, 0.0) - Real positive root
+- Root 2: (-0.5, 0.866025) - Complex root (upper)
+- Root 3: (-0.5, -0.866025) - Complex root (lower)
+
 **Key Features:**
-- Colors represent which root is found
-- Boundaries show chaotic behavior
-- Often three-fold or higher symmetry
+- Three-fold rotational symmetry from the cubic polynomial
+- Colors represent which root is found and iteration count
+- Boundaries between basins of attraction show fractal behavior
+- Convergence tolerance: 0.000001
+- Non-escape-time algorithm (convergence-based instead)
 
 ### How to Explore
 
 **Start Position:**
 - Center: (0.0, 0.0)
 - Zoom: 1.0
+- Max Iterations: 80
+
+**Coloring:**
+- The fractal uses a hybrid coloring approach:
+  - Base offset (0.0, 0.33, or 0.66) depending on which root converges
+  - Iteration count contribution for smooth gradients
+- Formula: `(iteration / max_iterations) * 0.5 + root_offset * 0.5`
 
 **Tips:**
-- Colors indicate different roots
-- Boundaries are fractal
-- High symmetry patterns
+- The three-fold symmetry creates beautiful patterns
+- Zoom into the boundaries between basin regions for complex fractal detail
+- Different roots create different colored regions
+- Very different from escape-time fractals - based on convergence instead
 
 ## Lyapunov Fractal
 
 ### Description
 
-Lyapunov fractals visualize the stability of population models based on the logistic map. They show regions where iterative population models exhibit stable, periodic, or chaotic behavior.
+Lyapunov fractals visualize the stability of population models based on the logistic map. They show regions where iterative population models exhibit stable, periodic, or chaotic behavior. This fractal uses an alternating sequence of two different growth rate parameters.
 
 **Mathematical Definition:**
 ```
 x₀ = 0.5
 xₙ₊₁ = r·xₙ·(1 - xₙ)
 ```
-Where r alternates between values a and b based on a sequence (AAAAAABBBBBB in this implementation, 6-6 pattern).
+Where r alternates between values a and b based on a 12-step sequence (AAAAAABBBBBB - six a's followed by six b's).
+
+**Parameter Mapping:**
+- a = pixel.x × 2 + 2 (maps x-coordinate to [0,4] range)
+- b = pixel.y × 2 + 2 (maps y-coordinate to [0,4] range)
+
+**Lyapunov Exponent:**
+- λ = (1/N) × Σ log|r × (1 - 2x)|
+- Accumulated over max_iterations steps
+- Derivative threshold: 0.0001 (prevents log of very small values)
 
 **Key Features:**
-- Visualizes Lyapunov exponent: λ = (1/N)·Σ log|r·(1-2x)|
-- a = pixel.x * 2 + 2 (maps to [0,4] range)
-- b = pixel.y * 2 + 2 (maps to [0,4] range)
+- Different from escape-time fractals - based on dynamical stability analysis
+- 12-step alternating sequence between a and b parameters (6-6 pattern)
 - Color interpretation:
-  - λ < 0: Stable/convergent regions (darker colors)
-  - λ > 0: Chaotic regions (brighter colors)
-- 12-step alternating sequence between a and b parameters
-- Different from escape-time fractals - based on dynamical stability
+  - λ < 0: Stable/convergent regions (mapped to 0.0-0.5 range)
+  - λ > 0: Chaotic regions (mapped to 0.5-1.0 range)
+- Symmetrical across origin due to symmetric parameter mapping
+- Non-escape algorithm - uses stability measure instead
 
 ### How to Explore
 
@@ -467,12 +500,19 @@ Where r alternates between values a and b based on a sequence (AAAAAABBBBBB in t
 - Center: (0.0, 0.0)
 - Zoom: 1.0
 - Max Iterations: 80 (used for Lyapunov exponent accumulation)
+- Visible range typically covers parameter space [0,4] × [0,4]
+
+**Color Mapping:**
+- Lyapunov exponent is normalized and clamped
+- Negative λ: `0.5 - clamp(-λ * 0.5, 0.0, 0.5)` → darker colors
+- Positive λ: `0.5 + clamp(λ * 0.5, 0.0, 0.5)` → brighter colors
 
 **Tips:**
-- Brighter areas indicate chaotic behavior
-- Darker areas indicate stable periodic orbits
+- Brighter areas indicate chaotic behavior (positive Lyapunov exponent)
+- Darker areas indicate stable periodic orbits (negative Lyapunov exponent)
 - The parameter space ranges from 0 to 4 (classic logistic map range)
 - This fractal has a very different interpretation than escape-time fractals
+- Try exploring different regions to find boundaries between order and chaos
 
 ## Nova Fractal
 
@@ -485,26 +525,35 @@ Nova fractals combine Newton's method with the addition of a constant, creating 
 z₀ = pixel coordinate
 zₙ₊₁ = zₙ - R·f(zₙ)/f'(zₙ) + c
 ```
-Where f(z) = z³ - 1, R is relaxation parameter (1.0), and c is the Julia constant.
+Where f(z) = z³ - 1, R is the relaxation parameter (fixed at 1.0), and c is the Julia constant.
 
 **Key Features:**
 - Hybrid of Newton and Julia approaches
-- Uses Julia C parameter for the additive constant
+- Uses the Julia C parameter (uniforms.julia_c) for the additive constant
 - Complex symmetrical patterns with chaotic boundaries
 - Three-fold symmetry from cubic polynomial
+- Escape-time coloring with smooth iteration count
 
 ### How to Explore
 
 **Start Position:**
 - Center: (0.0, 0.0)
 - Zoom: 1.0
-- Julia C: (-0.7, 0.27015) (or experiment with different values)
-- Max Iterations: 80
+- Julia C: (-0.7, 0.27015) (default, or experiment with different values)
+- Max Iterations: 16 (default for Nova)
 
 **UI Parameters:**
 - **Julia Constant C:** Controls the additive offset after Newton step
+  - Real component (julia_c.x): -2.0 to 2.0
+  - Imaginary component (julia_c.y): -2.0 to 2.0
 - Try values similar to Julia set exploration
 - Small changes create dramatic pattern differences
+
+**Tips:**
+- Experiment with different Julia C values to create varied patterns
+- The fractal escapes when |z| > 2 (standard escape radius)
+- Uses smooth coloring for band-free gradients
+- Three-fold symmetry creates beautiful kaleidoscopic patterns
 
 ## Magnet Fractal
 
@@ -541,21 +590,32 @@ zₙ₊₁ = ((zₙ² + c - 1) / (2zₙ + c - 2))²
 
 ### Description
 
-Based on the famous Collatz conjecture (3n+1 problem) extended to complex numbers. This fractal visualizes the behavior of a complex generalization of the Collatz map.
+Based on the famous Collatz conjecture (3n+1 problem) extended to complex numbers. This fractal visualizes the behavior of a complex generalization of the Collatz map using a smooth analytical formula.
 
 **Mathematical Definition:**
 ```
 z₀ = pixel coordinate
-zₙ₊₁ = 0.25 * (2 + 7z - (2 + 5z) * cos(πz))
+zₙ₊₁ = 0.25 × (2 + 7z - (2 + 5z) × cos(πz))
 ```
+
+**Complex Cosine Implementation:**
+For complex z = x + iy:
+```
+cos(πz) = cos(πx) × cosh(πy) - i × sin(πx) × sinh(πy)
+```
+Where cosh(x) = (eˣ + e⁻ˣ)/2 and sinh(x) = (eˣ - e⁻ˣ)/2
 
 **Key Features:**
 - Experimental visualization of number theory concept
-- Complex trigonometric iteration formula
-- Uses cos(πz) for complex z (involves hyperbolic functions)
-- Escape condition: |z| > 10000
-- Colors based on minimum distance to origin during iteration
-- Highly experimental and produces unique patterns
+- Complex trigonometric iteration formula involving hyperbolic functions
+- Dual escape/convergence behavior:
+  - Escape condition: |z| > 10000
+  - Tracks minimum distance to origin during iteration
+- Unique coloring approach:
+  - Escaped points: `fract((iteration + 1 - smooth_nu) / 50.0)`
+  - Converged points: `fract(min_distance × 2.0)`
+- Highly experimental and produces unique, organic patterns
+- Very different behavior from polynomial fractals
 
 ### How to Explore
 
@@ -564,17 +624,25 @@ zₙ₊₁ = 0.25 * (2 + 7z - (2 + 5z) * cos(πz))
 - Zoom: 1.0
 - Max Iterations: 80
 
+**Coloring Details:**
+- Points that escape use smooth escape-time coloring (like Mandelbrot)
+- Points that don't escape are colored based on their minimum distance to the origin
+- The fract() function creates repeating color bands
+- Escape normalization uses division by 50 for varied color distribution
+
 **Tips:**
-- This is a highly experimental fractal
-- Patterns are very different from classic fractals
-- Try zooming into different regions to find structure
-- Increase iterations for more detail
+- This is a highly experimental fractal with unpredictable behavior
+- Patterns are very different from classic polynomial fractals
+- Try zooming into different regions to find interesting structures
+- Increase iterations to capture more detail in complex regions
+- The minimum distance coloring creates unique organic textures
+- Expect asymmetric and non-self-similar patterns
 
 ## Sierpinski Carpet
 
 ### Description
 
-The Sierpinski Carpet is a classic fractal pattern created through recursive subdivision. Note: Despite the fractal type being named "Sierpinski2D", this implementation creates a Sierpinski Carpet (square-based), not a Sierpinski Triangle.
+The Sierpinski Carpet is a classic square-based fractal pattern created through recursive subdivision.
 
 **Algorithm:**
 1. Start with a unit square
@@ -588,6 +656,7 @@ The Sierpinski Carpet is a classic fractal pattern created through recursive sub
 - Deterministic (not based on iteration/escape)
 - Infinite fractal detail
 - Different coloring: based on subdivision level rather than escape time
+- High-precision zoom support for extremely deep exploration
 
 ### How to Explore
 
@@ -607,6 +676,63 @@ The Sierpinski Carpet is a classic fractal pattern created through recursive sub
 - Zoom in anywhere to see identical pattern at smaller scale
 - Unlike escape-time fractals, this has a deterministic structure
 - Try different color palettes to highlight the subdivision levels
+- Supports high-precision mode for deep zooms
+
+## Sierpinski Triangle
+
+### Description
+
+The Sierpinski Triangle is a classic triangular fractal pattern created through barycentric coordinate subdivision. This creates the iconic triangular fractal with holes at every scale.
+
+**Algorithm:**
+1. Start with an equilateral triangle
+2. Identify the center region using barycentric coordinates
+3. Remove the center triangular region
+4. Recursively repeat for each remaining triangle
+
+**Key Features:**
+- Perfect triangular self-similarity at all scales
+- Triangle-based recursive pattern using barycentric subdivision
+- Deterministic geometric structure
+- Different from Sierpinski Carpet (square-based version)
+- Smooth coloring based on iteration depth and distance to hole edges
+- High-precision zoom support for deep exploration
+
+### How to Explore
+
+**Start Position:**
+- Center: (0.0, 0.0)
+- Zoom: 1.0
+- Max Iterations: 30 (default)
+- Visible triangle with vertices at (0,0), (1,0), and (0.5, √3/2)
+
+**How It Works:**
+- Uses barycentric coordinates (u, v, w) to represent position within the triangle
+- At each iteration, checks if the point is in the center hole (all coordinates < 0.5)
+- If in a hole, returns a color based on iteration depth
+- Otherwise, transforms coordinates to the appropriate corner sub-triangle
+- Provides smooth coloring using the maximum barycentric coordinate
+
+**Mathematical Foundation:**
+```
+Initial triangle vertices:
+v0 = (0.0, 0.0)           // Bottom-left
+v1 = (1.0, 0.0)           // Bottom-right
+v2 = (0.5, √3/2)          // Top
+
+Barycentric subdivision rule:
+- If u ≥ 0.5: transform to bottom-left corner
+- If v ≥ 0.5: transform to bottom-right corner
+- If w ≥ 0.5: transform to top corner
+- If all < 0.5: point is in a hole
+```
+
+**Tips:**
+- Beautiful example of triangular self-similarity
+- Zoom in on any edge to see the same triangular pattern repeated
+- Try different palettes to visualize the iteration depths
+- Supports high-precision mode for extremely deep zooms
+- Different coloring than Sierpinski Carpet - uses smooth iteration-based shading
 
 ## Color Techniques
 

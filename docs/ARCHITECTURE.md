@@ -11,13 +11,16 @@ High-level system design and component architecture for Par Fractal, a cross-pla
 - [Uniform Buffer Synchronization](#uniform-buffer-synchronization)
 - [Rendering Modes](#rendering-modes)
 - [Performance Optimizations](#performance-optimizations)
+- [Common Development Tasks](#common-development-tasks)
+- [Web/WASM Support](#webwasm-support)
 - [Related Documentation](#related-documentation)
 
 ## Overview
 
-Par Fractal is built on a modern Rust graphics stack using WebGPU for cross-platform GPU acceleration. The architecture follows a clean separation between:
+Par Fractal is built on a modern Rust graphics stack using WebGPU for cross-platform GPU acceleration. The architecture supports both native desktop (Windows, macOS, Linux) and web (WASM) platforms. The system follows a clean separation between:
 
 - **Application Layer** - Event handling, user input, and state management
+- **Platform Layer** - Cross-platform abstractions for storage, file dialogs, and capture
 - **Rendering Layer** - GPU pipeline management and frame rendering
 - **Computation Layer** - WGSL shaders performing fractal calculations
 - **UI Layer** - EGUI-based interface for parameter control
@@ -26,7 +29,9 @@ Par Fractal is built on a modern Rust graphics stack using WebGPU for cross-plat
 - GPU-first computation for maximum performance
 - Immediate mode UI for responsive parameter adjustments
 - Type-safe uniform buffer management
-- Cross-platform graphics API abstraction
+- Cross-platform graphics API abstraction (WebGPU/WGPU)
+- Platform-agnostic core with trait-based platform implementations
+- Compile-time platform selection via feature flags and conditional compilation
 
 ## System Architecture
 
@@ -63,6 +68,13 @@ graph TD
         FractalUIState[fractal/ui_state.rs<br/>UI State]
         Camera[camera.rs<br/>Camera & Controller]
         LOD[lod.rs<br/>Level of Detail]
+        CommandPalette[command_palette.rs<br/>Quick Commands]
+    end
+
+    subgraph "Platform Abstraction"
+        Platform[platform/mod.rs<br/>Platform Context]
+        PlatformNative[platform/native/*<br/>Native Impl]
+        PlatformWeb[platform/web/*<br/>Web Impl]
     end
 
     subgraph "Rendering Layer"
@@ -103,6 +115,8 @@ graph TD
 
     App --> Camera
     App --> Renderer
+    App --> CommandPalette
+    App --> Platform
     Renderer --> RendererInit
     Renderer --> RendererUniforms
     Renderer --> RendererUpdate
@@ -110,8 +124,12 @@ graph TD
     Renderer --> PostProc
     Renderer --> VideoRec
 
+    Platform --> PlatformNative
+    Platform --> PlatformWeb
+
     UI --> Fractal
     UI --> Camera
+    UI --> CommandPalette
     AppPersist -.->|Load/Save| Fractal
 
     style Main fill:#e65100,stroke:#ff9800,stroke-width:3px,color:#ffffff
@@ -124,6 +142,10 @@ graph TD
     style Camera fill:#4a148c,stroke:#9c27b0,stroke-width:2px,color:#ffffff
     style VideoRec fill:#880e4f,stroke:#c2185b,stroke-width:2px,color:#ffffff
     style LOD fill:#ff6f00,stroke:#ffa726,stroke-width:2px,color:#ffffff
+    style CommandPalette fill:#37474f,stroke:#78909c,stroke-width:2px,color:#ffffff
+    style Platform fill:#ff6f00,stroke:#ffa726,stroke-width:2px,color:#ffffff
+    style PlatformNative fill:#37474f,stroke:#78909c,stroke-width:2px,color:#ffffff
+    style PlatformWeb fill:#37474f,stroke:#78909c,stroke-width:2px,color:#ffffff
 ```
 
 ## Core Components
@@ -177,22 +199,24 @@ graph TD
 - EGUI rendering integration
 - Surface presentation
 
-**`app/capture.rs`** - Screenshot and Video Capture
+**`app/camera_transition.rs`** - Camera Animations
+- Smooth camera transitions between positions
+- Preset camera bookmark animations
+- Interpolated movement
+
+**Note:** The following submodules are only available in native builds (not WASM/web):
+
+**`app/capture.rs`** - Screenshot and Video Capture (Native Only)
 - High-resolution screenshot capture
 - Custom resolution rendering
 - Video recording management
 - File saving and auto-opening
 
-**`app/persistence.rs`** - Settings Persistence
+**`app/persistence.rs`** - Settings Persistence (Native Only)
 - Settings save/load to YAML files
 - Automatic periodic saving
 - Camera position persistence
 - Window size restoration
-
-**`app/camera_transition.rs`** - Camera Animations
-- Smooth camera transitions between positions
-- Preset camera bookmark animations
-- Interpolated movement
 
 **Key State:**
 ```rust
@@ -208,15 +232,34 @@ pub struct App {
     // Performance tracking
     last_frame_time: Instant,
     frame_count: u32,
+    fps_timer: Instant,
     current_fps: f32,
     // Input state
     mouse_pressed: bool,
+    last_mouse_pos: Option<(f32, f32)>,
     cursor_pos: (f32, f32),
+    shift_pressed: bool,
+    // Screenshot and rendering control
+    save_screenshot: bool,
+    save_hires_render: Option<(u32, u32)>,
+    // Settings persistence timing
+    camera_last_moved: Instant,
+    camera_needs_save: bool,
+    settings_last_changed: Instant,
+    settings_need_save: bool,
     // Camera transitions
     camera_transition: CameraTransition,
-    // Video recording
+    smooth_transitions_enabled: bool,
+    was_auto_orbiting: bool,
+    // Animation timing
+    start_time: Instant,
+    // Video recording (native only)
     video_recorder: VideoRecorder,
-    // ... more state
+    // CLI options
+    screenshot_delay: Option<f32>,
+    exit_delay: Option<f32>,
+    screenshot_taken: bool,
+    should_exit: bool,
 }
 ```
 
@@ -242,11 +285,11 @@ pub struct App {
 **Submodules:**
 
 **`fractal/types.rs`** - Fractal Type Definitions
-- `FractalType` enum (24 fractal types)
+- `FractalType` enum (26 fractal types: 13 2D + 13 3D)
 - `RenderMode` enum (TwoD, ThreeD)
 - `ShadingModel` enum (BlinnPhong, PBR)
 - `ColorMode` enum (16 visualization modes)
-- `ChannelSource` enum for per-channel coloring
+- `ChannelSource` enum (8 sources: Iterations, Distance, PositionX/Y/Z, Normal, AO, Constant)
 - `FogMode` enum (Linear, Exponential, Quadratic)
 
 **`fractal/palettes.rs`** - Color Palette System
@@ -282,14 +325,14 @@ pub struct App {
 
 **Supported Fractals:**
 
-**2D Fractals (12 types):**
-- Mandelbrot2D, Julia2D, Sierpinski2D
+**2D Fractals (13 types):**
+- Mandelbrot2D, Julia2D, Sierpinski2D, SierpinskiTriangle2D
 - BurningShip2D, Tricorn2D, Phoenix2D
 - Celtic2D, Newton2D, Lyapunov2D
 - Nova2D, Magnet2D, Collatz2D
 
-**3D Fractals (12 types):**
-- Mandelbulb3D, MengerSponge3D, SierpinskiPyramid3D
+**3D Fractals (13 types):**
+- Mandelbulb3D, MengerSponge3D, SierpinskiPyramid3D, SierpinskiGasket3D
 - JuliaSet3D, Mandelbox3D, TgladFormula3D
 - OctahedralIFS3D, IcosahedralIFS3D
 - ApollonianGasket3D, Kleinian3D
@@ -319,11 +362,11 @@ pub struct App {
 - GPU enumeration and selection
 
 **`renderer/uniforms.rs`** - Uniform Buffer Management
-- `Uniforms` struct (832 bytes, matching WGSL)
+- `Uniforms` struct (832 bytes, matching WGSL exactly)
 - `BloomUniforms`, `BlurUniforms`, `PostProcessUniforms`
-- Conversion from `FractalParams` to GPU format
-- Compile-time size assertions
-- High-precision double-float emulation for deep zoom
+- Conversion from `FractalParams` to GPU format via `update()` method
+- Compile-time size assertions to ensure Rust/WGSL synchronization
+- High-precision double-float emulation for deep zoom (zoom > 1,000,000)
 
 **`renderer/update.rs`** - Pipeline Execution
 - Uniform buffer updates
@@ -369,6 +412,47 @@ pub struct App {
 - Mouse Drag: Look around
 - Mouse Wheel: Adjust speed
 
+### Command Palette
+
+**File:** `command_palette.rs`
+
+**Type:** `CommandPalette`
+
+**Purpose:** Quick command execution and navigation
+
+**Responsibilities:**
+- Command search and filtering
+- Keyboard shortcut execution
+- Preset loading
+- Settings management
+- Quick navigation to features
+
+### Platform Abstraction Layer
+
+**Module:** `platform/`
+
+**Purpose:** Cross-platform support for native and web builds
+
+**Platform Traits:**
+- `Storage` - Save/load settings, presets, palettes
+- `FileDialog` - Open/save file dialogs
+- `Capture` - Screenshot saving
+
+**Platform Implementations:**
+
+**`platform/native/`** - Native Platform (Desktop)
+- `NativeStorage` - Filesystem-based storage using directories
+- `NativeFileDialog` - Native file dialogs using rfd crate
+- `NativeCapture` - Save screenshots to Pictures directory
+
+**`platform/web/`** - Web Platform (WASM)
+- `WebStorage` - Browser localStorage API
+- `WebFileDialog` - Browser download/upload APIs
+- `WebCapture` - Download screenshots via browser
+
+**Platform Context:**
+The `PlatformContext` struct provides a unified interface that automatically selects the correct implementation based on the target platform (native vs WASM).
+
 ### User Interface
 
 **Module:** `ui/`
@@ -381,9 +465,9 @@ pub struct App {
 
 **Submodules:**
 
-**`ui/command.rs`** - Command Palette Integration
-- Quick command execution
+**`ui/command.rs`** - Command Palette UI Integration
 - Command palette UI rendering
+- Keyboard shortcut handling for command palette
 - Integration with `CommandPalette` from `command_palette.rs`
 
 **`ui/history.rs`** - Undo/Redo System
@@ -483,21 +567,21 @@ The `Uniforms` struct in `renderer/uniforms.rs` must exactly match the `Uniforms
 **Current Size:** 832 bytes (52 × 16-byte alignment)
 
 **Key Fields:**
-- Camera matrices (view-projection, inverse view-projection)
+- Camera matrices (view-projection, inverse view-projection for 3D ray generation)
 - Camera position (3D mode)
-- Fractal type and render mode
-- 2D parameters (center, zoom, iterations, high-precision center for deep zoom)
-- 3D parameters (power, ray steps, min distance, fractal-specific parameters)
-- Color palette (5 colors × RGBA)
-- Color modes and channel sources (16 visualization modes)
-- Visual effects (AO, soft shadows, fog, DoF)
-- Material properties (roughness, metallic, albedo) for PBR
-- Lighting (direction, intensity, ambient)
-- Floor rendering (height, colors, reflections)
-- Ray marching (adaptive stepping, max distance)
-- Post-processing (brightness, contrast, saturation, bloom, vignette, FXAA)
-- LOD debug visualization (distance zones)
-- Aspect ratio for correct rendering
+- Fractal type (0-25 for 26 fractal types) and render mode (0=2D, 1=3D)
+- 2D parameters (center, zoom, iterations with auto-scaling, high-precision center for deep zoom)
+- 3D parameters (power, ray steps, min distance, fractal-specific scale/fold/radius parameters)
+- Color palette (5 colors × RGBA with palette_offset for animation)
+- Color modes (16 visualization modes) and channel sources (8 per-channel sources for RGB)
+- Visual effects (AO with intensity/step, soft shadows with samples/softness, fog with mode/density/color, DoF with focal length/aperture/samples)
+- Material properties (roughness, metallic, albedo) for PBR shading
+- Lighting (azimuth/elevation angles, intensity, ambient)
+- Floor rendering (show/height, two colors for checkerboard, reflections with strength)
+- Ray marching (adaptive stepping flag, fixed step size, step multiplier, max distance)
+- Post-processing (brightness, contrast, saturation, hue shift, bloom threshold/intensity/radius, vignette, FXAA)
+- LOD debug visualization (enabled flag, three distance zone thresholds)
+- Aspect ratio for correct rendering (stored in vec4 for 16-byte alignment)
 
 ### Shader Execution
 
@@ -802,9 +886,29 @@ When enabled, LOD zones are visualized in 3D space as colored distance rings aro
    }
    ```
 
-2. **Implement distance estimator or iteration function** in `shaders/fractal.wgsl`
-   - For 2D fractals: Add iteration logic in the 2D fractal switch statement
-   - For 3D fractals: Add distance estimator function and call it from `map()` function
+2. **Add filename_safe_name** in `fractal/types.rs`
+   ```rust
+   impl FractalType {
+       pub fn filename_safe_name(&self) -> &'static str {
+           match self {
+               // ... existing mappings ...
+               FractalType::MyNewFractal2D => "my_new_fractal",
+           }
+       }
+   }
+   ```
+
+3. **Update fractal type mapping** in `renderer/uniforms.rs`
+   ```rust
+   self.fractal_type = match params.fractal_type {
+       // ... existing mappings (0-25) ...
+       crate::fractal::FractalType::MyNewFractal2D => 26,  // Next available index
+   };
+   ```
+
+4. **Implement shader logic** in `shaders/fractal.wgsl`
+   - For 2D fractals: Add case to 2D fractal switch statement in fragment shader
+   - For 3D fractals: Add distance estimator function and call from `map()` function
    ```wgsl
    fn de_my_fractal(p: vec3<f32>) -> f32 {
        // Distance estimator implementation
@@ -812,21 +916,10 @@ When enabled, LOD zones are visualized in 3D space as colored distance rings aro
    }
    ```
 
-3. **Update fractal type mapping** in `renderer/uniforms.rs`
-   ```rust
-   self.fractal_type = match params.fractal_type {
-       // ... existing mappings ...
-       crate::fractal::FractalType::MyNewFractal2D => 24,
-   };
-   ```
-
-4. **Add shader implementation** in `shaders/fractal.wgsl`
-   - Add case to fractal type switch statement
-   - Implement fractal-specific algorithm
-
 5. **Add UI controls** (optional) in `ui/mod.rs`
    - Add fractal-specific parameter controls if needed
-   - Update `FractalParams` if new parameters are required
+   - Update `FractalParams` in `fractal/mod.rs` if new parameters are required
+   - Ensure settings serialization in `fractal/settings.rs` if adding parameters
 
 6. **Create preset** in `fractal/presets.rs`
    - Add built-in preset showcasing the new fractal
@@ -835,12 +928,13 @@ When enabled, LOD zones are visualized in 3D space as colored distance rings aro
 7. **Test rendering**
    - Build and run: `make r`
    - Test parameter adjustments via UI
+   - Test on both native and web builds if applicable
    - Capture screenshots for documentation
-   - Run tests: `make checkall`
+   - Run all checks: `make checkall`
 
 8. **Update documentation**
    - Add to FRACTALS2D.md or FRACTALS3D.md
-   - Include description, parameters, and example images
+   - Include description, mathematical formula, parameters, and example images
 
 ### Modifying Uniforms
 
@@ -850,8 +944,9 @@ When enabled, LOD zones are visualized in 3D space as colored distance rings aro
    - Update `Uniforms::update()` to populate from `FractalParams`
 
 2. **Update WGSL struct** in `shaders/fractal.wgsl`
-   - Add matching field to `Uniforms` struct
-   - Ensure exact type and alignment match
+   - Add matching field to `Uniforms` struct at the beginning of the shader file
+   - Ensure exact type and alignment match (WGSL has strict alignment rules)
+   - Account for WGSL's implicit padding around vec3 fields (aligned to 16-byte boundaries)
 
 3. **Add to FractalParams** in `fractal/mod.rs` (if user-configurable)
    - Add field to `FractalParams` struct
@@ -926,6 +1021,57 @@ When enabled, LOD zones are visualized in 3D space as colored distance rings aro
 3. Add explicit padding fields in Rust
 4. Account for WGSL implicit vec3 padding
 5. Verify both structs have identical byte size (832 bytes)
+
+## Web/WASM Support
+
+Par Fractal supports compilation to WebAssembly (WASM) for running in web browsers.
+
+### Build Configuration
+
+**Feature Flags:**
+- `native` - Native desktop build (default)
+- `web` - Web/WASM build
+
+**Platform Detection:**
+Code uses `#[cfg(target_arch = "wasm32")]` and `#[cfg(not(target_arch = "wasm32"))]` to conditionally compile platform-specific code.
+
+### Platform Differences
+
+**Native Build:**
+- Full GPU selection and preferences
+- File system access for settings/presets
+- Native file dialogs (save/load)
+- Video recording support
+- Auto-open screenshots/videos
+
+**Web Build:**
+- Browser-managed GPU selection
+- localStorage for settings/presets
+- Browser download/upload for files
+- No video recording (stub implementation)
+- Screenshots downloaded via browser
+
+### Entry Points
+
+**Native:** `main.rs`
+- Creates window with winit
+- Runs event loop
+- Full CLI argument support
+
+**Web:** `web_main.rs`
+- WASM entry point
+- Canvas-based rendering
+- Limited to URL parameters for configuration
+
+### Platform Abstraction
+
+The `platform/` module provides trait-based abstractions that allow the same core rendering and UI code to work on both platforms:
+
+- `Storage` trait - File system (native) vs localStorage (web)
+- `FileDialog` trait - Native dialogs vs browser download/upload
+- `Capture` trait - File saving vs browser downloads
+
+This abstraction ensures maximum code reuse while supporting platform-specific capabilities.
 
 ## Related Documentation
 

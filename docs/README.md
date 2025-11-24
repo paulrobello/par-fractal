@@ -84,7 +84,7 @@ cargo run --release
 2. Use mouse wheel to zoom in
 3. Drag to pan around
 4. Press `P` to change colors
-5. Press `F9` to take a screenshot
+5. Press `F12` to take a screenshot
 
 ## User Guides
 
@@ -243,20 +243,20 @@ Par Fractal includes 21 professionally-designed color palettes optimized for fra
 
 ### Fractal Type Reference
 
-**2D Fractals (12 types):**
-- Mandelbrot2D, Julia2D, Sierpinski2D
+**2D Fractals (13 types):**
+- Mandelbrot2D, Julia2D, Sierpinski2D, SierpinskiTriangle2D
 - BurningShip2D, Tricorn2D, Phoenix2D
 - Celtic2D, Newton2D, Lyapunov2D
 - Nova2D, Magnet2D, Collatz2D
 
-**3D Fractals (12 types):**
-- Mandelbulb3D, MengerSponge3D, SierpinskiPyramid3D
+**3D Fractals (13 types):**
+- Mandelbulb3D, MengerSponge3D, SierpinskiPyramid3D, SierpinskiGasket3D
 - JuliaSet3D, Mandelbox3D, TgladFormula3D
 - OctahedralIFS3D, IcosahedralIFS3D
 - ApollonianGasket3D, Kleinian3D
 - HybridMandelbulbJulia3D, QuaternionCubic3D
 
-**Total:** 24 fractal types
+**Total:** 26 fractal types
 
 ### Command-Line Interface
 
@@ -374,8 +374,8 @@ par-fractal --preset "Ocean Julia" --screenshot-delay 5 --exit-delay 6
 ### Version Information
 
 **Documentation Version:** 1.0.0
-**Project Version:** 0.1.0
-**Last Updated:** 2025-11-23
+**Project Version:** 0.2.0
+**Last Updated:** 2025-11-24
 
 ### Contributing to Documentation
 

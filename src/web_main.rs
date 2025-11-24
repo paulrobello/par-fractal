@@ -73,8 +73,16 @@ pub async fn main_web() {
     };
 
     // Set canvas size to match window
-    let width = window.inner_width().ok().and_then(|v| v.as_f64()).unwrap_or(800.0) as u32;
-    let height = window.inner_height().ok().and_then(|v| v.as_f64()).unwrap_or(600.0) as u32;
+    let width = window
+        .inner_width()
+        .ok()
+        .and_then(|v| v.as_f64())
+        .unwrap_or(800.0) as u32;
+    let height = window
+        .inner_height()
+        .ok()
+        .and_then(|v| v.as_f64())
+        .unwrap_or(600.0) as u32;
     canvas.set_width(width);
     canvas.set_height(height);
 
@@ -138,7 +146,10 @@ pub async fn main_web() {
                             app.update();
                             match app.render() {
                                 Ok(_) => {}
-                                Err(wgpu::SurfaceError::Lost) => app.resize(app.size()),
+                                Err(wgpu::SurfaceError::Lost) => {
+                                    let size = app.size();
+                                    app.resize(size);
+                                }
                                 Err(wgpu::SurfaceError::OutOfMemory) => target.exit(),
                                 Err(e) => log::error!("Render error: {:?}", e),
                             }

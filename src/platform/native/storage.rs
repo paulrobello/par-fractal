@@ -24,7 +24,8 @@ impl NativeStorage {
     }
 
     fn get_file_path(&self, category: &str, key: &str) -> PathBuf {
-        self.get_category_dir(category).join(format!("{}.yaml", key))
+        self.get_category_dir(category)
+            .join(format!("{}.yaml", key))
     }
 
     fn ensure_category_dir(&self, category: &str) -> Result<(), PlatformError> {

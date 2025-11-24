@@ -20,6 +20,31 @@ use glam::Vec3;
 
 use history::HistoryEntry;
 
+// Video format - use actual type on native, stub on web
+#[cfg(not(target_arch = "wasm32"))]
+use crate::video_recorder::VideoFormat;
+
+/// Stub video format for web builds
+#[cfg(target_arch = "wasm32")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum VideoFormat {
+    #[default]
+    MP4,
+    WebM,
+    GIF,
+}
+
+#[cfg(target_arch = "wasm32")]
+impl VideoFormat {
+    pub fn extension(&self) -> &'static str {
+        match self {
+            VideoFormat::MP4 => "mp4",
+            VideoFormat::WebM => "webm",
+            VideoFormat::GIF => "gif",
+        }
+    }
+}
+
 pub struct UI {
     pub show_ui: bool,
     pub show_fps: bool,
@@ -69,7 +94,7 @@ pub struct UI {
     pub selected_gpu_index: Option<usize>,
     pub gpu_selection_message: Option<String>,
     // Video recording
-    pub video_format: crate::video_recorder::VideoFormat,
+    pub video_format: VideoFormat,
     pub video_fps: u32,
     // Monitor/wallpaper support
     pub available_monitors: Vec<MonitorInfo>,
@@ -130,7 +155,7 @@ impl UI {
             available_gpus: Vec::new(),
             selected_gpu_index: None,
             gpu_selection_message: None,
-            video_format: crate::video_recorder::VideoFormat::MP4,
+            video_format: VideoFormat::MP4,
             video_fps: 60,
             available_monitors: Vec::new(),
             toasts: Vec::new(),
@@ -2588,41 +2613,31 @@ impl UI {
                         ui.label("Format:");
                         ui.add_enabled(
                             !is_recording,
-                            egui::RadioButton::new(
-                                self.video_format == crate::video_recorder::VideoFormat::MP4,
-                                "MP4",
-                            ),
+                            egui::RadioButton::new(self.video_format == VideoFormat::MP4, "MP4"),
                         )
                         .clicked()
-                        .then(|| self.video_format = crate::video_recorder::VideoFormat::MP4);
+                        .then(|| self.video_format = VideoFormat::MP4);
                         ui.add_enabled(
                             !is_recording,
-                            egui::RadioButton::new(
-                                self.video_format == crate::video_recorder::VideoFormat::WebM,
-                                "WebM",
-                            ),
+                            egui::RadioButton::new(self.video_format == VideoFormat::WebM, "WebM"),
                         )
                         .clicked()
-                        .then(|| self.video_format = crate::video_recorder::VideoFormat::WebM);
+                        .then(|| self.video_format = VideoFormat::WebM);
                         ui.add_enabled(
                             !is_recording,
-                            egui::RadioButton::new(
-                                self.video_format == crate::video_recorder::VideoFormat::GIF,
-                                "GIF",
-                            ),
+                            egui::RadioButton::new(self.video_format == VideoFormat::GIF, "GIF"),
                         )
                         .clicked()
-                        .then(|| self.video_format = crate::video_recorder::VideoFormat::GIF);
+                        .then(|| self.video_format = VideoFormat::GIF);
                     });
 
                     ui.horizontal(|ui| {
                         ui.label("FPS:");
-                        let fps_range =
-                            if self.video_format == crate::video_recorder::VideoFormat::GIF {
-                                10..=30 // GIFs typically use lower FPS
-                            } else {
-                                24..=60
-                            };
+                        let fps_range = if self.video_format == VideoFormat::GIF {
+                            10..=30 // GIFs typically use lower FPS
+                        } else {
+                            24..=60
+                        };
                         ui.add_enabled(
                             !is_recording,
                             egui::Slider::new(&mut self.video_fps, fps_range).text("fps"),
@@ -2630,13 +2645,9 @@ impl UI {
                     });
 
                     // Clamp FPS when switching to GIF
-                    if self.video_format == crate::video_recorder::VideoFormat::GIF
-                        && self.video_fps > 30
-                    {
+                    if self.video_format == VideoFormat::GIF && self.video_fps > 30 {
                         self.video_fps = 30;
-                    } else if self.video_format != crate::video_recorder::VideoFormat::GIF
-                        && self.video_fps < 24
-                    {
+                    } else if self.video_format != VideoFormat::GIF && self.video_fps < 24 {
                         self.video_fps = 24;
                     }
 
@@ -2661,7 +2672,7 @@ impl UI {
                     ui.label("Output: {fractal}_YYYYMMDD_HHMMSS.{mp4,webm,gif}")
                         .on_hover_text("Saved to current directory. {fractal} = fractal type name");
 
-                    if self.video_format == crate::video_recorder::VideoFormat::GIF {
+                    if self.video_format == VideoFormat::GIF {
                         ui.label("ℹ GIF: Optimized palette, looped, great for social media")
                             .on_hover_text(
                                 "GIFs use palette-based encoding with dithering for best quality",

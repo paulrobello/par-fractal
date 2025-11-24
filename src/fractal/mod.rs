@@ -405,6 +405,7 @@ impl FractalParams {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn save_to_file(&self) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(config_dir) = directories::ProjectDirs::from("com", "fractal", "par-fractal") {
             let config_path = config_dir.config_dir();
@@ -422,6 +423,13 @@ impl FractalParams {
         }
     }
 
+    #[cfg(target_arch = "wasm32")]
+    pub fn save_to_file(&self) -> Result<(), Box<dyn std::error::Error>> {
+        // Settings persistence not yet implemented for web
+        Ok(())
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn load_from_file() -> Option<Self> {
         if let Some(config_dir) = directories::ProjectDirs::from("com", "fractal", "par-fractal") {
             let settings_file = config_dir.config_dir().join("settings.yaml");
@@ -433,6 +441,12 @@ impl FractalParams {
                 }
             }
         }
+        None
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn load_from_file() -> Option<Self> {
+        // Settings persistence not yet implemented for web
         None
     }
 

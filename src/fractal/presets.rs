@@ -73,6 +73,7 @@ pub struct AppPreferences {
 }
 
 impl AppPreferences {
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn load() -> Self {
         if let Some(config_dir) = directories::ProjectDirs::from("com", "fractal", "par-fractal") {
             let prefs_file = config_dir.config_dir().join("preferences.yaml");
@@ -82,6 +83,11 @@ impl AppPreferences {
                 }
             }
         }
+        Self::default()
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn load() -> Self {
         Self::default()
     }
 
@@ -99,6 +105,7 @@ impl AppPreferences {
         self.window_height = Some(height);
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn save(&self) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(config_dir) = directories::ProjectDirs::from("com", "fractal", "par-fractal") {
             let config_path = config_dir.config_dir();
@@ -111,12 +118,32 @@ impl AppPreferences {
             Err("Could not determine config directory".into())
         }
     }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn save(&self) -> Result<(), Box<dyn std::error::Error>> {
+        // Preferences saving not supported on web yet
+        Ok(())
+    }
 }
 
 impl CameraBookmark {
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn new(name: String, position: Vec3, target: Vec3, fov: f32) -> Self {
         use chrono::Local;
         let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+        Self {
+            name,
+            position: position.to_array(),
+            target: target.to_array(),
+            fov,
+            timestamp,
+        }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn new(name: String, position: Vec3, target: Vec3, fov: f32) -> Self {
+        // Web: use a simple timestamp placeholder
+        let timestamp = "web".to_string();
         Self {
             name,
             position: position.to_array(),
@@ -138,6 +165,7 @@ impl CameraBookmark {
 // Gallery of camera bookmarks
 pub struct BookmarkGallery;
 
+#[cfg(not(target_arch = "wasm32"))]
 impl BookmarkGallery {
     pub fn save_bookmark(
         bookmark: &CameraBookmark,
@@ -209,6 +237,28 @@ impl BookmarkGallery {
         } else {
             Ok(Vec::new())
         }
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+impl BookmarkGallery {
+    pub fn save_bookmark(
+        _bookmark: &CameraBookmark,
+        _filename: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        Err("Bookmark saving not yet supported on web".into())
+    }
+
+    pub fn load_bookmark(_filename: &str) -> Result<CameraBookmark, Box<dyn std::error::Error>> {
+        Err("Bookmark loading not yet supported on web".into())
+    }
+
+    pub fn delete_bookmark(_filename: &str) -> Result<(), Box<dyn std::error::Error>> {
+        Err("Bookmark deletion not yet supported on web".into())
+    }
+
+    pub fn list_bookmarks() -> Result<Vec<String>, Box<dyn std::error::Error>> {
+        Ok(Vec::new())
     }
 }
 
@@ -637,6 +687,16 @@ impl PresetGallery {
         ]
     }
 
+    /// Get a builtin preset by name (for web use)
+    #[allow(dead_code)]
+    pub fn get_builtin_preset(name: &str) -> Option<&'static Preset> {
+        // Use a static to avoid repeated allocation
+        static PRESETS: std::sync::OnceLock<Vec<Preset>> = std::sync::OnceLock::new();
+        let presets = PRESETS.get_or_init(Self::get_builtin_presets);
+        presets.iter().find(|p| p.name == name)
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn save_preset(preset: &Preset, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(config_dir) = directories::ProjectDirs::from("com", "fractal", "par-fractal") {
             let presets_dir = config_dir.config_dir().join("presets");
@@ -653,6 +713,7 @@ impl PresetGallery {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn load_preset(filename: &str) -> Result<Preset, Box<dyn std::error::Error>> {
         if let Some(config_dir) = directories::ProjectDirs::from("com", "fractal", "par-fractal") {
             let preset_file = config_dir
@@ -668,6 +729,7 @@ impl PresetGallery {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn list_user_presets() -> Result<Vec<String>, Box<dyn std::error::Error>> {
         if let Some(config_dir) = directories::ProjectDirs::from("com", "fractal", "par-fractal") {
             let presets_dir = config_dir.config_dir().join("presets");
@@ -692,6 +754,7 @@ impl PresetGallery {
     }
 
     /// Export current settings to a JSON file (user chooses location)
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn export_to_json(
         settings: &Settings,
         camera_position: [f32; 3],
@@ -724,6 +787,7 @@ impl PresetGallery {
     }
 
     /// Import settings from a JSON file (user chooses file)
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn import_from_json() -> Result<Preset, Box<dyn std::error::Error>> {
         let file_dialog = rfd::FileDialog::new()
             .add_filter("JSON", &["json"])
@@ -737,5 +801,38 @@ impl PresetGallery {
         } else {
             Err("Import cancelled by user".into())
         }
+    }
+
+    // Web stubs
+    #[cfg(target_arch = "wasm32")]
+    pub fn save_preset(
+        _preset: &Preset,
+        _filename: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        Err("Preset saving not yet supported on web".into())
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn load_preset(_filename: &str) -> Result<Preset, Box<dyn std::error::Error>> {
+        Err("User preset loading not yet supported on web".into())
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn list_user_presets() -> Result<Vec<String>, Box<dyn std::error::Error>> {
+        Ok(Vec::new())
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn export_to_json(
+        _settings: &Settings,
+        _camera_position: [f32; 3],
+        _camera_target: [f32; 3],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        Err("Export not yet supported on web".into())
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn import_from_json() -> Result<Preset, Box<dyn std::error::Error>> {
+        Err("Import not yet supported on web".into())
     }
 }

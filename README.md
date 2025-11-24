@@ -2,7 +2,7 @@
 
 [![Crates.io](https://img.shields.io/crates/v/par-fractal)](https://crates.io/crates/par-fractal)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Runs on Linux | MacOS | Windows](https://img.shields.io/badge/runs%20on-Linux%20%7C%20MacOS%20%7C%20Windows-blue)
+![Runs on Linux | MacOS | Windows | Web](https://img.shields.io/badge/runs%20on-Linux%20%7C%20MacOS%20%7C%20Windows%20%7C%20Web-blue)
 ![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)
 
 A high-performance, cross-platform GPU-accelerated fractal renderer built with Rust and WebGPU. Features stunning 2D and immersive 3D fractal visualization with advanced rendering techniques.
@@ -21,19 +21,24 @@ cd par-fractal
 make r
 
 # Or download pre-built binaries from releases
+
+# Or try it in your browser (WebGPU required)
 ```
+
+**[Try Par Fractal in your browser](https://par-fractal.pardev.net)** - No installation required!
 
 See the [Quick Start Guide](docs/QUICKSTART.md) for detailed instructions.
 
 ## Features
 
 - **GPU-Accelerated** - Efficient WebGPU rendering for 2D and 3D fractals
-- **Multiple Fractal Types** - Mandelbrot, Julia, Mandelbulb, Menger Sponge, and more
+- **26 Fractal Types** - 13 2D and 13 3D fractals including Mandelbrot, Julia, Mandelbulb, Menger Sponge, and more
 - **Advanced Rendering** - PBR shading, ambient occlusion, soft shadows, depth of field
 - **Real-time Interaction** - Smooth pan/zoom, camera controls, parameter adjustment
 - **High-Quality Output** - PNG screenshots, video recording, custom resolutions
 - **Productivity Tools** - Command palette, presets, bookmarks, undo/redo
 - **Custom Palettes** - 6 built-in palettes plus custom color scheme support
+- **Web Browser Support** - Run directly in browser via WebGPU/WASM
 - **Performance Tuning** - LOD system, quality profiles, GPU selection
 
 See [Features](docs/FEATURES.md) for complete feature documentation.
@@ -74,6 +79,27 @@ See [Features](docs/FEATURES.md) for complete feature documentation.
 </td>
 </tr>
 </table>
+
+## Supported Fractals
+
+### 2D Fractals (13)
+Mandelbrot, Julia, Sierpinski Carpet, Sierpinski Triangle, Burning Ship, Tricorn, Phoenix, Celtic, Newton, Lyapunov, Nova, Magnet, Collatz
+
+### 3D Fractals (13)
+Mandelbulb, Menger Sponge, Sierpinski Pyramid, Julia Set 3D, Mandelbox, Tglad Formula, Octahedral IFS, Icosahedral IFS, Apollonian Gasket, Kleinian, Hybrid Mandelbulb-Julia, Quaternion Cubic, Sierpinski Gasket
+
+## Command Palette
+
+Press **Ctrl/Cmd+P** to open the command palette for quick access to all features:
+
+- **Fractal Selection** - Switch between all 26 fractal types
+- **Effects** - Toggle AO, shadows, DoF, fog, bloom, FXAA
+- **Color Modes** - Palette, normals, orbit traps, debug visualization
+- **LOD Profiles** - Balanced, Quality First, Performance First
+- **Recording** - Screenshots, MP4/WebM/GIF video recording
+- **Settings** - Save/load presets, import/export configurations
+
+Features fuzzy search matching - type partial names to filter commands.
 
 ## Documentation
 
@@ -170,9 +196,16 @@ See [Controls Reference](docs/CONTROLS.md) for complete keyboard and mouse docum
 
 ## Platform Support
 
+### Desktop
 - **Windows** - DirectX 12 / Vulkan
 - **macOS** - Metal
 - **Linux** - Vulkan
+
+### Web (WebGPU)
+- **Chrome** 113+
+- **Edge** 113+
+- **Firefox** 141+
+- **Safari** 26+
 
 Cross-platform compatibility through WebGPU (wgpu-rs).
 
@@ -185,6 +218,26 @@ Cross-platform compatibility through WebGPU (wgpu-rs).
 - **glam** - Mathematics library
 - **bytemuck** - Safe GPU data casting
 - **image** - Screenshot encoding
+- **Trunk** - Web/WASM build tool
+
+## Web Build
+
+Build and run Par Fractal in a web browser using WebGPU:
+
+```bash
+# Install Trunk (WASM build tool)
+cargo install trunk
+
+# Build for web (release)
+trunk build --release
+
+# Development server with hot reload
+trunk serve
+```
+
+The web version is automatically deployed to [par-fractal.pardev.net](https://par-fractal.pardev.net) on releases.
+
+**Note:** The web version has most features of the desktop app except video recording and file system access (presets/bookmarks use browser localStorage).
 
 ## Contributing
 

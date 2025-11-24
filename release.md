@@ -2,20 +2,30 @@
 
 I'm excited to share **Par Fractal**, a high-performance, GPU-accelerated fractal renderer I've been working on. It's built with Rust and WebGPU to deliver smooth, real-time exploration of both 2D and 3D fractals.
 
+## What's New in v0.2.0
+
+**Web/WASM Support** - Try Par Fractal directly in your browser at [par-fractal.pardev.net](https://par-fractal.pardev.net). No installation required!
+
+**New Fractals** - Added Sierpinski Triangle (2D) and Sierpinski Gasket (3D) for a total of 26 fractal types.
+
+**Enhanced Command Palette** - Organized commands into categories with fuzzy search, keyboard shortcuts display, and 10+ new commands for LOD profiles, color modes, effects, and recording.
+
 ## What Makes It Special?
 
-**24 Fractal Types** spanning both 2D escape-time and 3D ray-marched fractals:
+**26 Fractal Types** spanning both 2D escape-time and 3D ray-marched fractals:
 
-**2D Fractals:**
+**2D Fractals (13 types):**
 - Classic fractals: Mandelbrot, Julia, Burning Ship, Tricorn
 - Advanced types: Phoenix, Celtic, Newton, Nova
-- Experimental: Lyapunov, Magnet, Collatz, Sierpinski
+- Experimental: Lyapunov, Magnet, Collatz
+- Sierpinski: Carpet and Triangle
 
-**3D Fractals:**
+**3D Fractals (13 types):**
 - Mandelbulb with configurable power
 - Menger Sponge, Mandelbox, Julia Set 3D
 - Advanced structures: Tglad Formula, Octahedral/Icosahedral IFS
 - Exotic types: Apollonian Gasket, Kleinian, Hybrid Mandelbulb-Julia
+- Sierpinski: Pyramid and Gasket
 
 ## Key Features
 
@@ -46,6 +56,8 @@ Built with Rust and leveraging modern GPU APIs (Metal on macOS, Vulkan on Linux,
 
 ## Try It Yourself
 
+**Try in Browser:** [par-fractal.pardev.net](https://par-fractal.pardev.net) - No installation required!
+
 The project is open source and available on GitHub: [github.com/paulrobello/par-fractal](https://github.com/paulrobello/par-fractal)
 
 **Installation:**
@@ -65,10 +77,10 @@ cargo run --release
 ## What's Next?
 
 I'm actively developing Par Fractal and would love to hear feedback from the community! Future plans include:
-- Additional fractal types
 - Animation timeline system
 - Shader hot-reloading for experimentation
 - More post-processing effects
+- Additional fractal types and coloring modes
 
 ## Feedback Welcome
 

@@ -1,5 +1,7 @@
 use super::App;
 use crate::fractal::FractalParams;
+
+#[cfg(not(target_arch = "wasm32"))]
 use crate::video_recorder::VideoRecorder;
 
 /// Render methods
@@ -221,7 +223,10 @@ impl App {
 
         // If screenshot requested or recording, capture fractal before UI is rendered
         let should_screenshot = self.save_screenshot;
+        #[cfg(not(target_arch = "wasm32"))]
         let is_recording = self.video_recorder.is_recording();
+        #[cfg(target_arch = "wasm32")]
+        let is_recording = false;
 
         if should_screenshot || is_recording {
             // Submit the fractal rendering first
@@ -231,10 +236,14 @@ impl App {
 
             if should_screenshot {
                 // Capture the screenshot (fractal only)
+                #[cfg(not(target_arch = "wasm32"))]
                 self.capture_screenshot(&output.texture);
+                #[cfg(target_arch = "wasm32")]
+                log::warn!("Screenshot capture not yet fully implemented on web");
                 self.save_screenshot = false;
             }
 
+            #[cfg(not(target_arch = "wasm32"))]
             if is_recording {
                 // Capture video frame (fractal only)
                 self.capture_video_frame(&output.texture);
@@ -293,13 +302,21 @@ impl App {
                 // Scan monitors (always do this when the button is clicked)
                 self.ui.scan_monitors(&self.window);
 
-                // Also scan GPUs for backward compatibility
-                // Spawn async task to enumerate GPUs
-                // Note: We can't easily do async here, so we'll use pollster to block
-                let gpus = pollster::block_on(crate::renderer::Renderer::enumerate_gpus());
-                self.ui.available_gpus = gpus;
-                self.ui.gpu_selection_message =
-                    Some(format!("Found {} GPU(s)", self.ui.available_gpus.len()));
+                // Also scan GPUs for backward compatibility (native only)
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    // Spawn async task to enumerate GPUs
+                    // Note: We can't easily do async here, so we'll use pollster to block
+                    let gpus = pollster::block_on(crate::renderer::Renderer::enumerate_gpus());
+                    self.ui.available_gpus = gpus;
+                    self.ui.gpu_selection_message =
+                        Some(format!("Found {} GPU(s)", self.ui.available_gpus.len()));
+                }
+                #[cfg(target_arch = "wasm32")]
+                {
+                    self.ui.gpu_selection_message =
+                        Some("GPU selection not available on web".to_string());
+                }
             }
 
             // Handle preset loading
@@ -388,58 +405,64 @@ impl App {
                 );
             }
 
-            // Handle video recording
-            if start_recording {
-                // Generate filename with fractal type and timestamp
-                let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
-                let fractal_name = self.fractal_params.fractal_type.filename_safe_name();
-                let filename = format!(
-                    "{}_{}.{}",
-                    fractal_name,
-                    timestamp,
-                    self.ui.video_format.extension()
-                );
+            // Handle video recording (native only)
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                if start_recording {
+                    // Generate filename with fractal type and timestamp
+                    let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+                    let fractal_name = self.fractal_params.fractal_type.filename_safe_name();
+                    let filename = format!(
+                        "{}_{}.{}",
+                        fractal_name,
+                        timestamp,
+                        self.ui.video_format.extension()
+                    );
 
-                // Update video recorder settings
-                self.video_recorder = VideoRecorder::new(
-                    self.renderer.config.width,
-                    self.renderer.config.height,
-                    self.ui.video_fps,
-                    self.ui.video_format,
-                );
+                    // Update video recorder settings
+                    self.video_recorder = VideoRecorder::new(
+                        self.renderer.config.width,
+                        self.renderer.config.height,
+                        self.ui.video_fps,
+                        self.ui.video_format,
+                    );
 
-                if let Err(e) = self.video_recorder.start_recording(filename.clone()) {
-                    eprintln!("Failed to start recording: {}", e);
-                } else {
-                    println!("Started recording to {}", filename);
+                    if let Err(e) = self.video_recorder.start_recording(filename.clone()) {
+                        eprintln!("Failed to start recording: {}", e);
+                    } else {
+                        println!("Started recording to {}", filename);
+                    }
                 }
-            }
 
-            if stop_recording {
-                match self.video_recorder.stop_recording() {
-                    Ok(filename) => {
-                        // Convert to absolute path and show in toast
-                        let abs_path = std::path::Path::new(&filename)
-                            .canonicalize()
-                            .unwrap_or_else(|_| std::path::PathBuf::from(&filename));
+                if stop_recording {
+                    match self.video_recorder.stop_recording() {
+                        Ok(filename) => {
+                            // Convert to absolute path and show in toast
+                            let abs_path = std::path::Path::new(&filename)
+                                .canonicalize()
+                                .unwrap_or_else(|_| std::path::PathBuf::from(&filename));
 
-                        // Auto-open if enabled
-                        if self.ui.auto_open_captures {
-                            if let Err(e) = open::that(&abs_path) {
-                                eprintln!("Failed to open video: {}", e);
+                            // Auto-open if enabled
+                            if self.ui.auto_open_captures {
+                                if let Err(e) = open::that(&abs_path) {
+                                    eprintln!("Failed to open video: {}", e);
+                                }
                             }
-                        }
 
-                        self.ui.show_toast_with_file(
-                            format!("🎬 Video saved: {} - Click to open", filename),
-                            abs_path.to_string_lossy().to_string(),
-                        );
-                    }
-                    Err(e) => {
-                        eprintln!("Failed to stop recording: {}", e);
+                            self.ui.show_toast_with_file(
+                                format!("🎬 Video saved: {} - Click to open", filename),
+                                abs_path.to_string_lossy().to_string(),
+                            );
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to stop recording: {}", e);
+                        }
                     }
                 }
             }
+            // Suppress unused warnings on web
+            #[cfg(target_arch = "wasm32")]
+            let _ = (start_recording, stop_recording);
 
             // Mark settings for auto-save (debounced)
             if changed {
@@ -460,12 +483,15 @@ impl App {
                 &self.fractal_params.lod_config.distance_zones,
             );
             self.ui.render_performance_overlay(ctx, self.current_fps);
+            #[cfg(not(target_arch = "wasm32"))]
             self.ui.render_recording_indicator(
                 ctx,
                 self.video_recorder.is_recording(),
                 self.video_recorder.frame_count(),
                 self.video_recorder.filename(),
             );
+            #[cfg(target_arch = "wasm32")]
+            self.ui.render_recording_indicator(ctx, false, 0, "");
             self.ui.render_lod_debug_overlay(ctx, &self.fractal_params);
         });
 

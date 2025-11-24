@@ -1,11 +1,14 @@
 [build]
 target = "index.html"
 dist = "dist"
+# Disable default features (native) and enable web feature
+default-features = false
+features = ["web"]
 
 [watch]
 watch = ["src", "index.html", "Cargo.toml"]
 
 [serve]
-address = "127.0.0.1"
+addresses = ["127.0.0.1"]
 port = 8080
 open = true

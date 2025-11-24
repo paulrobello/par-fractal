@@ -456,6 +456,7 @@ impl CustomPalette {
 // Gallery for managing custom palettes
 pub struct CustomPaletteGallery;
 
+#[cfg(not(target_arch = "wasm32"))]
 impl CustomPaletteGallery {
     pub fn save_palette(
         palette: &CustomPalette,
@@ -527,5 +528,28 @@ impl CustomPaletteGallery {
         } else {
             Ok(Vec::new())
         }
+    }
+}
+
+// Web stub - returns not supported errors
+#[cfg(target_arch = "wasm32")]
+impl CustomPaletteGallery {
+    pub fn save_palette(
+        _palette: &CustomPalette,
+        _filename: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        Err("Custom palette saving not yet supported on web".into())
+    }
+
+    pub fn load_palette(_filename: &str) -> Result<CustomPalette, Box<dyn std::error::Error>> {
+        Err("Custom palette loading not yet supported on web".into())
+    }
+
+    pub fn delete_palette(_filename: &str) -> Result<(), Box<dyn std::error::Error>> {
+        Err("Custom palette deletion not yet supported on web".into())
+    }
+
+    pub fn list_palettes() -> Result<Vec<String>, Box<dyn std::error::Error>> {
+        Ok(Vec::new())
     }
 }

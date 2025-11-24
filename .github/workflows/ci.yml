@@ -75,3 +75,38 @@ jobs:
 
     - name: Run clippy
       run: cargo clippy --all-targets --all-features -- -D warnings
+
+  web-build:
+    name: Web/WASM Build Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: wasm32-unknown-unknown
+
+    - name: Cache cargo
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-web-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-web-
+
+    - name: Install trunk
+      run: |
+        if ! command -v trunk &> /dev/null; then
+          cargo install trunk
+        fi
+
+    - name: Build WASM
+      run: trunk build --release

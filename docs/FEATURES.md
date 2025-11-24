@@ -12,12 +12,14 @@ Complete feature documentation for Par Fractal's rendering capabilities, effects
 
 ## Fractal Types
 
-### 2D Fractals (12 types)
+### 2D Fractals (14 types)
 
-Par Fractal supports 12 different 2D escape-time fractals:
+Par Fractal supports 14 different 2D escape-time fractals:
 
 - **Mandelbrot2D** - The classic fractal with infinite detail at all zoom levels
 - **Julia2D** - Symmetric variations with customizable complex constant parameters
+- **Sierpinski2D** - Triangle-based recursive pattern
+- **SierpinskiTriangle2D** - Alternative Sierpinski triangle visualization
 - **BurningShip2D** - Dramatic ship-like patterns with sharp edges
 - **Tricorn2D** - Conjugate Mandelbrot with unique symmetry
 - **Phoenix2D** - Multi-parameter fractal with flowing patterns
@@ -27,11 +29,10 @@ Par Fractal supports 12 different 2D escape-time fractals:
 - **Nova2D** - Newton-Raphson hybrid fractal
 - **Magnet2D** - Magnetic field-inspired patterns
 - **Collatz2D** - Collatz conjecture visualization
-- **Sierpinski2D** - Triangle-based recursive pattern
 
-### 3D Fractals (12 types)
+### 3D Fractals (13 types)
 
-Par Fractal supports 12 different 3D ray-marched fractals:
+Par Fractal supports 13 different 3D ray-marched fractals:
 
 - **Mandelbulb3D** - 3D extension of Mandelbrot set with configurable power (typically 8)
 - **MengerSponge3D** - Recursive cube structure with self-similarity
@@ -45,6 +46,7 @@ Par Fractal supports 12 different 3D ray-marched fractals:
 - **Kleinian3D** - Kleinian group limit set visualization
 - **HybridMandelbulbJulia3D** - Combination of Mandelbulb and Julia patterns
 - **QuaternionCubic3D** - Quaternion-based cubic iteration
+- **SierpinskiGasket3D** - 3D Sierpinski gasket recursive structure
 
 ## Rendering Capabilities
 
@@ -373,10 +375,10 @@ Par Fractal supports 12 different 3D ray-marched fractals:
 ### Quality Profiles
 
 **LOD Quality Levels:**
-- **Ultra** - 325 ray steps, 128 shadow samples, 0.00035 precision, 8 DoF samples
-- **High** - 250 ray steps, 64 shadow samples, 0.0007 precision, 4 DoF samples
-- **Medium** - 175 ray steps, 32 shadow samples, 0.0015 precision, 2 DoF samples
-- **Low** - 100 ray steps, 16 shadow samples, 0.003 precision, 1 DoF sample
+- **Ultra** - 325 ray steps, 128 shadow samples, 0.00035 precision, 8 DoF samples, 1.0 render scale
+- **High** - 250 ray steps, 64 shadow samples, 0.0007 precision, 4 DoF samples, 0.85 render scale
+- **Medium** - 175 ray steps, 32 shadow samples, 0.0015 precision, 2 DoF samples, 0.7 render scale
+- **Low** - 100 ray steps, 16 shadow samples, 0.003 precision, 1 DoF sample, 0.5 render scale
 
 **LOD Strategies:**
 - **Distance** - Reduce quality based on camera distance from fractal

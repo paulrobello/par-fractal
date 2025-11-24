@@ -95,6 +95,7 @@
             document.getElementById('error').style.display = 'block';
         }
     </script>
-    <link data-trunk rel="rust" data-wasm-opt="z" data-cargo-features="web" data-cargo-no-default-features />
+    <!-- data-wasm-opt removed to avoid wasm-opt validation errors with WebGPU -->
+    <link data-trunk rel="rust" data-wasm-opt="0" data-cargo-features="web" data-cargo-no-default-features />
 </body>
 </html>

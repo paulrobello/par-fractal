@@ -78,17 +78,25 @@ impl UI {
                 if let Some(path) = &file_path {
                     eprintln!("DEBUG: Attempting to open file: {}", path);
 
-                    // Verify file exists before trying to open
-                    if std::path::Path::new(path).exists() {
-                        eprintln!("DEBUG: File exists at path");
-                    } else {
-                        eprintln!("DEBUG: WARNING - File does not exist at path!");
-                    }
+                    // Open file (native only)
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        // Verify file exists before trying to open
+                        if std::path::Path::new(path).exists() {
+                            eprintln!("DEBUG: File exists at path");
+                        } else {
+                            eprintln!("DEBUG: WARNING - File does not exist at path!");
+                        }
 
-                    if let Err(e) = open::that(path) {
-                        eprintln!("ERROR: Failed to open file {}: {}", path, e);
-                    } else {
-                        eprintln!("DEBUG: Successfully called open::that()");
+                        if let Err(e) = open::that(path) {
+                            eprintln!("ERROR: Failed to open file {}: {}", path, e);
+                        } else {
+                            eprintln!("DEBUG: Successfully called open::that()");
+                        }
+                    }
+                    #[cfg(target_arch = "wasm32")]
+                    {
+                        log::info!("Would open file: {}", path);
                     }
                 } else {
                     eprintln!("DEBUG: No file_path available");

@@ -7,10 +7,10 @@
 
 use std::fmt;
 
-#[cfg(feature = "native")]
+#[cfg(not(target_arch = "wasm32"))]
 pub mod native;
 
-#[cfg(feature = "web")]
+#[cfg(target_arch = "wasm32")]
 pub mod web;
 
 /// Platform-specific error type
@@ -65,7 +65,8 @@ pub mod category {
 }
 
 /// Storage abstraction for persisting data
-pub trait Storage: Send + Sync {
+/// Note: Send + Sync bounds removed to support web_sys types
+pub trait Storage {
     /// Save data to storage
     fn save(&self, category: &str, key: &str, data: &[u8]) -> Result<(), PlatformError>;
 
@@ -128,7 +129,7 @@ pub struct PlatformContext {
 
 impl PlatformContext {
     /// Create a new platform context for the current platform
-    #[cfg(feature = "native")]
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn new() -> Self {
         Self {
             storage: Box::new(native::NativeStorage::new()),
@@ -137,7 +138,7 @@ impl PlatformContext {
         }
     }
 
-    #[cfg(feature = "web")]
+    #[cfg(target_arch = "wasm32")]
     pub fn new() -> Self {
         Self {
             storage: Box::new(web::WebStorage::new()),
@@ -147,14 +148,14 @@ impl PlatformContext {
     }
 }
 
-#[cfg(feature = "native")]
+#[cfg(not(target_arch = "wasm32"))]
 impl Default for PlatformContext {
     fn default() -> Self {
         Self::new()
     }
 }
 
-#[cfg(feature = "web")]
+#[cfg(target_arch = "wasm32")]
 impl Default for PlatformContext {
     fn default() -> Self {
         Self::new()

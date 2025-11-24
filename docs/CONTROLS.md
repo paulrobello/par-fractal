@@ -39,8 +39,7 @@ Par Fractal provides intuitive controls for exploring both 2D and 3D fractals. C
 | **H** | Toggle UI | Show/hide the parameter panel |
 | **F** | Toggle FPS | Show/hide FPS counter |
 | **V** | Toggle Performance | Show/hide performance overlay |
-| **Esc** | Close/Cancel | Close dialogs, exit fullscreen |
-| **F11** | Toggle Fullscreen | Enter/exit fullscreen mode (platform dependent) |
+| **Esc** | Close/Cancel | Close command palette and dialogs |
 
 ### Fractal Type Switching - 2D Fractals
 
@@ -57,7 +56,7 @@ Par Fractal provides intuitive controls for exploring both 2D and 3D fractals. C
 | **9** | Lyapunov | Lyapunov fractal |
 | **0** | Nova | Nova fractal |
 
-**Note:** Magnet2D and Collatz2D are accessible via UI only.
+**Note:** Magnet2D, Collatz2D, and Sierpinski Triangle2D are accessible via UI and command palette only.
 
 ### Fractal Type Switching - 3D Fractals
 
@@ -75,21 +74,21 @@ Par Fractal provides intuitive controls for exploring both 2D and 3D fractals. C
 | **F10** | Kleinian | Kleinian limit set |
 | **F11** | Hybrid Mandelbulb-Julia | Hybrid 3D fractal |
 
-**Note:** QuaternionCubic3D is accessible via UI only.
+**Note:** QuaternionCubic3D and Sierpinski Gasket3D are accessible via UI and command palette only.
 
 ### View Controls
 
 | Key | Action | Description |
 |-----|--------|-------------|
-| **R** | Reset View | Return to default camera/view position |
+| **R** | Reset View | Return to default camera/view position (resets camera in 3D mode) |
 
 ### Screenshot and Capture
 
 | Key | Action | Description |
 |-----|--------|-------------|
-| **F12** | Quick Screenshot | Capture current view as PNG |
+| **F12** | Quick Screenshot | Capture current view as PNG (saved to current directory) |
 
-**Note:** High-resolution screenshot and video recording controls are available via the UI panel and command palette.
+**Note:** High-resolution screenshots and video recording controls are available via the UI panel and command palette.
 
 ### Color and Appearance
 
@@ -101,7 +100,7 @@ Par Fractal provides intuitive controls for exploring both 2D and 3D fractals. C
 
 | Key | Action | Description |
 |-----|--------|-------------|
-| **/** | Open Command Palette | Quick access to all commands |
+| **/** | Open Command Palette | Quick access to all commands (fuzzy search) |
 | **Ctrl/Cmd+K** | Open Command Palette | Alternative VS Code-style shortcut |
 
 ### Effects and Visual Settings
@@ -132,9 +131,7 @@ Par Fractal provides intuitive controls for exploring both 2D and 3D fractals. C
 | **Click + Drag** | Pan view | Move around complex plane |
 | **Scroll Up** | Zoom In | At cursor position |
 | **Scroll Down** | Zoom Out | At cursor position |
-| **Shift + Scroll** | Continuous Zoom | Smooth zoom animation |
-| **Double Click** | Center + Zoom | Center at cursor and zoom in |
-| **Right Click** | Context Menu | Quick settings |
+| **Shift + Click + Drag** | Continuous Zoom | Smooth zoom animation |
 
 ### Keyboard Navigation
 
@@ -180,13 +177,9 @@ Par Fractal provides intuitive controls for exploring both 2D and 3D fractals. C
 
 ### Camera Speed
 
-| Action | Effect | Description |
-|--------|--------|-------------|
-| **Scroll Up** | Increase Speed | Faster movement |
-| **Scroll Down** | Decrease Speed | Slower movement |
-| **Ctrl/Cmd+Scroll** | Fine Adjustment | Smaller speed increments |
+**Note:** Camera speed is adjusted via the UI slider in the Camera section. There are no keyboard shortcuts for speed control in 3D mode.
 
-**Speed Range:** 0.1 to 10.0 units/second
+**Speed Range:** 0.1 to 10.0 units/second (adjustable via UI)
 
 ### 3D-Specific Settings
 
@@ -279,15 +272,10 @@ Par Fractal provides intuitive controls for exploring both 2D and 3D fractals. C
 ### Capture Section
 
 **Screenshot:**
-- **Quick Capture** - F9 shortcut button
+- **Quick Capture** - F12 keyboard shortcut or button
 - **Custom Resolution** - Width × Height input
-- **Resolution Presets**
-  - 1920×1080 (Full HD)
-  - 2560×1440 (2K)
-  - 3840×2160 (4K)
-  - Custom
-- **Monitor Selection** - Capture for specific monitor
-- **Detect Monitors** - Auto-detect connected displays
+- **File Format** - PNG (automatic filename generation)
+- **Save Location** - Current working directory
 
 **Video Recording:**
 - **Format** - MP4 or GIF
@@ -386,13 +374,14 @@ The command palette provides access to all application features through fuzzy se
 ### Essential Shortcuts
 
 ```
-H              Toggle UI
-F              Toggle FPS
+H              Toggle UI Panel
+F              Toggle FPS Counter
 V              Toggle Performance Overlay
-R              Reset View
+R              Reset View/Camera
 F12            Screenshot
 /              Command Palette
 Ctrl/Cmd+K     Command Palette (VS Code style)
+Esc            Close Command Palette/Dialogs
 ```
 
 ### Fractal Switching
@@ -417,18 +406,19 @@ F11            Hybrid Mandelbulb-Julia
 ### 2D Navigation
 
 ```
-Drag           Pan
-Scroll         Zoom (at cursor position)
+Drag                  Pan View
+Scroll                Zoom (at cursor position)
+Shift + Drag          Continuous Zoom In
 ```
 
 ### 3D Navigation
 
 ```
 WASD           Move (Forward/Left/Back/Right)
-Arrow Keys     Alternative movement (same as WASD)
-EQ             Move (Up/Down)
-Mouse Drag     Look Around
-Scroll         Adjust Camera Speed
+Arrow Keys     Alternative movement (Up/Down/Left/Right)
+E              Move Up (world Y axis)
+Q              Move Down (world Y axis)
+Mouse Drag     Look Around (rotate camera)
 ```
 
 ### Parameter Adjustment
@@ -494,20 +484,21 @@ graph LR
 ### Mouse Sensitivity
 
 **Camera Sensitivity (3D):**
-- Fixed at 0.003 in the code (controls look-around speed)
+- Look-around sensitivity is fixed at 0.003 (controls rotation speed)
 
 **Zoom Sensitivity (2D):**
-- Zoom factor is 1.1 per scroll step (hardcoded)
+- Zoom factor is 1.1 per scroll step
 
-**Note:** Mouse sensitivity settings are not currently exposed in the UI but can be adjusted by modifying the `rotate_speed` field in `CameraController` (src/camera.rs).
+**Note:** Mouse sensitivity settings are not exposed in the UI and require code modification in `src/camera.rs` to adjust.
 
 ### UI Panel Layout
 
 **Customization:**
-- Collapse/expand sections by clicking headers
+- Collapse/expand sections by clicking section headers
 - Panel position is fixed to the right side
+- Panel width adjusts automatically based on content
 
-**Note:** The UI panel uses egui's default collapsible headers for organizing sections.
+**Note:** The UI panel uses egui with collapsible sections for organizing controls.
 
 ## Related Documentation
 

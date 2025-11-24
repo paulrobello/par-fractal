@@ -51,11 +51,13 @@ web = [
     "dep:console_log",
     "dep:console_error_panic_hook",
     "dep:gloo-timers",
+    "dep:getrandom",
 ]
 
 [[bin]]
 name = "par-fractal"
 path = "src/main.rs"
+required-features = ["native"]
 
 [dependencies]
 # Core graphics
@@ -66,9 +68,9 @@ winit = "0.30"
 glam = "0.30"
 
 # UI
-egui = "0.33"
+egui = { version = "0.33", default-features = false, features = ["default_fonts"] }
 egui-wgpu = "0.33"
-egui-winit = "0.33"
+egui-winit = { version = "0.33", default-features = false, features = ["links"] }
 
 # Utilities
 bytemuck = { version = "1.24", features = ["derive"] }
@@ -83,7 +85,7 @@ base64 = "0.22"
 # Native-only dependencies (optional, enabled by "native" feature)
 pollster = { version = "0.4", optional = true }
 directories = { version = "6.0", optional = true }
-rfd = { version = "0.15", optional = true }
+rfd = { version = "0.16", optional = true }
 open = { version = "5", optional = true }
 crossbeam-channel = { version = "0.5", optional = true }
 chrono = { version = "0.4", optional = true }
@@ -96,6 +98,7 @@ js-sys = { version = "0.3", optional = true }
 console_log = { version = "1.0", optional = true }
 console_error_panic_hook = { version = "0.1", optional = true }
 gloo-timers = { version = "0.3", optional = true }
+getrandom = { version = "0.3", optional = true, features = ["wasm_js"] }
 
 [dependencies.web-sys]
 version = "0.3"

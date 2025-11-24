@@ -12,7 +12,12 @@ impl WebFileDialog {
     }
 
     /// Trigger a file download in the browser
-    fn download_blob(&self, filename: &str, data: &[u8], mime_type: &str) -> Result<(), PlatformError> {
+    fn download_blob(
+        &self,
+        filename: &str,
+        data: &[u8],
+        mime_type: &str,
+    ) -> Result<(), PlatformError> {
         let window = web_sys::window().ok_or(PlatformError::NotSupported("no window".into()))?;
         let document = window
             .document()

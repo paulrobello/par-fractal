@@ -19,7 +19,12 @@ impl Default for NativeFileDialog {
 }
 
 impl FileDialog for NativeFileDialog {
-    fn save_file(&self, filename: &str, data: &[u8], _mime_type: &str) -> Result<(), PlatformError> {
+    fn save_file(
+        &self,
+        filename: &str,
+        data: &[u8],
+        _mime_type: &str,
+    ) -> Result<(), PlatformError> {
         let dialog = rfd::FileDialog::new()
             .set_file_name(filename)
             .add_filter("All Files", &["*"]);
