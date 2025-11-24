@@ -5,6 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Par Fractal - GPU Accelerated Fractal Renderer</title>
     <meta name="description" content="Cross-platform GPU-accelerated fractal renderer with 2D and 3D support">
+    <meta name="theme-color" content="#4a90d9">
+    <!-- Favicons -->
+    <link rel="icon" type="image/x-icon" href="/icons/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
+    <link rel="manifest" href="/icons/site.webmanifest">
     <style>
         * {
             margin: 0;
@@ -95,6 +102,8 @@
             document.getElementById('error').style.display = 'block';
         }
     </script>
+    <!-- Copy icons folder to dist -->
+    <link data-trunk rel="copy-dir" href="icons" />
     <!-- data-wasm-opt removed to avoid wasm-opt validation errors with WebGPU -->
     <link data-trunk rel="rust" data-wasm-opt="0" data-cargo-features="web" data-cargo-no-default-features />
 </body>
