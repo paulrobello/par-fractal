@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UIState {
     pub fractal_type_open: bool,
+    pub presets_open: bool,
     pub color_viz_open: bool,
     pub params_2d_open: bool,
     pub params_3d_open: bool,
@@ -84,6 +85,7 @@ impl Default for UIState {
     fn default() -> Self {
         Self {
             fractal_type_open: true,
+            presets_open: false,
             color_viz_open: true,
             params_2d_open: true,
             params_3d_open: true,

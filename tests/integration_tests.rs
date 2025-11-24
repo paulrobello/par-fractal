@@ -199,6 +199,7 @@ fn test_all_fractal_types_switchable() {
             FractalType::Mandelbrot2D
             | FractalType::Julia2D
             | FractalType::Sierpinski2D
+            | FractalType::SierpinskiTriangle2D
             | FractalType::BurningShip2D
             | FractalType::Tricorn2D
             | FractalType::Phoenix2D
@@ -221,7 +222,8 @@ fn test_all_fractal_types_switchable() {
             | FractalType::ApollonianGasket3D
             | FractalType::Kleinian3D
             | FractalType::HybridMandelbulbJulia3D
-            | FractalType::QuaternionCubic3D => {
+            | FractalType::QuaternionCubic3D
+            | FractalType::SierpinskiGasket3D => {
                 assert_eq!(params.render_mode, RenderMode::ThreeD);
             }
         }

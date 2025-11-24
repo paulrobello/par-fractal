@@ -69,6 +69,7 @@ pub enum CommandAction {
     ToggleLODDebug,
     ToggleUI,
     ToggleStats,
+    ToggleFPS,
     ResetView,
     ResetAll,
     SavePreset,
@@ -78,6 +79,13 @@ pub enum CommandAction {
     StopRecording,
     Screenshot,
     CycleTheme,
+    CyclePalette,
+    IncrementIterations,
+    DecrementIterations,
+    IncrementPower,
+    DecrementPower,
+    IncrementOrbitSpeed,
+    DecrementOrbitSpeed,
 }
 
 #[allow(dead_code, clippy::upper_case_acronyms)]
@@ -92,6 +100,8 @@ pub enum EffectType {
     Vignette,
     FXAA,
     SSR,
+    Floor,
+    AutoOrbit,
 }
 
 /// A single command in the palette
@@ -352,17 +362,6 @@ impl CommandPalette {
 
         commands.push(
             Command::new(
-                "Burning Ship (2D)",
-                CommandCategory::Fractal,
-                CommandAction::SetFractalType(FractalType::BurningShip2D),
-                "Burning Ship fractal variation",
-            )
-            .with_aliases(vec!["burning ship", "ship"])
-            .with_shortcut("3"),
-        );
-
-        commands.push(
-            Command::new(
                 "Mandelbulb (3D)",
                 CommandCategory::Fractal,
                 CommandAction::SetFractalType(FractalType::Mandelbulb3D),
@@ -389,6 +388,18 @@ impl CommandPalette {
                 FractalType::Sierpinski2D,
                 "Sierpinski Carpet (2D)",
                 vec!["sierpinski", "carpet"],
+                Some("3"),
+            ),
+            (
+                FractalType::SierpinskiTriangle2D,
+                "Sierpinski Triangle (2D)",
+                vec!["sierpinski triangle", "triangle"],
+                None,
+            ),
+            (
+                FractalType::BurningShip2D,
+                "Burning Ship (2D)",
+                vec!["burning ship", "ship"],
                 Some("4"),
             ),
             (
@@ -409,14 +420,19 @@ impl CommandPalette {
                 vec!["celtic"],
                 Some("7"),
             ),
-            (FractalType::Newton2D, "Newton (2D)", vec!["newton"], None),
+            (
+                FractalType::Newton2D,
+                "Newton (2D)",
+                vec!["newton"],
+                Some("8"),
+            ),
             (
                 FractalType::Lyapunov2D,
                 "Lyapunov (2D)",
                 vec!["lyapunov"],
-                None,
+                Some("9"),
             ),
-            (FractalType::Nova2D, "Nova (2D)", vec!["nova"], None),
+            (FractalType::Nova2D, "Nova (2D)", vec!["nova"], Some("0")),
             (FractalType::Magnet2D, "Magnet (2D)", vec!["magnet"], None),
             (
                 FractalType::Collatz2D,
@@ -484,6 +500,12 @@ impl CommandPalette {
                 vec!["quaternion", "quat"],
                 None,
             ),
+            (
+                FractalType::SierpinskiGasket3D,
+                "Sierpinski Gasket (3D)",
+                vec!["sierpinski gasket", "gasket3d"],
+                None,
+            ),
         ];
 
         for (ftype, name, aliases, shortcut) in fractal_types {
@@ -510,7 +532,8 @@ impl CommandPalette {
                 CommandAction::ToggleEffect(EffectType::AmbientOcclusion),
                 "Toggle ambient occlusion effect",
             )
-            .with_aliases(vec!["ao", "occlusion", "ambient"]),
+            .with_aliases(vec!["ao", "occlusion", "ambient"])
+            .with_shortcut("L"),
         );
 
         commands.push(
@@ -518,9 +541,9 @@ impl CommandPalette {
                 "Toggle Soft Shadows",
                 CommandCategory::Effect,
                 CommandAction::ToggleEffect(EffectType::SoftShadows),
-                "Toggle soft shadow rendering",
+                "Cycle shadow modes (off/hard/soft)",
             )
-            .with_aliases(vec!["soft shadows", "shadows soft"])
+            .with_aliases(vec!["soft shadows", "shadows soft", "shadow"])
             .with_shortcut("B"),
         );
 
@@ -531,7 +554,8 @@ impl CommandPalette {
                 CommandAction::ToggleEffect(EffectType::DepthOfField),
                 "Toggle depth of field effect",
             )
-            .with_aliases(vec!["dof", "depth of field", "blur"]),
+            .with_aliases(vec!["dof", "depth of field", "blur"])
+            .with_shortcut("T"),
         );
 
         commands.push(
@@ -584,6 +608,28 @@ impl CommandPalette {
             .with_aliases(vec!["ssr", "reflections", "reflect"]),
         );
 
+        commands.push(
+            Command::new(
+                "Toggle Floor",
+                CommandCategory::Effect,
+                CommandAction::ToggleEffect(EffectType::Floor),
+                "Toggle ground plane visibility",
+            )
+            .with_aliases(vec!["floor", "ground", "plane"])
+            .with_shortcut("G"),
+        );
+
+        commands.push(
+            Command::new(
+                "Toggle Auto-Orbit",
+                CommandCategory::Camera,
+                CommandAction::ToggleEffect(EffectType::AutoOrbit),
+                "Toggle automatic camera orbiting",
+            )
+            .with_aliases(vec!["auto orbit", "orbit", "spin", "rotate"])
+            .with_shortcut("O"),
+        );
+
         // === Color Mode Commands ===
         let color_modes = vec![
             (
@@ -600,6 +646,36 @@ impl CommandPalette {
                 ColorMode::RaySteps,
                 "Ray Steps Visualization",
                 vec!["ray steps", "steps"],
+            ),
+            (
+                ColorMode::OrbitTrapXYZ,
+                "Orbit Trap XYZ",
+                vec!["orbit xyz", "trap xyz"],
+            ),
+            (
+                ColorMode::OrbitTrapRadial,
+                "Orbit Trap Radial",
+                vec!["orbit radial", "trap radial"],
+            ),
+            (
+                ColorMode::WorldPosition,
+                "World Position",
+                vec!["world position", "world pos"],
+            ),
+            (
+                ColorMode::LocalPosition,
+                "Local Position",
+                vec!["local position", "local pos"],
+            ),
+            (
+                ColorMode::AmbientOcclusion,
+                "Ambient Occlusion Only",
+                vec!["ao only", "occlusion only"],
+            ),
+            (
+                ColorMode::PerChannel,
+                "Per-Channel Mapping",
+                vec!["per channel", "channel"],
             ),
             (
                 ColorMode::DistanceField,
@@ -631,6 +707,11 @@ impl CommandPalette {
                 "Camera Distance LOD Debug",
                 vec!["lod distance", "debug lod"],
             ),
+            (
+                ColorMode::DistanceGrayscale,
+                "Distance Grayscale Debug",
+                vec!["distance grayscale", "grayscale"],
+            ),
         ];
 
         for (mode, name, aliases) in color_modes {
@@ -648,12 +729,13 @@ impl CommandPalette {
         // === LOD Commands ===
         commands.push(
             Command::new(
-                "Enable LOD System",
+                "Toggle LOD System",
                 CommandCategory::LOD,
                 CommandAction::ToggleLOD,
                 "Toggle adaptive Level of Detail system",
             )
-            .with_aliases(vec!["lod", "lod on", "lod enable", "enable lod"]),
+            .with_aliases(vec!["lod", "lod on", "lod enable", "enable lod"])
+            .with_shortcut("I"),
         );
 
         commands.push(
@@ -663,7 +745,8 @@ impl CommandPalette {
                 CommandAction::ToggleLODDebug,
                 "Toggle LOD debug overlay",
             )
-            .with_aliases(vec!["lod debug", "debug lod", "lod viz"]),
+            .with_aliases(vec!["lod debug", "debug lod", "lod viz"])
+            .with_shortcut("Shift+D"),
         );
 
         let lod_profiles = vec![
@@ -720,12 +803,23 @@ impl CommandPalette {
 
         commands.push(
             Command::new(
+                "Toggle FPS Counter",
+                CommandCategory::UI,
+                CommandAction::ToggleFPS,
+                "Show/hide FPS counter",
+            )
+            .with_aliases(vec!["fps counter", "fps display"])
+            .with_shortcut("F"),
+        );
+
+        commands.push(
+            Command::new(
                 "Toggle Performance Overlay",
                 CommandCategory::UI,
                 CommandAction::ToggleStats,
-                "Show/hide FPS and performance graph",
+                "Show/hide performance stats graph",
             )
-            .with_aliases(vec!["stats", "fps", "performance", "perf"])
+            .with_aliases(vec!["stats", "performance", "perf", "graph"])
             .with_shortcut("V"),
         );
 
@@ -737,6 +831,84 @@ impl CommandPalette {
                 "Switch between dark and light themes",
             )
             .with_aliases(vec!["theme", "dark", "light"]),
+        );
+
+        // === Control Commands ===
+        commands.push(
+            Command::new(
+                "Next Palette",
+                CommandCategory::Color,
+                CommandAction::CyclePalette,
+                "Cycle to next color palette",
+            )
+            .with_aliases(vec!["next palette", "palette next", "cycle palette"])
+            .with_shortcut("P"),
+        );
+
+        commands.push(
+            Command::new(
+                "Increase Iterations/Steps",
+                CommandCategory::Settings,
+                CommandAction::IncrementIterations,
+                "Increase max iterations (2D) or ray steps (3D)",
+            )
+            .with_aliases(vec!["more iterations", "more steps", "increase iter"])
+            .with_shortcut("="),
+        );
+
+        commands.push(
+            Command::new(
+                "Decrease Iterations/Steps",
+                CommandCategory::Settings,
+                CommandAction::DecrementIterations,
+                "Decrease max iterations (2D) or ray steps (3D)",
+            )
+            .with_aliases(vec!["less iterations", "less steps", "decrease iter"])
+            .with_shortcut("-"),
+        );
+
+        commands.push(
+            Command::new(
+                "Increase Power",
+                CommandCategory::Settings,
+                CommandAction::IncrementPower,
+                "Increase fractal power parameter",
+            )
+            .with_aliases(vec!["more power", "power up", "increase power"])
+            .with_shortcut("."),
+        );
+
+        commands.push(
+            Command::new(
+                "Decrease Power",
+                CommandCategory::Settings,
+                CommandAction::DecrementPower,
+                "Decrease fractal power parameter",
+            )
+            .with_aliases(vec!["less power", "power down", "decrease power"])
+            .with_shortcut(","),
+        );
+
+        commands.push(
+            Command::new(
+                "Increase Orbit Speed",
+                CommandCategory::Camera,
+                CommandAction::IncrementOrbitSpeed,
+                "Increase auto-orbit rotation speed",
+            )
+            .with_aliases(vec!["faster orbit", "speed up orbit"])
+            .with_shortcut("]"),
+        );
+
+        commands.push(
+            Command::new(
+                "Decrease Orbit Speed",
+                CommandCategory::Camera,
+                CommandAction::DecrementOrbitSpeed,
+                "Decrease auto-orbit rotation speed",
+            )
+            .with_aliases(vec!["slower orbit", "slow down orbit"])
+            .with_shortcut("["),
         );
 
         // === Camera Commands ===
@@ -799,7 +971,8 @@ impl CommandPalette {
                 CommandAction::Screenshot,
                 "Save current view as PNG image",
             )
-            .with_aliases(vec!["screenshot", "capture", "snap", "save image"]),
+            .with_aliases(vec!["screenshot", "capture", "snap", "save image"])
+            .with_shortcut("F12"),
         );
 
         // === Settings Commands ===

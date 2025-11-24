@@ -421,7 +421,7 @@ impl PresetGallery {
                     max_steps: 200,
                     camera_position: [5.0, 4.0, 5.0],
                     camera_target: [0.0, 0.0, 0.0],
-                    show_floor: true,
+                    show_floor: false,
                     ambient_occlusion: true,
                     shadow_mode: 2,    // soft
                     palette_index: 19, // Mint
@@ -609,6 +609,28 @@ impl PresetGallery {
                     ao_intensity: 1.2,
                     shadow_mode: 2,   // soft
                     palette_index: 8, // Inferno
+                    ..default_settings.clone()
+                },
+            },
+            // Sierpinski Gasket
+            Preset {
+                name: "Sierpinski Gasket".to_string(),
+                description: "Tetrahedral IFS fractal with sphere folding".to_string(),
+                category: PresetCategory::IFS,
+                settings: Settings {
+                    fractal_type: FractalType::SierpinskiGasket3D,
+                    fractal_scale: 1.5,
+                    fractal_fold: 1.0,
+                    fractal_min_radius: 0.5,
+                    max_iterations: 8,
+                    max_steps: 200,
+                    camera_position: [3.5, 3.0, 3.5],
+                    camera_target: [0.0, 0.0, 0.0],
+                    show_floor: true,
+                    ambient_occlusion: true,
+                    ao_intensity: 1.3,
+                    shadow_mode: 2,    // soft
+                    palette_index: 15, // Forest
                     ..default_settings.clone()
                 },
             },

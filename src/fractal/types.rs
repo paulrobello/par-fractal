@@ -6,6 +6,7 @@ pub enum FractalType {
     Mandelbrot2D,
     Julia2D,
     Sierpinski2D,
+    SierpinskiTriangle2D,
     BurningShip2D,
     Tricorn2D,
     Phoenix2D,
@@ -29,6 +30,7 @@ pub enum FractalType {
     Kleinian3D,
     HybridMandelbulbJulia3D,
     QuaternionCubic3D,
+    SierpinskiGasket3D,
 }
 
 impl FractalType {
@@ -38,6 +40,7 @@ impl FractalType {
             FractalType::Mandelbrot2D => "mandelbrot",
             FractalType::Julia2D => "julia",
             FractalType::Sierpinski2D => "sierpinski",
+            FractalType::SierpinskiTriangle2D => "sierpinski_triangle",
             FractalType::BurningShip2D => "burning_ship",
             FractalType::Tricorn2D => "tricorn",
             FractalType::Phoenix2D => "phoenix",
@@ -59,6 +62,7 @@ impl FractalType {
             FractalType::Kleinian3D => "kleinian",
             FractalType::HybridMandelbulbJulia3D => "hybrid_bulb_julia",
             FractalType::QuaternionCubic3D => "quaternion_cubic",
+            FractalType::SierpinskiGasket3D => "sierpinski_gasket",
         }
     }
 }

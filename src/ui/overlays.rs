@@ -398,7 +398,7 @@ impl UI {
                                     _ => "?",
                                 };
                                 ui.label(
-                                    egui::RichText::new(format!("→ {}", target_name))
+                                    egui::RichText::new(format!("> {}", target_name))
                                         .color(egui::Color32::from_rgb(255, 200, 100))
                                         .size(12.0),
                                 );

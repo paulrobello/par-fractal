@@ -283,32 +283,34 @@ impl Uniforms {
         self.julia_c = params.julia_c;
 
         self.fractal_type = match params.fractal_type {
-            // 2D fractals (0-11)
+            // 2D fractals (0-12)
             crate::fractal::FractalType::Mandelbrot2D => 0,
             crate::fractal::FractalType::Julia2D => 1,
             crate::fractal::FractalType::Sierpinski2D => 2,
-            crate::fractal::FractalType::BurningShip2D => 3,
-            crate::fractal::FractalType::Tricorn2D => 4,
-            crate::fractal::FractalType::Phoenix2D => 5,
-            crate::fractal::FractalType::Celtic2D => 6,
-            crate::fractal::FractalType::Newton2D => 7,
-            crate::fractal::FractalType::Lyapunov2D => 8,
-            crate::fractal::FractalType::Nova2D => 9,
-            crate::fractal::FractalType::Magnet2D => 10,
-            crate::fractal::FractalType::Collatz2D => 11,
-            // 3D fractals (12-20)
-            crate::fractal::FractalType::Mandelbulb3D => 12,
-            crate::fractal::FractalType::MengerSponge3D => 13,
-            crate::fractal::FractalType::SierpinskiPyramid3D => 14,
-            crate::fractal::FractalType::JuliaSet3D => 15,
-            crate::fractal::FractalType::Mandelbox3D => 16,
-            crate::fractal::FractalType::TgladFormula3D => 17,
-            crate::fractal::FractalType::OctahedralIFS3D => 18,
-            crate::fractal::FractalType::IcosahedralIFS3D => 19,
-            crate::fractal::FractalType::ApollonianGasket3D => 20,
-            crate::fractal::FractalType::Kleinian3D => 21,
-            crate::fractal::FractalType::HybridMandelbulbJulia3D => 22,
-            crate::fractal::FractalType::QuaternionCubic3D => 23,
+            crate::fractal::FractalType::SierpinskiTriangle2D => 3,
+            crate::fractal::FractalType::BurningShip2D => 4,
+            crate::fractal::FractalType::Tricorn2D => 5,
+            crate::fractal::FractalType::Phoenix2D => 6,
+            crate::fractal::FractalType::Celtic2D => 7,
+            crate::fractal::FractalType::Newton2D => 8,
+            crate::fractal::FractalType::Lyapunov2D => 9,
+            crate::fractal::FractalType::Nova2D => 10,
+            crate::fractal::FractalType::Magnet2D => 11,
+            crate::fractal::FractalType::Collatz2D => 12,
+            // 3D fractals (13-25)
+            crate::fractal::FractalType::Mandelbulb3D => 13,
+            crate::fractal::FractalType::MengerSponge3D => 14,
+            crate::fractal::FractalType::SierpinskiPyramid3D => 15,
+            crate::fractal::FractalType::JuliaSet3D => 16,
+            crate::fractal::FractalType::Mandelbox3D => 17,
+            crate::fractal::FractalType::TgladFormula3D => 18,
+            crate::fractal::FractalType::OctahedralIFS3D => 19,
+            crate::fractal::FractalType::IcosahedralIFS3D => 20,
+            crate::fractal::FractalType::ApollonianGasket3D => 21,
+            crate::fractal::FractalType::Kleinian3D => 22,
+            crate::fractal::FractalType::HybridMandelbulbJulia3D => 23,
+            crate::fractal::FractalType::QuaternionCubic3D => 24,
+            crate::fractal::FractalType::SierpinskiGasket3D => 25,
         };
 
         self.render_mode = match params.render_mode {

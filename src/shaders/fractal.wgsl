@@ -487,6 +487,81 @@ fn sierpinski(coord: vec2<f32>) -> f32 {
     return f32(iteration) / f32(uniforms.max_iterations);
 }
 
+// High-precision version for deep zooms
+fn sierpinski_hp(coord_hi: vec2<f32>, coord_lo: vec2<f32>) -> f32 {
+    // Recombine hi+lo for best precision at large zooms
+    let coord = vec2<f32>(coord_hi.x + coord_lo.x, coord_hi.y + coord_lo.y);
+    return sierpinski(coord);
+}
+
+// Sierpinski Gasket (Triangle) using barycentric subdivision
+fn sierpinski_triangle(coord: vec2<f32>) -> f32 {
+    // Map coord from [-1,1] to [0,1] range
+    let p = coord * 0.5 + 0.5;
+
+    // Equilateral triangle vertices
+    let v0 = vec2<f32>(0.0, 0.0);       // Bottom-left
+    let v1 = vec2<f32>(1.0, 0.0);       // Bottom-right
+    let v2 = vec2<f32>(0.5, sqrt(3.0) * 0.5);  // Top
+
+    // Compute barycentric coordinates
+    let v0v1 = v1 - v0;
+    let v0v2 = v2 - v0;
+    let v0p = p - v0;
+
+    let d00 = dot(v0v1, v0v1);
+    let d01 = dot(v0v1, v0v2);
+    let d11 = dot(v0v2, v0v2);
+    let d20 = dot(v0p, v0v1);
+    let d21 = dot(v0p, v0v2);
+
+    let denom = d00 * d11 - d01 * d01;
+    let bv = (d11 * d20 - d01 * d21) / denom;
+    let bw = (d00 * d21 - d01 * d20) / denom;
+    let bu = 1.0 - bv - bw;
+
+    var bary = vec3<f32>(bu, bv, bw);  // (u=v0 weight, v=v1 weight, w=v2 weight)
+
+    // Check if outside the main triangle
+    if (bary.x < 0.0 || bary.y < 0.0 || bary.z < 0.0) {
+        return 0.0;  // Outside triangle - render as black
+    }
+
+    // Iterate using barycentric subdivision
+    // Color holes based on iteration depth (like Mandelbrot escape-time)
+    for (var i = 0u; i < uniforms.max_iterations; i = i + 1u) {
+        // Check if in center hole (all coords < 0.5)
+        if (bary.x < 0.5 && bary.y < 0.5 && bary.z < 0.5) {
+            // In a hole at iteration i - color based on depth
+            // Add smooth coloring based on how close to edge of hole
+            let max_bary = max(max(bary.x, bary.y), bary.z);
+            let smooth_val = max_bary / 0.5;  // 0 at center, 1 at edge
+            return (f32(i) + smooth_val) / f32(uniforms.max_iterations);
+        }
+
+        // Transform to the appropriate corner sub-triangle
+        if (bary.x >= 0.5) {
+            // Bottom-left corner sub-triangle (near v0)
+            bary = vec3<f32>(2.0 * bary.x - 1.0, 2.0 * bary.y, 2.0 * bary.z);
+        } else if (bary.y >= 0.5) {
+            // Bottom-right corner sub-triangle (near v1)
+            bary = vec3<f32>(2.0 * bary.x, 2.0 * bary.y - 1.0, 2.0 * bary.z);
+        } else {
+            // Top corner sub-triangle (near v2, since bary.z >= 0.5)
+            bary = vec3<f32>(2.0 * bary.x, 2.0 * bary.y, 2.0 * bary.z - 1.0);
+        }
+    }
+
+    // Point survived all iterations - it's in the fractal (like points in Mandelbrot set)
+    return 0.0;
+}
+
+// High-precision version for extreme zooms
+fn sierpinski_triangle_hp(coord_hi: vec2<f32>, coord_lo: vec2<f32>) -> f32 {
+    let coord = vec2<f32>(coord_hi.x + coord_lo.x, coord_hi.y + coord_lo.y);
+    return sierpinski_triangle(coord);
+}
+
 fn burning_ship(c: vec2<f32>) -> f32 {
     var z = vec2<f32>(0.0, 0.0);
     var iteration = 0u;
@@ -1324,6 +1399,44 @@ fn quaternion_cubic_de(pos: vec3<f32>) -> f32 {
     return 0.5 * log(r) * r / dr;
 }
 
+// Sierpinski Gasket (Tetrahedral IFS with sphere folding)
+fn sierpinski_gasket_de(pos: vec3<f32>) -> f32 {
+    let scale_inv = 1.0 / uniforms.fractal_scale;
+    var p = pos * scale_inv;
+    let scale_factor = 2.0 + uniforms.fractal_fold * 0.5;  // Base scale factor (2.0-3.0 range)
+    var scale = 1.0;
+
+    for (var i = 0u; i < uniforms.max_iterations; i = i + 1u) {
+        // Tetrahedral folding - creates 4-fold symmetry
+        if (p.x + p.y < 0.0) {
+            p = vec3<f32>(-p.y, -p.x, p.z);
+        }
+        if (p.x + p.z < 0.0) {
+            p = vec3<f32>(-p.z, p.y, -p.x);
+        }
+        if (p.y + p.z < 0.0) {
+            p = vec3<f32>(p.x, -p.z, -p.y);
+        }
+
+        // Sphere inversion folding to create "gasket" holes
+        let r2 = dot(p, p);
+        let min_r2 = uniforms.fractal_min_radius * uniforms.fractal_min_radius;
+
+        if (r2 < min_r2) {
+            let k = min_r2 / r2;
+            p = p * k;
+            scale = scale * k;
+        }
+
+        // Scale and translate to create the gasket structure
+        p = p * scale_factor - vec3<f32>(1.0, 1.0, 1.0) * (scale_factor - 1.0);
+        scale = scale * scale_factor;
+    }
+
+    // Distance to tetrahedron
+    return (length(p) - 1.0) / scale;
+}
+
 // Quaternion multiplication helper
 fn quat_mul(a: vec4<f32>, b: vec4<f32>) -> vec4<f32> {
     return vec4<f32>(
@@ -1356,31 +1469,33 @@ fn scene_de_with_material(pos: vec3<f32>) -> SceneResult {
     var result: SceneResult;
     var fractal_dist = 1000.0;
 
-    // 3D fractals start at type 12 (after 12 2D types: 0-11)
-    if (uniforms.fractal_type == 12u) {
+    // 3D fractals start at type 13 (after 13 2D types: 0-12)
+    if (uniforms.fractal_type == 13u) {
         fractal_dist = mandelbulb_de(pos);
-    } else if (uniforms.fractal_type == 13u) {
-        fractal_dist = menger_sponge_de(pos);
     } else if (uniforms.fractal_type == 14u) {
-        fractal_dist = sierpinski_pyramid_de(pos);
+        fractal_dist = menger_sponge_de(pos);
     } else if (uniforms.fractal_type == 15u) {
-        fractal_dist = julia_set_3d_de(pos);
+        fractal_dist = sierpinski_pyramid_de(pos);
     } else if (uniforms.fractal_type == 16u) {
-        fractal_dist = mandelbox_de(pos);
+        fractal_dist = julia_set_3d_de(pos);
     } else if (uniforms.fractal_type == 17u) {
-        fractal_dist = tglad_formula_de(pos);
+        fractal_dist = mandelbox_de(pos);
     } else if (uniforms.fractal_type == 18u) {
-        fractal_dist = octahedral_ifs_de(pos);
+        fractal_dist = tglad_formula_de(pos);
     } else if (uniforms.fractal_type == 19u) {
-        fractal_dist = icosahedral_ifs_de(pos);
+        fractal_dist = octahedral_ifs_de(pos);
     } else if (uniforms.fractal_type == 20u) {
-        fractal_dist = apollonian_gasket_de(pos);
+        fractal_dist = icosahedral_ifs_de(pos);
     } else if (uniforms.fractal_type == 21u) {
-        fractal_dist = kleinian_de(pos);
+        fractal_dist = apollonian_gasket_de(pos);
     } else if (uniforms.fractal_type == 22u) {
-        fractal_dist = hybrid_mandelbulb_julia_de(pos);
+        fractal_dist = kleinian_de(pos);
     } else if (uniforms.fractal_type == 23u) {
+        fractal_dist = hybrid_mandelbulb_julia_de(pos);
+    } else if (uniforms.fractal_type == 24u) {
         fractal_dist = quaternion_cubic_de(pos);
+    } else if (uniforms.fractal_type == 25u) {
+        fractal_dist = sierpinski_gasket_de(pos);
     }
 
     var floor_dist = 1000.0;
@@ -2181,7 +2296,11 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
                 t = mandelbrot_hp(coord_hi, coord_lo);
             } else if (uniforms.fractal_type == 1u) {
                 t = julia_hp(coord_hi, coord_lo);
+            } else if (uniforms.fractal_type == 2u) {
+                t = sierpinski_hp(coord_hi, coord_lo);
             } else if (uniforms.fractal_type == 3u) {
+                t = sierpinski_triangle_hp(coord_hi, coord_lo);
+            } else if (uniforms.fractal_type == 4u) {
                 t = burning_ship_hp(coord_hi, coord_lo);
             } else {
                 t = tricorn_hp(coord_hi, coord_lo);
@@ -2200,20 +2319,22 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
             } else if (uniforms.fractal_type == 2u) {
                 t = sierpinski(coord);
             } else if (uniforms.fractal_type == 3u) {
-                t = burning_ship(coord);
+                t = sierpinski_triangle(coord);
             } else if (uniforms.fractal_type == 4u) {
-                t = tricorn(coord);
+                t = burning_ship(coord);
             } else if (uniforms.fractal_type == 5u) {
-                t = phoenix(coord);
+                t = tricorn(coord);
             } else if (uniforms.fractal_type == 6u) {
-                t = celtic(coord);
+                t = phoenix(coord);
             } else if (uniforms.fractal_type == 7u) {
-                t = newton_fractal(coord);
+                t = celtic(coord);
             } else if (uniforms.fractal_type == 8u) {
-                t = lyapunov_fractal(coord);
+                t = newton_fractal(coord);
             } else if (uniforms.fractal_type == 9u) {
-                t = nova_fractal(coord);
+                t = lyapunov_fractal(coord);
             } else if (uniforms.fractal_type == 10u) {
+                t = nova_fractal(coord);
+            } else if (uniforms.fractal_type == 11u) {
                 t = magnet_fractal(coord);
             } else {
                 t = collatz_fractal(coord);

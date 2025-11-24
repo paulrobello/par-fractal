@@ -355,32 +355,36 @@ impl UI {
                                 .on_hover_text("Julia set - beautiful variations with complex parameter");
                         });
                         ui.horizontal(|ui| {
-                            ui.selectable_value(&mut params.fractal_type, FractalType::Sierpinski2D, "Sierpinski")
-                                .on_hover_text("Sierpinski carpet - recursive geometric pattern");
+                            ui.selectable_value(&mut params.fractal_type, FractalType::Sierpinski2D, "Sierpinski Carpet")
+                                .on_hover_text("Sierpinski carpet - recursive square pattern");
+                            ui.selectable_value(&mut params.fractal_type, FractalType::SierpinskiTriangle2D, "Sierpinski Triangle")
+                                .on_hover_text("Sierpinski triangle - classic recursive triangle pattern");
+                        });
+                        ui.horizontal(|ui| {
                             ui.selectable_value(&mut params.fractal_type, FractalType::BurningShip2D, "Burning Ship")
                                 .on_hover_text("Burning Ship fractal - variant with absolute values");
-                        });
-                        ui.horizontal(|ui| {
                             ui.selectable_value(&mut params.fractal_type, FractalType::Tricorn2D, "Tricorn")
                                 .on_hover_text("Tricorn - Mandelbrot with conjugate iteration");
+                        });
+                        ui.horizontal(|ui| {
                             ui.selectable_value(&mut params.fractal_type, FractalType::Phoenix2D, "Phoenix")
                                 .on_hover_text("Phoenix fractal - dynamic iteration algorithm");
-                        });
-                        ui.horizontal(|ui| {
                             ui.selectable_value(&mut params.fractal_type, FractalType::Celtic2D, "Celtic")
                                 .on_hover_text("Celtic fractal - alternative complex iteration");
+                        });
+                        ui.horizontal(|ui| {
                             ui.selectable_value(&mut params.fractal_type, FractalType::Newton2D, "Newton")
                                 .on_hover_text("Newton fractal - polynomial root-finding visualization");
-                        });
-                        ui.horizontal(|ui| {
                             ui.selectable_value(&mut params.fractal_type, FractalType::Lyapunov2D, "Lyapunov")
                                 .on_hover_text("Lyapunov fractal - stability diagram patterns");
-                            ui.selectable_value(&mut params.fractal_type, FractalType::Nova2D, "Nova")
-                                .on_hover_text("Nova fractal - Newton-Mandelbrot hybrid");
                         });
                         ui.horizontal(|ui| {
+                            ui.selectable_value(&mut params.fractal_type, FractalType::Nova2D, "Nova")
+                                .on_hover_text("Nova fractal - Newton-Mandelbrot hybrid");
                             ui.selectable_value(&mut params.fractal_type, FractalType::Magnet2D, "Magnet")
                                 .on_hover_text("Magnet Type 1 - physics-inspired fractal");
+                        });
+                        ui.horizontal(|ui| {
                             ui.selectable_value(&mut params.fractal_type, FractalType::Collatz2D, "Collatz")
                                 .on_hover_text("Collatz fractal - based on Collatz conjecture");
                         });
@@ -394,32 +398,36 @@ impl UI {
                                 .on_hover_text("Recursive cubic structure with infinite holes");
                         });
                         ui.horizontal(|ui| {
-                            ui.selectable_value(&mut params.fractal_type, FractalType::SierpinskiPyramid3D, "Sierpinski 3D")
+                            ui.selectable_value(&mut params.fractal_type, FractalType::SierpinskiPyramid3D, "Sierpinski Pyramid")
                                 .on_hover_text("3D Sierpinski pyramid - recursive tetrahedron");
+                            ui.selectable_value(&mut params.fractal_type, FractalType::SierpinskiGasket3D, "Sierpinski Gasket")
+                                .on_hover_text("3D Sierpinski gasket - sphere packing structure");
+                        });
+                        ui.horizontal(|ui| {
                             ui.selectable_value(&mut params.fractal_type, FractalType::JuliaSet3D, "Julia 3D")
                                 .on_hover_text("3D Julia set with quaternion math");
-                        });
-                        ui.horizontal(|ui| {
                             ui.selectable_value(&mut params.fractal_type, FractalType::Mandelbox3D, "Mandelbox")
                                 .on_hover_text("Cubic folding fractal with sharp edges");
+                        });
+                        ui.horizontal(|ui| {
                             ui.selectable_value(&mut params.fractal_type, FractalType::TgladFormula3D, "Tglad")
                                 .on_hover_text("Complex 3D iteration formula");
-                        });
-                        ui.horizontal(|ui| {
                             ui.selectable_value(&mut params.fractal_type, FractalType::OctahedralIFS3D, "Octahedron IFS")
                                 .on_hover_text("Kaleidoscopic IFS with 8-fold symmetry");
+                        });
+                        ui.horizontal(|ui| {
                             ui.selectable_value(&mut params.fractal_type, FractalType::IcosahedralIFS3D, "Icosahedron IFS")
                                 .on_hover_text("Kaleidoscopic IFS with 20-fold symmetry");
-                        });
-                        ui.horizontal(|ui| {
                             ui.selectable_value(&mut params.fractal_type, FractalType::ApollonianGasket3D, "Apollonian Gasket")
                                 .on_hover_text("Beautiful sphere-packing fractal");
-                            ui.selectable_value(&mut params.fractal_type, FractalType::Kleinian3D, "Kleinian")
-                                .on_hover_text("Kleinian group limit set fractal");
                         });
                         ui.horizontal(|ui| {
+                            ui.selectable_value(&mut params.fractal_type, FractalType::Kleinian3D, "Kleinian")
+                                .on_hover_text("Kleinian group limit set fractal");
                             ui.selectable_value(&mut params.fractal_type, FractalType::HybridMandelbulbJulia3D, "Hybrid Bulb-Julia")
                                 .on_hover_text("Mandelbulb and Julia set hybrid");
+                        });
+                        ui.horizontal(|ui| {
                             ui.selectable_value(&mut params.fractal_type, FractalType::QuaternionCubic3D, "Quaternion Cubic")
                                 .on_hover_text("Cubic quaternion Julia set (z³+c)");
                         });
@@ -432,8 +440,8 @@ impl UI {
                 self.ui_state.fractal_type_open = response.openness > 0.0;
 
                 // Preset management section
-                egui::CollapsingHeader::new("Presets")
-                    .default_open(false)
+                let response = egui::CollapsingHeader::new("Presets")
+                    .default_open(self.ui_state.presets_open)
                     .show(ui, |ui| {
                         // Category filter buttons
                         ui.horizontal_wrapped(|ui| {
@@ -488,7 +496,7 @@ impl UI {
                         } else {
                             egui::ScrollArea::vertical()
                                 .id_salt("builtin_presets_scroll")
-                                .max_height(200.0)
+                                .max_height(400.0)
                                 .show(ui, |ui| {
                                     for preset in filtered_builtin.iter() {
                                         ui.horizontal(|ui| {
@@ -622,6 +630,7 @@ impl UI {
                             }
                         });
                     });
+                self.ui_state.presets_open = response.openness > 0.0;
 
                 let response = egui::CollapsingHeader::new("Color & Visualization")
                     .default_open(self.ui_state.color_viz_open)
@@ -714,7 +723,7 @@ impl UI {
                                         ui.painter().rect_filled(segment_rect, 0.0, color);
                                     }
                                 });
-                                ui.label("← Simple/Open Areas (Blue) | Complex/Tight Areas (Red) →");
+                                ui.label("<- Simple/Open Areas (Blue) | Complex/Tight Areas (Red) ->");
                             }
                             crate::fractal::ColorMode::Depth => {
                                 ui.separator();
@@ -740,7 +749,7 @@ impl UI {
                                         ui.painter().rect_filled(segment_rect, 0.0, color);
                                     }
                                 });
-                                ui.label("← Near Camera (Bright) | Far from Camera (Dark) →");
+                                ui.label("<- Near Camera (Bright) | Far from Camera (Dark) ->");
                             }
                             crate::fractal::ColorMode::Convergence => {
                                 ui.separator();
@@ -766,7 +775,7 @@ impl UI {
                                         ui.painter().rect_filled(segment_rect, 0.0, color);
                                     }
                                 });
-                                ui.label("← Slow Convergence (Green) | Fast Convergence (Red) →");
+                                ui.label("<- Slow Convergence (Green) | Fast Convergence (Red) ->");
                             }
                             crate::fractal::ColorMode::ShadowMap => {
                                 ui.separator();
@@ -789,7 +798,7 @@ impl UI {
                                         ui.painter().rect_filled(segment_rect, 0.0, color);
                                     }
                                 });
-                                ui.label("← In Shadow (Dark) | Fully Lit (Bright) →");
+                                ui.label("<- In Shadow (Dark) | Fully Lit (Bright) ->");
                             }
                             crate::fractal::ColorMode::LightingOnly => {
                                 ui.separator();
@@ -1127,7 +1136,7 @@ impl UI {
                             .show(ui, |ui| {
                                 // Hide iterations slider for Collatz (doesn't affect it)
                                 if params.fractal_type != FractalType::Collatz2D {
-                                    changed |= ui.add(egui::Slider::new(&mut params.max_iterations, 16..=1024)
+                                    changed |= ui.add(egui::Slider::new(&mut params.max_iterations, 1..=1024)
                                         .text("Max Iterations")
                                         .logarithmic(true))
                                         .on_hover_text("Number of iterations before considering a point escaped\nHigher = more detail but slower")
@@ -1204,7 +1213,7 @@ impl UI {
                                 }
 
                                 if params.fractal_type == FractalType::QuaternionCubic3D {
-                                    changed |= ui.add(egui::Slider::new(&mut params.max_iterations, 4..=64)
+                                    changed |= ui.add(egui::Slider::new(&mut params.max_iterations, 1..=64)
                                         .text("Iterations"))
                                         .on_hover_text("Number of quaternion iterations (higher = more detail, slower)")
                                         .changed();
@@ -1845,7 +1854,7 @@ impl UI {
                                                 let (rect, _) = ui.allocate_exact_size(egui::vec2(12.0, 12.0), egui::Sense::hover());
                                                 ui.painter().rect_filled(rect, 2.0, egui::Color32::from_rgb(0, 255, 0));
                                                 changed |= ui.add(egui::Slider::new(&mut params.lod_config.distance_zones[0], 1.0..=50.0)
-                                                    .text("Near → Mid"))
+                                                    .text("Near -> Mid"))
                                                     .on_hover_text("Distance where quality drops from Ultra to High")
                                                     .changed();
                                             });
@@ -1855,7 +1864,7 @@ impl UI {
                                                 let (rect, _) = ui.allocate_exact_size(egui::vec2(12.0, 12.0), egui::Sense::hover());
                                                 ui.painter().rect_filled(rect, 2.0, egui::Color32::from_rgb(100, 255, 100));
                                                 changed |= ui.add(egui::Slider::new(&mut params.lod_config.distance_zones[1], 10.0..=100.0)
-                                                    .text("Mid → Far"))
+                                                    .text("Mid -> Far"))
                                                     .on_hover_text("Distance where quality drops from High to Medium")
                                                     .changed();
                                             });
@@ -1865,7 +1874,7 @@ impl UI {
                                                 let (rect, _) = ui.allocate_exact_size(egui::vec2(12.0, 12.0), egui::Sense::hover());
                                                 ui.painter().rect_filled(rect, 2.0, egui::Color32::from_rgb(255, 200, 0));
                                                 changed |= ui.add(egui::Slider::new(&mut params.lod_config.distance_zones[2], 25.0..=150.0)
-                                                    .text("Far → Distant"))
+                                                    .text("Far -> Distant"))
                                                     .on_hover_text("Distance where quality drops from Medium to Low")
                                                     .changed();
                                             });
@@ -2196,25 +2205,48 @@ impl UI {
                     .show(ui, |ui| {
                         ui.label("General:");
                         ui.label("• H: Toggle UI");
-                        ui.label("• F: Toggle FPS");
-                        ui.label("• F12: Save Screenshot");
+                        ui.label("• F: Toggle FPS counter");
+                        ui.label("• V: Toggle performance overlay");
+                        ui.label("• F12: Save screenshot");
                         ui.label("• R: Reset view");
                         ui.label("• P: Next color palette");
                         ui.separator();
 
-                        ui.label("Fractal Selection:");
-                        ui.label("• 1: Mandelbrot 2D");
-                        ui.label("• 2: Julia 2D");
-                        ui.label("• 3: Mandelbulb 3D");
-                        ui.label("• 4: Menger Sponge 3D");
+                        ui.label("2D Fractals (Number Keys):");
+                        ui.label("• 1: Mandelbrot");
+                        ui.label("• 2: Julia");
+                        ui.label("• 3: Sierpinski Carpet");
+                        ui.label("• 4: Burning Ship");
+                        ui.label("• 5: Tricorn");
+                        ui.label("• 6: Phoenix");
+                        ui.label("• 7: Celtic");
+                        ui.label("• 8: Newton");
+                        ui.label("• 9: Lyapunov");
+                        ui.label("• 0: Nova");
+                        ui.label("• (Magnet, Collatz: use UI buttons)");
+                        ui.separator();
+
+                        ui.label("3D Fractals (Function Keys):");
+                        ui.label("• F1: Mandelbulb");
+                        ui.label("• F2: Menger Sponge");
+                        ui.label("• F3: Sierpinski Pyramid");
+                        ui.label("• F4: Julia Set 3D");
+                        ui.label("• F5: Mandelbox");
+                        ui.label("• F6: Tglad Formula");
+                        ui.label("• F7: Octahedral IFS");
+                        ui.label("• F8: Icosahedral IFS");
+                        ui.label("• F9: Apollonian Gasket");
+                        ui.label("• F10: Kleinian");
+                        ui.label("• F11: Hybrid Bulb-Julia");
+                        ui.label("• (Others: use UI buttons)");
                         ui.separator();
 
                         ui.label("Parameters:");
-                        ui.label("• -/+: Decrease/increase iterations or steps");
+                        ui.label("• -/=: Decrease/increase iterations/steps");
                         ui.label("• ,/.: Decrease/increase fractal power");
                         ui.separator();
 
-                        ui.label("Effects:");
+                        ui.label("Effects (3D):");
                         ui.label("• L: Toggle ambient occlusion");
                         ui.label("• T: Toggle depth of field");
                         ui.label("• G: Toggle floor");
@@ -2222,21 +2254,23 @@ impl UI {
                         ui.separator();
 
                         ui.label("Camera (3D):");
+                        ui.label("• WASD: Move forward/left/back/right");
+                        ui.label("• Q/E: Move down/up");
+                        ui.label("• Mouse Drag: Look around");
                         ui.label("• O: Toggle auto-orbit");
                         ui.label("• [/]: Decrease/increase orbit speed");
                         ui.separator();
 
                         match params.render_mode {
                             crate::fractal::RenderMode::TwoD => {
-                                ui.label("Mouse (2D):");
+                                ui.label("Mouse (2D Mode):");
                                 ui.label("• Drag: Pan view");
-                                ui.label("• Wheel: Zoom");
+                                ui.label("• Wheel: Zoom in/out");
                             }
                             crate::fractal::RenderMode::ThreeD => {
-                                ui.label("Mouse (3D):");
-                                ui.label("• WASD: Move camera");
-                                ui.label("• Q/E: Down/Up");
-                                ui.label("• Drag: Look around");
+                                ui.label("Mouse (3D Mode):");
+                                ui.label("• Drag: Rotate camera view");
+                                ui.label("• Wheel: Adjust move speed");
                             }
                         }
                     });

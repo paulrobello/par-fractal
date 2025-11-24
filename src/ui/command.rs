@@ -132,13 +132,13 @@ impl UI {
                 ui.add_space(8.0);
                 ui.separator();
                 ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new("↑↓").weak());
+                    ui.label(egui::RichText::new("[Up/Down]").monospace().weak());
                     ui.label(egui::RichText::new("Navigate").small().weak());
                     ui.add_space(12.0);
-                    ui.label(egui::RichText::new("Enter").weak());
+                    ui.label(egui::RichText::new("[Enter]").monospace().weak());
                     ui.label(egui::RichText::new("Execute").small().weak());
                     ui.add_space(12.0);
-                    ui.label(egui::RichText::new("Esc").weak());
+                    ui.label(egui::RichText::new("[Esc]").monospace().weak());
                     ui.label(egui::RichText::new("Close").small().weak());
                 });
             });
@@ -254,6 +254,14 @@ impl UI {
                         params.floor_reflections = !params.floor_reflections;
                         (params.floor_reflections, "Floor Reflections")
                     }
+                    EffectType::Floor => {
+                        params.show_floor = !params.show_floor;
+                        (params.show_floor, "Floor")
+                    }
+                    EffectType::AutoOrbit => {
+                        params.auto_orbit = !params.auto_orbit;
+                        (params.auto_orbit, "Auto-Orbit")
+                    }
                 };
                 changed = true;
                 message = Some(format!(
@@ -276,6 +284,65 @@ impl UI {
                         "OFF"
                     }
                 ));
+            }
+            CommandAction::ToggleFPS => {
+                self.show_fps = !self.show_fps;
+                self.ui_state.show_fps = self.show_fps;
+                message = Some(format!(
+                    "FPS Counter: {}",
+                    if self.show_fps { "ON" } else { "OFF" }
+                ));
+            }
+            CommandAction::CyclePalette => {
+                params.next_palette();
+                changed = true;
+                message = Some(format!("Palette: {}", params.palette.name));
+            }
+            CommandAction::IncrementIterations => {
+                use crate::fractal::RenderMode;
+                match params.render_mode {
+                    RenderMode::TwoD => {
+                        params.max_iterations = (params.max_iterations + 32).min(2048);
+                        message = Some(format!("Max iterations: {}", params.max_iterations));
+                    }
+                    RenderMode::ThreeD => {
+                        params.max_steps = (params.max_steps + 10).min(500);
+                        message = Some(format!("Max steps: {}", params.max_steps));
+                    }
+                }
+                changed = true;
+            }
+            CommandAction::DecrementIterations => {
+                use crate::fractal::RenderMode;
+                match params.render_mode {
+                    RenderMode::TwoD => {
+                        params.max_iterations = params.max_iterations.saturating_sub(32).max(32);
+                        message = Some(format!("Max iterations: {}", params.max_iterations));
+                    }
+                    RenderMode::ThreeD => {
+                        params.max_steps = params.max_steps.saturating_sub(10).max(30);
+                        message = Some(format!("Max steps: {}", params.max_steps));
+                    }
+                }
+                changed = true;
+            }
+            CommandAction::IncrementPower => {
+                params.power = (params.power + 0.5).min(16.0);
+                changed = true;
+                message = Some(format!("Power: {:.1}", params.power));
+            }
+            CommandAction::DecrementPower => {
+                params.power = (params.power - 0.5).max(2.0);
+                changed = true;
+                message = Some(format!("Power: {:.1}", params.power));
+            }
+            CommandAction::IncrementOrbitSpeed => {
+                params.orbit_speed = (params.orbit_speed + 0.1).min(5.0);
+                message = Some(format!("Orbit speed: {:.2}", params.orbit_speed));
+            }
+            CommandAction::DecrementOrbitSpeed => {
+                params.orbit_speed = (params.orbit_speed - 0.1).max(0.1);
+                message = Some(format!("Orbit speed: {:.2}", params.orbit_speed));
             }
             CommandAction::ResetView => {
                 // Reset 2D view parameters

@@ -304,6 +304,7 @@ impl FractalParams {
             FractalType::Mandelbrot2D
             | FractalType::Julia2D
             | FractalType::Sierpinski2D
+            | FractalType::SierpinskiTriangle2D
             | FractalType::BurningShip2D
             | FractalType::Tricorn2D
             | FractalType::Phoenix2D
@@ -324,7 +325,8 @@ impl FractalParams {
             | FractalType::ApollonianGasket3D
             | FractalType::Kleinian3D
             | FractalType::HybridMandelbulbJulia3D
-            | FractalType::QuaternionCubic3D => RenderMode::ThreeD,
+            | FractalType::QuaternionCubic3D
+            | FractalType::SierpinskiGasket3D => RenderMode::ThreeD,
         };
 
         Self {
@@ -440,6 +442,7 @@ impl FractalParams {
             FractalType::Mandelbrot2D
             | FractalType::Julia2D
             | FractalType::Sierpinski2D
+            | FractalType::SierpinskiTriangle2D
             | FractalType::BurningShip2D
             | FractalType::Tricorn2D
             | FractalType::Phoenix2D
@@ -460,7 +463,8 @@ impl FractalParams {
             | FractalType::ApollonianGasket3D
             | FractalType::Kleinian3D
             | FractalType::HybridMandelbulbJulia3D
-            | FractalType::QuaternionCubic3D => RenderMode::ThreeD,
+            | FractalType::QuaternionCubic3D
+            | FractalType::SierpinskiGasket3D => RenderMode::ThreeD,
         };
 
         // Set fractal-specific defaults
@@ -474,6 +478,9 @@ impl FractalParams {
             }
             FractalType::Nova2D | FractalType::Lyapunov2D => {
                 self.max_iterations = 16;
+            }
+            FractalType::SierpinskiTriangle2D => {
+                self.max_iterations = 30;
             }
             FractalType::Mandelbox3D => {
                 self.fractal_scale = 1.0; // Double the apparent size
