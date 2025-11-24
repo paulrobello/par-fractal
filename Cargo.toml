@@ -1,0 +1,69 @@
+[package]
+name = "par-fractal"
+version = "0.1.0"
+edition = "2021"
+authors = ["Paul Robello <probello@gmail.com>"]
+description = "Cross-platform GPU-accelerated fractal renderer with 2D and 3D support"
+readme = "README.md"
+license = "MIT"
+repository = "https://github.com/paulrobello/par-fractal"
+homepage = "https://github.com/paulrobello/par-fractal"
+documentation = "https://github.com/paulrobello/par-fractal/blob/main/README.md"
+keywords = ["fractal", "gpu", "graphics", "visualization", "renderer"]
+categories = ["graphics", "multimedia", "visualization"]
+default-run = "par-fractal"
+exclude = [
+    "*.png",
+    "*.jpg",
+    "*.mp4",
+    "*.webm",
+    "*.gif",
+    "screenshots/",
+    "images/",
+    ".github/",
+    ".gitignore",
+    "CLAUDE.md",
+    "lod.md",
+    "handoff.md"
+]
+
+[dependencies]
+open = "5"
+# Core graphics
+wgpu = "27"
+winit = "0.30"
+pollster = "0.4"
+
+# Math
+glam = "0.30"
+
+# UI
+egui = "0.33"
+egui-wgpu = "0.33"
+egui-winit = "0.33"
+
+# Utilities
+bytemuck = { version = "1.24", features = ["derive"] }
+env_logger = "0.11"
+log = "0.4"
+rand = "0.9"
+image = "0.25"
+chrono = "0.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
+serde_json = "1.0"
+directories = "6.0"
+rfd = "0.15"
+
+# Video recording
+crossbeam-channel = "0.5"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+
+[profile.dev]
+opt-level = 0
+debug = true

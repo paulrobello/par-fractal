@@ -1,0 +1,83 @@
+name: Publish to crates.io
+
+# Standalone workflow for publishing to crates.io
+# This can be triggered independently of the full release process
+# Useful for republishing or fixing crates.io releases without rebuilding everything
+
+on:
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'Skip running tests (use with caution)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish-crates:
+    name: Publish to crates.io
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libwayland-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev
+
+      - name: Get version
+        id: version
+        run: |
+          CARGO_VERSION=$(cargo metadata --format-version 1 --no-deps | jq -r '.packages[0].version')
+          echo "version=$CARGO_VERSION" >> $GITHUB_OUTPUT
+          echo "Cargo.toml version: $CARGO_VERSION"
+
+      - name: Check if version exists on crates.io
+        id: check_version
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          echo "Checking if version $VERSION exists on crates.io..."
+
+          # Search for the exact version
+          if cargo search par-fractal --limit 1 | grep -q "par-fractal = \"$VERSION\""; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "⚠️  Version $VERSION already exists on crates.io"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "✓ Version $VERSION not found on crates.io, proceeding with publish"
+          fi
+
+      - name: Run tests
+        if: ${{ !inputs.skip_tests && steps.check_version.outputs.exists == 'false' }}
+        run: cargo test --verbose
+
+      - name: Dry run publish
+        if: steps.check_version.outputs.exists == 'false'
+        run: cargo publish --dry-run
+
+      - name: Publish to crates.io
+        if: steps.check_version.outputs.exists == 'false'
+        run: cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Version already exists
+        if: steps.check_version.outputs.exists == 'true'
+        run: |
+          echo "::notice::Version ${{ steps.version.outputs.version }} already exists on crates.io. Skipping publish."
+
+      - name: Discord notification
+        if: success() && steps.check_version.outputs.exists == 'false'
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        uses: Ilshidur/action-discord@master
+        with:
+          args: 'Published {{ EVENT_PAYLOAD.repository.name }} v${{ steps.version.outputs.version }} to crates.io successfully!'
+        continue-on-error: true

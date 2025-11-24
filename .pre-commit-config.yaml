@@ -1,0 +1,53 @@
+# Pre-commit hooks for par-fractal
+# Install: make pre-commit-install
+# Run manually: make pre-commit-run
+
+repos:
+  # Standard pre-commit hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^(tests/.*\.expected|.*\.snap)$
+      - id: end-of-file-fixer
+        exclude: ^(tests/.*\.expected|.*\.snap)$
+      - id: check-yaml
+        exclude: ^\.github/workflows/
+      - id: check-toml
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+
+  # Rust formatting
+  - repo: local
+    hooks:
+      - id: cargo-fmt
+        name: cargo fmt
+        description: Format Rust code with rustfmt
+        entry: cargo fmt --all --
+        language: system
+        types: [rust]
+        pass_filenames: false
+
+  # Rust linting
+  - repo: local
+    hooks:
+      - id: cargo-clippy
+        name: cargo clippy
+        description: Lint Rust code with clippy
+        entry: cargo clippy --all-targets --all-features -- -D warnings
+        language: system
+        types: [rust]
+        pass_filenames: false
+
+  # Rust tests
+  - repo: local
+    hooks:
+      - id: cargo-test
+        name: cargo test
+        description: Run Rust tests
+        entry: cargo test --verbose
+        language: system
+        types: [rust]
+        pass_filenames: false

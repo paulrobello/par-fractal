@@ -1,0 +1,216 @@
+name: Release and Deploy
+
+# This workflow handles the complete release process:
+# 1. Builds standalone binaries for multiple platforms (Linux, macOS, Windows)
+# 2. Publishes the library to crates.io
+# 3. Creates a GitHub release with all binary artifacts
+#
+# To trigger: Go to Actions → Release and Deploy → Run workflow
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  # Build binaries for multiple platforms
+  build-binaries:
+    name: Build binary - ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x86_64
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: par-fractal
+            asset_name: par-fractal-linux-x86_64
+
+          - name: Linux ARM64
+            os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            artifact_name: par-fractal
+            asset_name: par-fractal-linux-aarch64
+
+          - name: macOS x86_64
+            os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: par-fractal
+            asset_name: par-fractal-macos-x86_64
+
+          - name: macOS ARM64
+            os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: par-fractal
+            asset_name: par-fractal-macos-aarch64
+
+          - name: Windows x86_64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: par-fractal.exe
+            asset_name: par-fractal-windows-x86_64.exe
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install Linux dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libwayland-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev
+
+      - name: Install cross-compilation tools (Linux ARM64)
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Build binary
+        run: cargo build --release --target ${{ matrix.target }}
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+
+      - name: Strip binary (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
+            aarch64-linux-gnu-strip target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
+          else
+            strip target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
+          fi
+
+      - name: Rename binary
+        shell: bash
+        run: |
+          mkdir -p release-binaries
+          cp target/${{ matrix.target }}/release/${{ matrix.artifact_name }} release-binaries/${{ matrix.asset_name }}
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.target }}
+          path: release-binaries/${{ matrix.asset_name }}
+          retention-days: 1
+
+  # Publish to crates.io
+  publish-crates:
+    name: Publish to crates.io
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [build-binaries]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libwayland-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev
+
+      - name: Get version
+        id: version
+        run: |
+          CARGO_VERSION=$(cargo metadata --format-version 1 --no-deps | jq -r '.packages[0].version')
+          echo "version=$CARGO_VERSION" >> $GITHUB_OUTPUT
+          echo "Cargo.toml version: $CARGO_VERSION"
+
+      - name: Run tests
+        run: cargo test --verbose
+
+      - name: Dry run publish
+        run: cargo publish --dry-run
+
+      - name: Publish to crates.io
+        run: cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }} || echo "Version may already exist on crates.io, continuing..."
+        continue-on-error: true
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Discord notification
+        if: success()
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        uses: Ilshidur/action-discord@master
+        with:
+          args: 'Published {{ EVENT_PAYLOAD.repository.name }} to crates.io successfully!'
+        continue-on-error: true
+
+  # Create GitHub release
+  github-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [publish-crates, build-binaries]
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Get version
+        id: get_version
+        run: |
+          version=$(cargo metadata --format-version 1 --no-deps | jq -r '.packages[0].version')
+          echo "version=$version" >> $GITHUB_OUTPUT
+          echo "Package version: $version"
+
+      - name: Download binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: binary-*
+          path: binaries
+          merge-multiple: true
+
+      - name: List downloaded binaries
+        run: ls -lh binaries/
+
+      - name: Create or update GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="v${{ steps.get_version.outputs.version }}"
+
+          # Check if release exists
+          if gh release view "$VERSION" --repo '${{ github.repository }}' >/dev/null 2>&1; then
+            echo "Release $VERSION already exists. Deleting and recreating..."
+            gh release delete "$VERSION" --repo '${{ github.repository }}' --yes
+          fi
+
+          # Create new release
+          gh release create \
+          "$VERSION" \
+          --repo '${{ github.repository }}' \
+          --generate-notes \
+          --latest
+
+      - name: Upload binaries to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload \
+          'v${{ steps.get_version.outputs.version }}' binaries/* \
+          --repo '${{ github.repository }}' \
+          --clobber
+
+      - name: Discord notification
+        if: success()
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        uses: Ilshidur/action-discord@master
+        with:
+          args: 'A new release v${{ steps.get_version.outputs.version }} has been created for {{ EVENT_PAYLOAD.repository.full_name }}.'
+        continue-on-error: true
