@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Par Fractal - GPU Accelerated Fractal Renderer</title>
+    <meta name="description" content="Cross-platform GPU-accelerated fractal renderer with 2D and 3D support">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #1a1a1a;
+        }
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            outline: none;
+        }
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #888;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 16px;
+            text-align: center;
+        }
+        .spinner {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 20px;
+            border: 3px solid #333;
+            border-top-color: #888;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        #error {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ff6b6b;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 16px;
+            text-align: center;
+            max-width: 400px;
+            padding: 20px;
+        }
+        #error h2 {
+            margin-bottom: 10px;
+            color: #ff6b6b;
+        }
+        #error p {
+            color: #888;
+            line-height: 1.5;
+        }
+        #error a {
+            color: #6b9fff;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <div class="spinner"></div>
+        <div>Loading Par Fractal...</div>
+        <div style="font-size: 12px; margin-top: 8px; color: #666;">Initializing WebGPU</div>
+    </div>
+    <div id="error">
+        <h2>WebGPU Not Available</h2>
+        <p>
+            Your browser doesn't support WebGPU, which is required for this application.
+            Please use a modern browser like Chrome 113+, Edge 113+, Firefox 141+, or Safari 26+.
+        </p>
+        <p style="margin-top: 10px;">
+            <a href="https://caniuse.com/webgpu" target="_blank">Check WebGPU browser support</a>
+        </p>
+    </div>
+    <canvas id="canvas" tabindex="0"></canvas>
+    <script>
+        // Check for WebGPU support before loading WASM
+        if (!navigator.gpu) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error').style.display = 'block';
+        }
+    </script>
+    <link data-trunk rel="rust" data-wasm-opt="z" data-cargo-features="web" data-cargo-no-default-features />
+</body>
+</html>

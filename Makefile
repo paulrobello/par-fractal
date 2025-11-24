@@ -3,7 +3,8 @@
 
 .PHONY: help build build-release run run-release test check clean clippy clippy-fix fmt fmt-check \
         install-deps doc checkall pre-commit-install pre-commit-uninstall pre-commit-run \
-        pre-commit-update lint deploy release cache-clean
+        pre-commit-update lint deploy release cache-clean \
+        web-install web-build web-serve web-clean web-deploy
 
 # Default target
 .DEFAULT_GOAL := help
@@ -56,6 +57,13 @@ help:
 	@echo "Deployment:"
 	@echo "  release            - Trigger GitHub release pipeline (with confirmation)"
 	@echo "  deploy             - Trigger GitHub 'Release and Deploy' workflow"
+	@echo ""
+	@echo "Web/WASM Build:"
+	@echo "  web-install        - Install trunk and WASM target"
+	@echo "  web-build          - Build WASM bundle for production"
+	@echo "  web-serve          - Start development server (http://127.0.0.1:8080)"
+	@echo "  web-clean          - Clean web build artifacts"
+	@echo "  web-deploy         - Trigger GitHub Pages deployment"
 	@echo ""
 	@echo "System:"
 	@echo "  install-deps       - Install required system dependencies (Linux only)"
@@ -409,3 +417,70 @@ b: build
 t: test
 c: check
 f: fmt
+
+# ============================================================================
+# Web/WASM Build
+# ============================================================================
+
+web-install:
+	@echo "Installing trunk and WASM target..."
+	@if ! command -v trunk > /dev/null; then \
+		cargo install trunk; \
+	else \
+		echo "trunk already installed"; \
+	fi
+	rustup target add wasm32-unknown-unknown
+	@echo ""
+	@echo "======================================================================"
+	@echo "  Web build tools installed!"
+	@echo "======================================================================"
+	@echo ""
+	@echo "Now you can run:"
+	@echo "  make web-serve    - Start development server"
+	@echo "  make web-build    - Build for production"
+	@echo ""
+
+web-build:
+	@echo "Building WASM bundle..."
+	trunk build --release
+	@echo ""
+	@echo "======================================================================"
+	@echo "  Web build complete!"
+	@echo "======================================================================"
+	@echo ""
+	@ls -lh dist/
+	@echo ""
+	@echo "Deploy with: make web-deploy"
+	@echo "Or serve locally: python3 -m http.server 8000 -d dist"
+	@echo ""
+
+web-serve:
+	@echo "Starting development server..."
+	@echo "Open http://127.0.0.1:8080 in your browser"
+	@echo ""
+	trunk serve
+
+web-clean:
+	@echo "Cleaning web build artifacts..."
+	rm -rf dist/
+	@echo "Web build artifacts cleaned."
+
+web-deploy:
+	@echo "======================================================================"
+	@echo "  Triggering GitHub Pages deployment"
+	@echo "======================================================================"
+	@echo ""
+	@if ! command -v gh > /dev/null; then \
+		echo "Error: GitHub CLI (gh) not found. Install it from:"; \
+		echo "  https://cli.github.com/"; \
+		exit 1; \
+	fi
+	gh workflow run deploy-web.yml
+	@echo ""
+	@echo "Deployment triggered!"
+	@echo "Monitor progress at:"
+	@echo "  https://github.com/paulrobello/par-fractal/actions"
+	@echo ""
+	@echo "Site will be available at:"
+	@echo "  https://par-fractal.pardev.net"
+	@echo ""

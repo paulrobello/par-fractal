@@ -1,10 +1,13 @@
 // Module declarations
 mod camera_transition;
-mod capture;
 mod input;
-mod persistence;
 mod render;
 mod update;
+
+#[cfg(feature = "native")]
+mod capture;
+#[cfg(feature = "native")]
+mod persistence;
 
 use camera_transition::CameraTransition;
 
@@ -12,10 +15,29 @@ use crate::camera::{Camera, CameraController};
 use crate::fractal::{FractalParams, RenderMode};
 use crate::renderer::Renderer;
 use crate::ui::UI;
-use crate::video_recorder::{VideoFormat, VideoRecorder};
 use std::sync::Arc;
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
+
+#[cfg(feature = "native")]
+use crate::video_recorder::{VideoFormat, VideoRecorder};
+
+/// Stub video recorder for web builds
+#[cfg(feature = "web")]
+pub struct VideoRecorder;
+
+#[cfg(feature = "web")]
+impl VideoRecorder {
+    pub fn is_recording(&self) -> bool {
+        false
+    }
+    pub fn is_available(&self) -> bool {
+        false
+    }
+    pub fn frame_count(&self) -> u32 {
+        0
+    }
+}
 
 pub struct App {
     window: Arc<Window>,
@@ -44,6 +66,9 @@ pub struct App {
     start_time: std::time::Instant, // Track elapsed time for palette animation
     camera_transition: CameraTransition,
     smooth_transitions_enabled: bool,
+    #[cfg(feature = "native")]
+    video_recorder: VideoRecorder,
+    #[cfg(feature = "web")]
     video_recorder: VideoRecorder,
     screenshot_delay: Option<f32>, // CLI option: take screenshot after N seconds
     exit_delay: Option<f32>,       // CLI option: exit after N seconds
@@ -52,6 +77,8 @@ pub struct App {
 }
 
 impl App {
+    /// Create a new App instance (native version)
+    #[cfg(feature = "native")]
     pub async fn new(
         window: Window,
         screenshot_delay: Option<f32>,
@@ -161,6 +188,95 @@ impl App {
         }
     }
 
+    /// Create a new App instance (web version with error handling)
+    #[cfg(feature = "web")]
+    pub async fn new_async(
+        window: Window,
+        screenshot_delay: Option<f32>,
+        exit_delay: Option<f32>,
+        preset_name: Option<String>,
+    ) -> Result<Self, String> {
+        let window = Arc::new(window);
+        let size = window.inner_size();
+
+        log::info!("Initializing renderer with size {}x{}", size.width, size.height);
+
+        // Create renderer (no GPU preference on web - browser handles this)
+        let renderer = Renderer::new(window.clone(), size).await;
+
+        // Use default fractal params for web (no persistent storage yet)
+        // TODO: Load from localStorage via platform abstraction
+        let fractal_params = if let Some(preset) = preset_name {
+            match crate::fractal::PresetGallery::get_builtin_preset(&preset) {
+                Some(preset_data) => {
+                    log::info!("Loaded preset: {}", preset);
+                    FractalParams::from_settings(preset_data.settings.clone())
+                }
+                None => {
+                    log::warn!("Preset '{}' not found, using defaults", preset);
+                    FractalParams::default()
+                }
+            }
+        } else {
+            FractalParams::default()
+        };
+
+        let mut camera = Camera::new(size.width, size.height);
+        camera.fovy = fractal_params.camera_fov;
+        let camera_controller = CameraController::new(fractal_params.camera_speed);
+
+        let ui = UI::new();
+
+        let egui_ctx = egui::Context::default();
+        let egui_state =
+            egui_winit::State::new(egui_ctx, egui::ViewportId::ROOT, &window, None, None, None);
+
+        let egui_renderer = egui_wgpu::Renderer::new(
+            &renderer.device,
+            renderer.config.format,
+            egui_wgpu::RendererOptions {
+                msaa_samples: 1,
+                ..Default::default()
+            },
+        );
+
+        let video_recorder = VideoRecorder;
+
+        Ok(Self {
+            window,
+            renderer,
+            camera,
+            camera_controller,
+            fractal_params,
+            ui,
+            egui_state,
+            egui_renderer,
+            last_frame_time: std::time::Instant::now(),
+            mouse_pressed: false,
+            last_mouse_pos: None,
+            cursor_pos: (0.0, 0.0),
+            shift_pressed: false,
+            frame_count: 0,
+            fps_timer: std::time::Instant::now(),
+            current_fps: 0.0,
+            save_screenshot: false,
+            save_hires_render: None,
+            camera_last_moved: std::time::Instant::now(),
+            camera_needs_save: false,
+            settings_last_changed: std::time::Instant::now(),
+            settings_need_save: false,
+            was_auto_orbiting: false,
+            start_time: std::time::Instant::now(),
+            camera_transition: CameraTransition::new(),
+            smooth_transitions_enabled: true,
+            video_recorder,
+            screenshot_delay,
+            exit_delay,
+            screenshot_taken: false,
+            should_exit: false,
+        })
+    }
+
     pub fn window(&self) -> &Window {
         &self.window
     }
@@ -177,7 +293,8 @@ impl App {
         self.renderer.resize(new_size);
         self.camera.resize(new_size.width, new_size.height);
 
-        // Persist window size so it can be restored on next launch
+        // Persist window size (native only)
+        #[cfg(feature = "native")]
         if new_size.width > 0 && new_size.height > 0 {
             let mut prefs = crate::fractal::AppPreferences::load();
             prefs.set_window_size(new_size.width, new_size.height);
