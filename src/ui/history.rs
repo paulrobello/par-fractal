@@ -6,7 +6,7 @@ use crate::fractal::FractalParams;
 pub(super) struct HistoryEntry {
     pub(super) params: FractalParams,
     #[allow(dead_code)]
-    pub(super) timestamp: std::time::Instant,
+    pub(super) timestamp: web_time::Instant,
 }
 
 /// Undo/redo functionality for UI
@@ -29,7 +29,7 @@ impl UI {
         if should_save {
             self.history.push(HistoryEntry {
                 params: params.clone(),
-                timestamp: std::time::Instant::now(),
+                timestamp: web_time::Instant::now(),
             });
 
             // Maintain max history size

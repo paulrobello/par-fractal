@@ -3,7 +3,7 @@
 pub struct Toast {
     pub(super) message: String,
     pub(super) file_path: Option<String>,
-    pub(super) created_at: std::time::Instant,
+    pub(super) created_at: web_time::Instant,
     pub(super) duration_secs: f32,
 }
 
@@ -12,7 +12,7 @@ impl Toast {
         Self {
             message,
             file_path: Some(file_path),
-            created_at: std::time::Instant::now(),
+            created_at: web_time::Instant::now(),
             duration_secs,
         }
     }

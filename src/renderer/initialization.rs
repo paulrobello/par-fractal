@@ -756,7 +756,7 @@ impl Renderer {
             uniform_buffer,
             uniform_bind_group,
             uniforms,
-            start_time: std::time::Instant::now(),
+            start_time: web_time::Instant::now(),
 
             // Multi-pass post-processing
             scene_texture,

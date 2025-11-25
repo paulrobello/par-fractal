@@ -9,7 +9,7 @@ pub(super) struct CameraTransition {
     end_position: Vec3,
     end_target: Vec3,
     end_fov: f32,
-    start_time: std::time::Instant,
+    start_time: web_time::Instant,
     duration: f32,
 }
 
@@ -23,7 +23,7 @@ impl CameraTransition {
             end_position: Vec3::ZERO,
             end_target: Vec3::ZERO,
             end_fov: 45.0,
-            start_time: std::time::Instant::now(),
+            start_time: web_time::Instant::now(),
             duration: 1.0,
         }
     }
@@ -46,7 +46,7 @@ impl CameraTransition {
         self.end_position = end_pos;
         self.end_target = end_tgt;
         self.end_fov = end_fov;
-        self.start_time = std::time::Instant::now();
+        self.start_time = web_time::Instant::now();
         self.duration = duration;
     }
 

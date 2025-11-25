@@ -4,7 +4,7 @@ use crate::fractal::RenderMode;
 /// Update loop methods
 impl App {
     pub fn update(&mut self) {
-        let now = std::time::Instant::now();
+        let now = web_time::Instant::now();
         let dt = (now - self.last_frame_time).as_secs_f32();
         self.last_frame_time = now;
 
@@ -121,7 +121,7 @@ impl App {
 
             // Check if camera moved
             if old_pos != self.camera.position || old_target != self.camera.target {
-                self.camera_last_moved = std::time::Instant::now();
+                self.camera_last_moved = web_time::Instant::now();
                 self.camera_needs_save = true;
             }
         }

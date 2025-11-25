@@ -63,7 +63,7 @@ pub struct UI {
     preset_search: String,
     preset_category_filter: PresetCategory,
     user_presets: Vec<String>,
-    last_preset_list_update: std::time::Instant,
+    last_preset_list_update: web_time::Instant,
     // Undo/Redo system
     history: Vec<HistoryEntry>,
     history_index: usize,
@@ -72,13 +72,13 @@ pub struct UI {
     // Camera bookmarks
     bookmark_name: String,
     bookmarks: Vec<String>,
-    last_bookmark_list_update: std::time::Instant,
+    last_bookmark_list_update: web_time::Instant,
     bookmark_to_delete: Option<String>,
     // Custom palette editor
     custom_palette_name: String,
     custom_palette_colors: [[f32; 3]; 5],
     custom_palettes: Vec<String>,
-    last_custom_palette_list_update: std::time::Instant,
+    last_custom_palette_list_update: web_time::Instant,
     custom_palette_to_delete: Option<String>,
     palette_import_path: String,
     palette_import_message: Option<String>,
@@ -101,7 +101,7 @@ pub struct UI {
     // Toast notifications
     toasts: Vec<Toast>,
     pub selected_monitor_index: usize,
-    pub last_monitor_scan: std::time::Instant,
+    pub last_monitor_scan: web_time::Instant,
     // Custom resolution input
     pub custom_width: String,
     pub custom_height: String,
@@ -126,14 +126,14 @@ impl UI {
             preset_search: String::new(),
             preset_category_filter: PresetCategory::All,
             user_presets: PresetGallery::list_user_presets().unwrap_or_default(),
-            last_preset_list_update: std::time::Instant::now(),
+            last_preset_list_update: web_time::Instant::now(),
             history: Vec::new(),
             history_index: 0,
             max_history_size: 50,
             last_saved_params: None,
             bookmark_name: String::new(),
             bookmarks: BookmarkGallery::list_bookmarks().unwrap_or_default(),
-            last_bookmark_list_update: std::time::Instant::now(),
+            last_bookmark_list_update: web_time::Instant::now(),
             bookmark_to_delete: None,
             custom_palette_name: String::new(),
             custom_palette_colors: [
@@ -144,7 +144,7 @@ impl UI {
                 [0.0, 0.0, 1.0], // Blue
             ],
             custom_palettes: CustomPaletteGallery::list_palettes().unwrap_or_default(),
-            last_custom_palette_list_update: std::time::Instant::now(),
+            last_custom_palette_list_update: web_time::Instant::now(),
             custom_palette_to_delete: None,
             palette_import_path: String::new(),
             palette_import_message: None,
@@ -160,7 +160,7 @@ impl UI {
             available_monitors: Vec::new(),
             toasts: Vec::new(),
             selected_monitor_index: 0,
-            last_monitor_scan: std::time::Instant::now(),
+            last_monitor_scan: web_time::Instant::now(),
             custom_width: String::from("1920"),
             custom_height: String::from("1080"),
             auto_open_captures: false,
@@ -234,7 +234,7 @@ impl UI {
         eprintln!("DEBUG: Monitors in list: {}", self.available_monitors.len());
 
         // Update scan time
-        self.last_monitor_scan = std::time::Instant::now();
+        self.last_monitor_scan = web_time::Instant::now();
 
         log::info!("Scanned {} monitor(s)", self.available_monitors.len());
     }
@@ -590,7 +590,7 @@ impl UI {
                         // Refresh user presets list periodically
                         if self.last_preset_list_update.elapsed().as_secs() > 2 {
                             self.user_presets = PresetGallery::list_user_presets().unwrap_or_default();
-                            self.last_preset_list_update = std::time::Instant::now();
+                            self.last_preset_list_update = web_time::Instant::now();
                         }
 
                         if !self.user_presets.is_empty() {
@@ -1106,7 +1106,7 @@ impl UI {
                                 // Refresh custom palette list periodically
                                 if self.last_custom_palette_list_update.elapsed().as_secs() > 2 {
                                     self.custom_palettes = CustomPaletteGallery::list_palettes().unwrap_or_default();
-                                    self.last_custom_palette_list_update = std::time::Instant::now();
+                                    self.last_custom_palette_list_update = web_time::Instant::now();
                                 }
 
                                 if !self.custom_palettes.is_empty() {
@@ -1439,7 +1439,7 @@ impl UI {
                                 // Refresh bookmark list periodically
                                 if self.last_bookmark_list_update.elapsed().as_secs() > 2 {
                                     self.bookmarks = BookmarkGallery::list_bookmarks().unwrap_or_default();
-                                    self.last_bookmark_list_update = std::time::Instant::now();
+                                    self.last_bookmark_list_update = web_time::Instant::now();
                                 }
 
                                 if !self.bookmarks.is_empty() {

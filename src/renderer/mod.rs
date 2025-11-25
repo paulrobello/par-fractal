@@ -25,7 +25,7 @@ pub struct Renderer {
     pub uniform_buffer: wgpu::Buffer,
     pub uniform_bind_group: wgpu::BindGroup,
     uniforms: Uniforms,
-    start_time: std::time::Instant,
+    start_time: web_time::Instant,
 
     // Multi-pass post-processing
     pub scene_texture: wgpu::Texture,

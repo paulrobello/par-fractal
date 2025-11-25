@@ -288,7 +288,7 @@ impl App {
                     .execute_command(command_action, &mut self.fractal_params);
 
                 if changed {
-                    self.settings_last_changed = std::time::Instant::now();
+                    self.settings_last_changed = web_time::Instant::now();
                     self.settings_need_save = true;
                 }
 
@@ -336,7 +336,7 @@ impl App {
                     .point_at_target(self.camera.position, self.camera.target);
 
                 // Mark settings for save
-                self.settings_last_changed = std::time::Instant::now();
+                self.settings_last_changed = web_time::Instant::now();
                 self.settings_need_save = true;
             }
 
@@ -466,7 +466,7 @@ impl App {
 
             // Mark settings for auto-save (debounced)
             if changed {
-                self.settings_last_changed = std::time::Instant::now();
+                self.settings_last_changed = web_time::Instant::now();
                 self.settings_need_save = true;
 
                 // Update camera parameters from fractal_params
