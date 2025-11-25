@@ -316,3 +316,4 @@ Full documentation in `docs/` directory:
 - Update Rust: `rustup update`
 - Clear build cache: `make clean && make build`
 - Check Linux dependencies: `make install-deps`
+- make sure to keep the about page in the app up to date with readme whats new

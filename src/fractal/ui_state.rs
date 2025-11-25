@@ -17,6 +17,7 @@ pub struct UIState {
     pub settings_open: bool,
     pub controls_open: bool,
     pub capture_window_open: bool,
+    pub about_window_open: bool,
     pub show_fps: bool,
     pub show_camera_info: bool,
 }
@@ -99,6 +100,7 @@ impl Default for UIState {
             settings_open: false,
             controls_open: false,
             capture_window_open: false,
+            about_window_open: false,
             show_fps: false,
             show_camera_info: false,
         }

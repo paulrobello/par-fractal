@@ -50,6 +50,22 @@ pub enum FractalType {
 }
 
 impl FractalType {
+    /// Returns true if this is a 2D strange attractor type
+    pub fn is_2d_attractor(&self) -> bool {
+        matches!(
+            self,
+            FractalType::Hopalong2D
+                | FractalType::Henon2D
+                | FractalType::Martin2D
+                | FractalType::Gingerbreadman2D
+                | FractalType::Latoocarfian2D
+                | FractalType::Chip2D
+                | FractalType::Quadruptwo2D
+                | FractalType::Threeply2D
+                | FractalType::Icon2D
+        )
+    }
+
     /// Returns a filename-safe name for this fractal type
     pub fn filename_safe_name(&self) -> &'static str {
         match self {

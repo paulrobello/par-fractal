@@ -133,6 +133,21 @@ trunk serve
 
 ## Current Issues (2025-11-24)
 
+### Strange Attractor Rendering Bug - FIXED
+
+**Status**: Fixed. All 9 2D attractor functions updated to use distance-based coloring.
+
+**Solution**: Changed from hit-count-based rendering to minimum distance-based rendering:
+- Each pixel now finds the minimum distance to the attractor orbit
+- Colors based on proximity: `1.0 - clamp(min_dist / threshold, 0.0, 1.0)`
+- Distance threshold scales with zoom: `0.5 / uniforms.zoom`
+
+**Files Modified**: `src/shaders/fractal.wgsl` lines 906-1246 (all 9 2D attractor functions)
+
+**Note**: 3D attractors (Pickover, Lorenz, Rossler) already use distance-based approach and should work correctly.
+
+---
+
 ### Web Video Recording - REMOVED
 
 **Status**: Feature removed from web build.

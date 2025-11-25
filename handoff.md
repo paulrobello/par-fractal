@@ -1,148 +1,147 @@
-# Handoff Document - Web Video Recording
-
-**Date**: 2025-11-24
-**Previous Developer**: Claude
-**Status**: FIXED - web video recording now uses async buffer mapping
+# Handoff Document
 
 ## Before Starting
 
-Read `plan.md` in the project root for overall project context and planning notes.
+Read `plan.md` in the project root for overall project context and architecture.
 
-## Fix Applied (2025-11-24)
+## Current Issue - Strange Attractor Rendering Bug - FIXED
 
-**Changes Made:**
+### Solution Applied
 
-1. **`src/app/mod.rs`**:
-   - Added `Rc<RefCell<>>` imports for web builds
-   - Changed `video_recorder` type from `WebVideoRecorder` to `Rc<RefCell<WebVideoRecorder>>` for web
+Changed all 9 2D strange attractor functions from hit-count-based rendering to distance-based rendering:
+- Each pixel now tracks minimum distance to the attractor orbit
+- Colors based on proximity: `1.0 - clamp(min_dist / threshold, 0.0, 1.0)`
+- Distance threshold scales with zoom: `0.5 / uniforms.zoom`
 
-2. **`src/app/capture_web.rs`**:
-   - Added new `capture_video_frame_web()` function that captures frames asynchronously
-   - Uses `wasm_bindgen_futures::spawn_local` and `gloo_timers` for non-blocking buffer mapping
-   - Same async pattern as the working `capture_screenshot_web()` function
+All tests pass (`make checkall`). Visual testing recommended.
 
-3. **`src/app/render.rs`**:
-   - Replaced synchronous blocking video frame capture with call to `capture_video_frame_web()`
-   - Updated all `video_recorder` accesses to use `.borrow()` and `.borrow_mut()` for web
-   - Fixed recording indicator to show actual recording state on web
+---
 
-**Why this works:**
-- The async pattern avoids blocking the main thread during GPU buffer mapping
-- `Rc<RefCell<>>` allows sharing the recorder between the render loop and async callbacks
-- Frame capture happens in the background without freezing the browser
+## Original Problem Description (for reference)
 
-## Previous Issue (Now Fixed)
+The 12 new strange attractor fractals (added from xfractint) render as a **solid color** instead of showing the attractor patterns. When iterations are reduced to around 10, concentric circles appear instead of the expected attractor patterns.
 
-**Problem**: Clicking the "Record" button on the web version causes the browser tab to become unresponsive and eventually get killed by the browser.
+### Affected Fractals
 
-**Root Cause Analysis**: The issue is in `src/app/render.rs` around line 270-360. The web video frame capture code attempts to do **synchronous GPU buffer mapping** which blocks the main thread:
+**2D Strange Attractors (types 26-34):**
+- Hopalong2D, Henon2D, Martin2D, Gingerbreadman2D
+- Latoocarfian2D, Chip2D, Quadruptwo2D, Threeply2D, Icon2D
 
-```rust
-// This is the problematic code (lines ~320-331):
-let (sender, receiver) = std::sync::mpsc::channel();
-buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
-    let _ = sender.send(result);
-});
+**3D Strange Attractors (types 35-37):**
+- Pickover3D, Lorenz3D, Rossler3D
 
-// Poll device to process the mapping - THIS BLOCKS!
-let _ = self.renderer.device.poll(wgpu::PollType::Wait {
-    submission_index: None,
-    timeout: None,
-});
+### Root Cause Analysis
 
-if receiver.recv().map(|r| r.is_ok()).unwrap_or(false) {
-    // Read buffer data...
+The issue is in the shader implementation. Strange attractors work differently from escape-time fractals:
+
+1. **Escape-time fractals** (Mandelbrot, Julia, etc.): Each pixel computes its own iteration sequence and colors based on how quickly it escapes.
+
+2. **Strange attractors**: A single orbit is computed from a fixed starting point, and pixels are colored based on whether the orbit passes near them.
+
+The current implementation in `src/shaders/fractal.wgsl` (lines 906-1272) attempts orbit-based rendering but has issues:
+
+**Problem 1: Pixel size calculation**
+```wgsl
+let pixel_size = 4.0 / uniforms.zoom;
+```
+This doesn't properly account for the screen resolution and attractor scale.
+
+**Problem 2: Hit detection threshold**
+```wgsl
+if (dist < pixel_size) {
+    hit_count += 1.0 - dist / pixel_size;
+}
+```
+The threshold may be too small relative to the attractor's natural scale, causing most pixels to never register hits.
+
+**Problem 3: Single orbit path**
+Each pixel computes the same orbit from the same starting point. This means all pixels see the same orbit, but only those near the orbit path should light up.
+
+### Suggested Fixes
+
+#### Option A: Density-based rendering (recommended)
+Instead of binary hit detection, accumulate a density field:
+
+```wgsl
+fn hopalong_attractor(coord: vec2<f32>) -> f32 {
+    // ... attractor parameters ...
+
+    var density = 0.0;
+    let sigma = 0.1 / uniforms.zoom;  // Gaussian width scales with zoom
+
+    // Skip transient
+    for (var i = 0u; i < 100u; i++) { /* iterate */ }
+
+    // Accumulate density
+    for (var i = 0u; i < uniforms.max_iterations; i++) {
+        // iterate attractor...
+        let dist_sq = dot(vec2(x, y) - coord, vec2(x, y) - coord);
+        density += exp(-dist_sq / (2.0 * sigma * sigma));
+    }
+
+    return clamp(density * 0.1, 0.0, 1.0);
 }
 ```
 
-On web (WASM), `device.poll()` with `Wait` and `std::sync::mpsc::channel` do not work the same as native. The browser's single-threaded model means this blocks the entire page.
-
-## Required Fix
-
-The web frame capture needs to be **asynchronous**. Options:
-
-### Option 1: Async Frame Collection (Recommended)
-Instead of capturing frames synchronously, collect them asynchronously using `wasm_bindgen_futures::spawn_local`:
-
-```rust
-// In render.rs, for web video recording:
-#[cfg(target_arch = "wasm32")]
-if is_recording {
-    // Submit copy command but don't wait for it
-    // Use async buffer mapping like capture_web.rs does for screenshots
-    // Store frames in a queue that the WebVideoRecorder processes
-}
+#### Option B: Increase hit radius
+Quick fix - increase the pixel_size multiplier:
+```wgsl
+let pixel_size = 20.0 / uniforms.zoom;  // Was 4.0
 ```
 
-Look at `src/app/capture_web.rs` lines 82-149 for the correct async pattern using:
-- `wasm_bindgen_futures::spawn_local`
-- `gloo_timers::future::TimeoutFuture` for polling
+#### Option C: Distance-based coloring
+Color based on minimum distance to orbit rather than hit count:
+```wgsl
+var min_dist = 1000.0;
+for (...) {
+    min_dist = min(min_dist, distance(vec2(x, y), coord));
+}
+return 1.0 - clamp(min_dist * uniforms.zoom * 0.5, 0.0, 1.0);
+```
 
-### Option 2: Skip Frame Capture on Web During Recording
-A simpler workaround - don't capture every frame. Instead:
-1. Only capture keyframes (e.g., every 30th frame)
-2. Use a lower capture rate for web
+### Files to Modify
 
-### Option 3: Use Canvas Recording
-Use the browser's `MediaRecorder` API to record the canvas directly instead of manual frame capture.
+1. **`src/shaders/fractal.wgsl`** (lines 906-1272)
+   - 2D attractor functions: `hopalong_attractor`, `henon_attractor`, etc.
+   - Fix the rendering algorithm for all 9 functions
 
-## Files to Modify
+2. **`src/shaders/fractal.wgsl`** (lines 1816-1937)
+   - 3D attractor distance functions: `pickover_attractor_de`, `lorenz_attractor_de`, `rossler_attractor_de`
+   - These may need different fix - point cloud approach might be too expensive for ray marching
 
-1. **`src/app/render.rs`** (lines 265-360)
-   - Remove synchronous buffer polling
-   - Implement async frame collection similar to `capture_web.rs`
-
-2. **`src/platform/web/video_recorder.rs`**
-   - May need to accept frames asynchronously
-   - Consider adding a frame queue that gets processed by the async callback
-
-## Related Code Reference
-
-| File | Purpose |
-|------|---------|
-| `src/app/render.rs` | Main render loop, contains broken frame capture |
-| `src/app/capture_web.rs` | Working async screenshot capture - use as reference |
-| `src/platform/web/video_recorder.rs` | WebVideoRecorder implementation |
-| `src/platform/web/gif_encoder.rs` | GIF encoder (works correctly) |
-| `src/platform/web/webm_muxer.rs` | WebM muxer (not currently used) |
-
-## What Was Implemented (Working)
-
-- WebVideoRecorder structure with format detection
-- GIF encoder using `gif` + `color_quant` crates
-- ZIP fallback (frames as PNG archive)
-- WebM muxer foundation (for future WebCodecs use)
-- Toast notifications for recording status
-
-## What Was Tested
-
-- Native video recording: Works correctly
-- Web screenshot capture: Works correctly
-- Web high-resolution render: Works (was fixed earlier in session)
-- Web video recording: **BROKEN** - causes browser hang
-
-## Build & Test Commands
+### Testing the Fix
 
 ```bash
-# Native build and test
-make checkall
+make r  # Run in release mode
+```
+Then:
+1. Select a strange attractor from the UI (e.g., "Hopalong" under "2D Strange Attractors")
+2. Adjust zoom and iterations
+3. Verify patterns appear similar to reference images from xfractint
 
-# Web build check
-cargo check --no-default-features --features web --target wasm32-unknown-unknown
+### Reference Material
 
-# Build and serve web version
-trunk serve --open
+- xfractint source code: `../xfractint-20.04p16/`
+- Original formulas are documented in shader comments
+- Wikipedia articles on each attractor type
+
+## Recent Commits (for context)
+
+1. `37d62f3` - feat(palettes): import 27 xfractint color maps
+2. `a7c04e9` - feat(fractals): add 12 strange attractor fractals from xfractint
+3. `af5bd0b` - feat(ui): add strange attractor buttons to fractal selector
+
+## Build Commands
+
+```bash
+make checkall  # Run all checks (format, lint, tests)
+make r         # Run in release mode
+make test      # Run tests only
 ```
 
 ## Notes
 
-- The `gif` crate (v0.14) and `color_quant` (v1.1) were added as web dependencies
-- web-sys was updated to v0.3.82 with WebCodecs features (for future use)
-- The WebCodecs API integration is prepared but not active (falls back to GIF)
-
-## Suggested Approach
-
-1. Start by understanding the async pattern in `capture_web.rs`
-2. Refactor the web video frame capture to use the same async approach
-3. Consider using `Rc<RefCell<>>` or similar to share the recorder state with async callbacks
-4. Test with a simple recording (just a few frames) before full integration
+- The existing escape-time fractals (Mandelbrot, Julia, etc.) work correctly
+- The 27 imported xfractint palettes work correctly
+- UI buttons for new fractals work correctly
+- The issue is purely in the shader rendering algorithm

@@ -132,9 +132,15 @@ pub struct Uniforms {
     // Aspect ratio stored in a vec4 slot to guarantee 16-byte alignment
     aspect_ratio: [f32; 4], // .x = width/height, others unused
 
-    // Padding for 16-byte alignment - reduced to account for new fields and vec3 alignment fix
-    _padding_end: [f32; 28], // 112 bytes (reduced by 16 for LOD fields)
-    _padding_end2: [f32; 4], // 16 bytes (reduced by 16 for aspect_ratio field)
+    // Reserved fields (unused, maintained for struct alignment)
+    _reserved1: u32,
+    _reserved2: u32,
+    _reserved3: u32,
+    _reserved4: u32,
+
+    // Padding for 16-byte alignment
+    _padding_end: [f32; 24], // 96 bytes
+    _padding_end2: [f32; 4], // 16 bytes
 }
 
 impl Default for Uniforms {
@@ -249,7 +255,12 @@ impl Uniforms {
 
             aspect_ratio: [16.0 / 9.0, 0.0, 0.0, 0.0], // Default aspect ratio
 
-            _padding_end: [0.0; 28],
+            _reserved1: 0,
+            _reserved2: 0,
+            _reserved3: 0,
+            _reserved4: 0,
+
+            _padding_end: [0.0; 24],
             _padding_end2: [0.0; 4],
         }
     }

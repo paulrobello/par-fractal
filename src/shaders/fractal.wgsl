@@ -118,10 +118,15 @@ struct Uniforms {
     // Aspect ratio stored in a vec4 slot to guarantee 16-byte alignment
     aspect_ratio: vec4<f32>, // .x = width/height, others unused
 
+    // Reserved fields (unused, maintained for struct alignment)
+    _reserved1: u32,
+    _reserved2: u32,
+    _reserved3: u32,
+    _reserved4: u32,
+
     // Padding to align struct to 832 bytes (52 × 16)
-    // After adding _padding_floor3_align, LOD fields, and aspect_ratio field
-    _padding_end: array<vec4<f32>, 7>,  // 112 bytes (reduced by 16 for LOD fields)
-    _padding_end2: vec4<f32>,           // 16 bytes (reduced by 16 for aspect_ratio field)
+    _padding_end: array<vec4<f32>, 6>,  // 96 bytes
+    _padding_end2: vec4<f32>,           // 16 bytes
 }
 
 @group(0) @binding(0)
@@ -913,31 +918,35 @@ fn hopalong_attractor(coord: vec2<f32>) -> f32 {
     var x = 0.1;
     var y = 0.0;
     var hit_count = 0.0;
-    let pixel_size = 4.0 / uniforms.zoom;
 
-    // Skip initial transient
-    for (var i = 0u; i < 100u; i = i + 1u) {
+    // Skip initial transient (fewer iterations for faster startup)
+    for (var i = 0u; i < 50u; i = i + 1u) {
         let x_new = y - sign(x) * sqrt(abs(b * x - c));
         let y_new = a - x;
         x = x_new;
         y = y_new;
     }
 
-    // Count how many orbit points hit near our coordinate
+    // Pixel threshold based on zoom level - smaller threshold for point scatter
+    // At zoom 1, view is ~4 units wide, with ~1000 pixels, so pixel_size ~= 0.004
+    let pixel_size = 4.0 / (uniforms.zoom * 1000.0);
+    let threshold_sq = pixel_size * pixel_size * 4.0; // 2 pixel radius
+
     for (var i = 0u; i < uniforms.max_iterations; i = i + 1u) {
         let x_new = y - sign(x) * sqrt(abs(b * x - c));
         let y_new = a - x;
         x = x_new;
         y = y_new;
 
-        let dist = distance(vec2<f32>(x, y), coord);
-        if (dist < pixel_size) {
-            hit_count += 1.0 - dist / pixel_size;
+        let diff = vec2<f32>(x, y) - coord;
+        let dist_sq = dot(diff, diff);
+        if (dist_sq < threshold_sq) {
+            hit_count += 1.0;
         }
     }
 
-    if (hit_count < 0.5) { return 0.0; }
-    return clamp(hit_count / 10.0, 0.0, 1.0);
+    // Normalize hit count - saturate gradually for visible points
+    return clamp(hit_count / 5.0, 0.0, 1.0);
 }
 
 // Hénon attractor: x' = 1 + y - a*x², y' = b*x
@@ -949,10 +958,9 @@ fn henon_attractor(coord: vec2<f32>) -> f32 {
     var x = 0.0;
     var y = 0.0;
     var hit_count = 0.0;
-    let pixel_size = 4.0 / uniforms.zoom;
 
     // Skip initial transient
-    for (var i = 0u; i < 100u; i = i + 1u) {
+    for (var i = 0u; i < 50u; i = i + 1u) {
         let x_new = 1.0 + y - a * x * x;
         let y_new = b * x;
         x = x_new;
@@ -963,6 +971,9 @@ fn henon_attractor(coord: vec2<f32>) -> f32 {
         }
     }
 
+    let pixel_size = 4.0 / (uniforms.zoom * 1000.0);
+    let threshold_sq = pixel_size * pixel_size * 4.0;
+
     for (var i = 0u; i < uniforms.max_iterations; i = i + 1u) {
         let x_new = 1.0 + y - a * x * x;
         let y_new = b * x;
@@ -971,14 +982,14 @@ fn henon_attractor(coord: vec2<f32>) -> f32 {
 
         if (abs(x) > 100.0 || abs(y) > 100.0) { break; }
 
-        let dist = distance(vec2<f32>(x, y), coord);
-        if (dist < pixel_size) {
-            hit_count += 1.0 - dist / pixel_size;
+        let diff = vec2<f32>(x, y) - coord;
+        let dist_sq = dot(diff, diff);
+        if (dist_sq < threshold_sq) {
+            hit_count += 1.0;
         }
     }
 
-    if (hit_count < 0.5) { return 0.0; }
-    return clamp(hit_count / 10.0, 0.0, 1.0);
+    return clamp(hit_count / 5.0, 0.0, 1.0);
 }
 
 // Martin attractor: x' = y - sin(x), y' = a - x
@@ -989,15 +1000,17 @@ fn martin_attractor(coord: vec2<f32>) -> f32 {
     var x = 0.1;
     var y = 0.0;
     var hit_count = 0.0;
-    let pixel_size = 4.0 / uniforms.zoom;
 
     // Skip initial transient
-    for (var i = 0u; i < 100u; i = i + 1u) {
+    for (var i = 0u; i < 50u; i = i + 1u) {
         let x_new = y - sin(x);
         let y_new = a - x;
         x = x_new;
         y = y_new;
     }
+
+    let pixel_size = 4.0 / (uniforms.zoom * 1000.0);
+    let threshold_sq = pixel_size * pixel_size * 4.0;
 
     for (var i = 0u; i < uniforms.max_iterations; i = i + 1u) {
         let x_new = y - sin(x);
@@ -1005,14 +1018,14 @@ fn martin_attractor(coord: vec2<f32>) -> f32 {
         x = x_new;
         y = y_new;
 
-        let dist = distance(vec2<f32>(x, y), coord);
-        if (dist < pixel_size) {
-            hit_count += 1.0 - dist / pixel_size;
+        let diff = vec2<f32>(x, y) - coord;
+        let dist_sq = dot(diff, diff);
+        if (dist_sq < threshold_sq) {
+            hit_count += 1.0;
         }
     }
 
-    if (hit_count < 0.5) { return 0.0; }
-    return clamp(hit_count / 10.0, 0.0, 1.0);
+    return clamp(hit_count / 5.0, 0.0, 1.0);
 }
 
 // Gingerbreadman: x' = 1 - y + |x|, y' = x
@@ -1020,7 +1033,6 @@ fn gingerbreadman_attractor(coord: vec2<f32>) -> f32 {
     var x = -0.1;
     var y = 0.0;
     var hit_count = 0.0;
-    let pixel_size = 4.0 / uniforms.zoom;
 
     // Skip initial transient
     for (var i = 0u; i < 50u; i = i + 1u) {
@@ -1030,6 +1042,9 @@ fn gingerbreadman_attractor(coord: vec2<f32>) -> f32 {
         y = y_new;
     }
 
+    let pixel_size = 4.0 / (uniforms.zoom * 1000.0);
+    let threshold_sq = pixel_size * pixel_size * 4.0;
+
     for (var i = 0u; i < uniforms.max_iterations; i = i + 1u) {
         let x_new = 1.0 - y + abs(x);
         let y_new = x;
@@ -1038,14 +1053,14 @@ fn gingerbreadman_attractor(coord: vec2<f32>) -> f32 {
 
         if (abs(x) > 1000.0 || abs(y) > 1000.0) { break; }
 
-        let dist = distance(vec2<f32>(x, y), coord);
-        if (dist < pixel_size) {
-            hit_count += 1.0 - dist / pixel_size;
+        let diff = vec2<f32>(x, y) - coord;
+        let dist_sq = dot(diff, diff);
+        if (dist_sq < threshold_sq) {
+            hit_count += 1.0;
         }
     }
 
-    if (hit_count < 0.5) { return 0.0; }
-    return clamp(hit_count / 10.0, 0.0, 1.0);
+    return clamp(hit_count / 5.0, 0.0, 1.0);
 }
 
 // Latoocarfian: x' = sin(y*b) + c*sin(x*b), y' = sin(x*a) + d*sin(y*a)
@@ -1059,15 +1074,17 @@ fn latoocarfian_attractor(coord: vec2<f32>) -> f32 {
     var x = 0.1;
     var y = 0.1;
     var hit_count = 0.0;
-    let pixel_size = 4.0 / uniforms.zoom;
 
     // Skip initial transient
-    for (var i = 0u; i < 100u; i = i + 1u) {
+    for (var i = 0u; i < 50u; i = i + 1u) {
         let x_new = sin(y * b) + c * sin(x * b);
         let y_new = sin(x * a) + d * sin(y * a);
         x = x_new;
         y = y_new;
     }
+
+    let pixel_size = 4.0 / (uniforms.zoom * 1000.0);
+    let threshold_sq = pixel_size * pixel_size * 4.0;
 
     for (var i = 0u; i < uniforms.max_iterations; i = i + 1u) {
         let x_new = sin(y * b) + c * sin(x * b);
@@ -1075,14 +1092,14 @@ fn latoocarfian_attractor(coord: vec2<f32>) -> f32 {
         x = x_new;
         y = y_new;
 
-        let dist = distance(vec2<f32>(x, y), coord);
-        if (dist < pixel_size) {
-            hit_count += 1.0 - dist / pixel_size;
+        let diff = vec2<f32>(x, y) - coord;
+        let dist_sq = dot(diff, diff);
+        if (dist_sq < threshold_sq) {
+            hit_count += 1.0;
         }
     }
 
-    if (hit_count < 0.5) { return 0.0; }
-    return clamp(hit_count / 10.0, 0.0, 1.0);
+    return clamp(hit_count / 5.0, 0.0, 1.0);
 }
 
 // Chip: x' = y - sign(x)*cos(log²(|b*x - c|))*arctan(log²(|c*x - b|)), y' = a - x
@@ -1095,10 +1112,9 @@ fn chip_attractor(coord: vec2<f32>) -> f32 {
     var x = 0.1;
     var y = 0.0;
     var hit_count = 0.0;
-    let pixel_size = 4.0 / uniforms.zoom;
 
     // Skip initial transient
-    for (var i = 0u; i < 100u; i = i + 1u) {
+    for (var i = 0u; i < 50u; i = i + 1u) {
         let log1 = log(max(abs(b * x - c), 0.001));
         let log2 = log(max(abs(c * x - b), 0.001));
         let x_new = y - sign(x) * cos(log1 * log1) * atan(log2 * log2);
@@ -1106,6 +1122,9 @@ fn chip_attractor(coord: vec2<f32>) -> f32 {
         x = x_new;
         y = y_new;
     }
+
+    let pixel_size = 4.0 / (uniforms.zoom * 1000.0);
+    let threshold_sq = pixel_size * pixel_size * 4.0;
 
     for (var i = 0u; i < uniforms.max_iterations; i = i + 1u) {
         let log1 = log(max(abs(b * x - c), 0.001));
@@ -1117,14 +1136,14 @@ fn chip_attractor(coord: vec2<f32>) -> f32 {
 
         if (abs(x) > 10000.0 || abs(y) > 10000.0) { break; }
 
-        let dist = distance(vec2<f32>(x, y), coord);
-        if (dist < pixel_size) {
-            hit_count += 1.0 - dist / pixel_size;
+        let diff = vec2<f32>(x, y) - coord;
+        let dist_sq = dot(diff, diff);
+        if (dist_sq < threshold_sq) {
+            hit_count += 1.0;
         }
     }
 
-    if (hit_count < 0.5) { return 0.0; }
-    return clamp(hit_count / 10.0, 0.0, 1.0);
+    return clamp(hit_count / 5.0, 0.0, 1.0);
 }
 
 // Quadruptwo: x' = y - sign(x)*sin(log(|b*x - c|))*arctan(log²(|c*x - b|)), y' = a - x
@@ -1137,10 +1156,9 @@ fn quadruptwo_attractor(coord: vec2<f32>) -> f32 {
     var x = 0.1;
     var y = 0.0;
     var hit_count = 0.0;
-    let pixel_size = 4.0 / uniforms.zoom;
 
     // Skip initial transient
-    for (var i = 0u; i < 100u; i = i + 1u) {
+    for (var i = 0u; i < 50u; i = i + 1u) {
         let log1 = log(max(abs(b * x - c), 0.001));
         let log2 = log(max(abs(c * x - b), 0.001));
         let x_new = y - sign(x) * sin(log1) * atan(log2 * log2);
@@ -1148,6 +1166,9 @@ fn quadruptwo_attractor(coord: vec2<f32>) -> f32 {
         x = x_new;
         y = y_new;
     }
+
+    let pixel_size = 4.0 / (uniforms.zoom * 1000.0);
+    let threshold_sq = pixel_size * pixel_size * 4.0;
 
     for (var i = 0u; i < uniforms.max_iterations; i = i + 1u) {
         let log1 = log(max(abs(b * x - c), 0.001));
@@ -1159,14 +1180,14 @@ fn quadruptwo_attractor(coord: vec2<f32>) -> f32 {
 
         if (abs(x) > 10000.0 || abs(y) > 10000.0) { break; }
 
-        let dist = distance(vec2<f32>(x, y), coord);
-        if (dist < pixel_size) {
-            hit_count += 1.0 - dist / pixel_size;
+        let diff = vec2<f32>(x, y) - coord;
+        let dist_sq = dot(diff, diff);
+        if (dist_sq < threshold_sq) {
+            hit_count += 1.0;
         }
     }
 
-    if (hit_count < 0.5) { return 0.0; }
-    return clamp(hit_count / 10.0, 0.0, 1.0);
+    return clamp(hit_count / 5.0, 0.0, 1.0);
 }
 
 // Threeply: x' = y - sign(x)*|sin(x)*cos(b) + c - x*sin(a+b+c)|, y' = a - x
@@ -1179,16 +1200,18 @@ fn threeply_attractor(coord: vec2<f32>) -> f32 {
     var x = 0.1;
     var y = 0.0;
     var hit_count = 0.0;
-    let pixel_size = 4.0 / uniforms.zoom;
 
     // Skip initial transient
-    for (var i = 0u; i < 100u; i = i + 1u) {
+    for (var i = 0u; i < 50u; i = i + 1u) {
         let term = sin(x) * cos(b) + c - x * sin(a + b + c);
         let x_new = y - sign(x) * abs(term);
         let y_new = a - x;
         x = x_new;
         y = y_new;
     }
+
+    let pixel_size = 4.0 / (uniforms.zoom * 1000.0);
+    let threshold_sq = pixel_size * pixel_size * 4.0;
 
     for (var i = 0u; i < uniforms.max_iterations; i = i + 1u) {
         let term = sin(x) * cos(b) + c - x * sin(a + b + c);
@@ -1199,14 +1222,14 @@ fn threeply_attractor(coord: vec2<f32>) -> f32 {
 
         if (abs(x) > 100000.0 || abs(y) > 100000.0) { break; }
 
-        let dist = distance(vec2<f32>(x, y), coord);
-        if (dist < pixel_size) {
-            hit_count += 1.0 - dist / pixel_size;
+        let diff = vec2<f32>(x, y) - coord;
+        let dist_sq = dot(diff, diff);
+        if (dist_sq < threshold_sq) {
+            hit_count += 1.0;
         }
     }
 
-    if (hit_count < 0.5) { return 0.0; }
-    return clamp(hit_count / 10.0, 0.0, 1.0);
+    return clamp(hit_count / 5.0, 0.0, 1.0);
 }
 
 // Icon fractal with rotational symmetry
@@ -1222,11 +1245,9 @@ fn icon_attractor(coord: vec2<f32>) -> f32 {
     var x = 0.1;
     var y = 0.1;
     var hit_count = 0.0;
-    let pixel_size = 4.0 / uniforms.zoom;
 
     // Skip initial transient
-    for (var i = 0u; i < 100u; i = i + 1u) {
-        // Compute z^(degree-2) where z = x + iy
+    for (var i = 0u; i < 50u; i = i + 1u) {
         var zn_real = 1.0;
         var zn_imag = 0.0;
         for (var j = 0; j < degree - 2; j = j + 1) {
@@ -1242,6 +1263,9 @@ fn icon_attractor(coord: vec2<f32>) -> f32 {
         x = x_new;
         y = y_new;
     }
+
+    let pixel_size = 4.0 / (uniforms.zoom * 1000.0);
+    let threshold_sq = pixel_size * pixel_size * 4.0;
 
     for (var i = 0u; i < uniforms.max_iterations; i = i + 1u) {
         var zn_real = 1.0;
@@ -1261,14 +1285,14 @@ fn icon_attractor(coord: vec2<f32>) -> f32 {
 
         if (abs(x) > 100.0 || abs(y) > 100.0) { break; }
 
-        let dist = distance(vec2<f32>(x, y), coord);
-        if (dist < pixel_size) {
-            hit_count += 1.0 - dist / pixel_size;
+        let diff = vec2<f32>(x, y) - coord;
+        let dist_sq = dot(diff, diff);
+        if (dist_sq < threshold_sq) {
+            hit_count += 1.0;
         }
     }
 
-    if (hit_count < 0.5) { return 0.0; }
-    return clamp(hit_count / 10.0, 0.0, 1.0);
+    return clamp(hit_count / 5.0, 0.0, 1.0);
 }
 
 // ============================================================================
