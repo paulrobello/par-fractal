@@ -1,6 +1,6 @@
 use super::{
-    AccumulationTexture, AttractorComputePipeline, BloomUniforms, BlurUniforms, GpuInfo,
-    PostProcessUniforms, Renderer, Uniforms,
+    AccumulationDisplayUniforms, AccumulationTexture, AttractorComputePipeline, BloomUniforms,
+    BlurUniforms, GpuInfo, PostProcessUniforms, Renderer, Uniforms,
 };
 use wgpu::util::DeviceExt;
 
@@ -626,29 +626,61 @@ impl Renderer {
         });
 
         // Accumulation display pipeline (for visualizing accumulated attractor data)
-        // Simple bind group layout with only the uint accumulation texture
+        // Bind group 0: uint accumulation texture
         let accumulation_texture_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("Accumulation Display Texture Layout"),
-                entries: &[
-                    // binding 0: uint accumulation texture
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Texture {
-                            sample_type: wgpu::TextureSampleType::Uint,
-                            view_dimension: wgpu::TextureViewDimension::D2,
-                            multisampled: false,
-                        },
-                        count: None,
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Uint,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
                     },
-                ],
+                    count: None,
+                }],
+            });
+
+        // Bind group 1: display uniforms (log_scale, gamma)
+        let accumulation_uniform_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Accumulation Display Uniform Layout"),
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+            });
+
+        // Create uniform buffer for accumulation display
+        let accumulation_display_uniforms = AccumulationDisplayUniforms::default();
+        let accumulation_display_uniform_buffer =
+            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Accumulation Display Uniform Buffer"),
+                contents: bytemuck::cast_slice(&[accumulation_display_uniforms]),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            });
+
+        let accumulation_display_uniform_bind_group =
+            device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("Accumulation Display Uniform Bind Group"),
+                layout: &accumulation_uniform_layout,
+                entries: &[wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: accumulation_display_uniform_buffer.as_entire_binding(),
+                }],
             });
 
         let accumulation_display_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Accumulation Display Layout"),
-                bind_group_layouts: &[&accumulation_texture_layout],
+                bind_group_layouts: &[&accumulation_texture_layout, &accumulation_uniform_layout],
                 push_constant_ranges: &[],
             });
 
@@ -858,6 +890,8 @@ impl Renderer {
             accumulation_texture: None,
             accumulation_display_pipeline,
             accumulation_display_bind_group: None,
+            accumulation_display_uniform_buffer,
+            accumulation_display_uniform_bind_group,
         }
     }
 

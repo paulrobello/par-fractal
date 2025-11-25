@@ -4,7 +4,7 @@ mod initialization;
 pub mod uniforms;
 mod update;
 
-use compute::{AccumulationTexture, AttractorComputePipeline};
+use compute::{AccumulationDisplayUniforms, AccumulationTexture, AttractorComputePipeline};
 use uniforms::*;
 
 #[derive(Debug, Clone)]
@@ -72,4 +72,6 @@ pub struct Renderer {
     pub accumulation_texture: Option<AccumulationTexture>,
     pub accumulation_display_pipeline: wgpu::RenderPipeline, // Uses fs_accumulation_display
     pub accumulation_display_bind_group: Option<wgpu::BindGroup>,
+    pub accumulation_display_uniform_buffer: wgpu::Buffer,
+    pub accumulation_display_uniform_bind_group: wgpu::BindGroup,
 }

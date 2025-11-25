@@ -1,6 +1,6 @@
 use super::App;
 use crate::fractal::FractalParams;
-use crate::renderer::compute::AttractorComputeUniforms;
+use crate::renderer::compute::{AccumulationDisplayUniforms, AttractorComputeUniforms};
 
 #[cfg(not(target_arch = "wasm32"))]
 use crate::video_recorder::VideoRecorder;
@@ -75,9 +75,19 @@ impl App {
                     self.fractal_params.attractor_iterations_per_frame as u64;
             }
 
-            // Render accumulation texture to scene_texture
-            // For now, just copy the accumulation data with basic visualization
-            // TODO: Add proper display pipeline with log scaling and palette
+            // Update accumulation display uniforms
+            let display_uniforms = AccumulationDisplayUniforms {
+                log_scale: self.fractal_params.attractor_log_scale,
+                gamma: 0.6,
+                _padding: [0.0; 2],
+            };
+            self.renderer.queue.write_buffer(
+                &self.renderer.accumulation_display_uniform_buffer,
+                0,
+                bytemuck::cast_slice(&[display_uniforms]),
+            );
+
+            // Render accumulation texture to scene_texture with log scaling
             {
                 let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("Accumulation Display Pass"),
@@ -102,6 +112,11 @@ impl App {
                 if let Some(ref bind_group) = self.renderer.accumulation_display_bind_group {
                     render_pass.set_pipeline(&self.renderer.accumulation_display_pipeline);
                     render_pass.set_bind_group(0, bind_group, &[]);
+                    render_pass.set_bind_group(
+                        1,
+                        &self.renderer.accumulation_display_uniform_bind_group,
+                        &[],
+                    );
                     render_pass
                         .set_vertex_buffer(0, self.renderer.postprocess_vertex_buffer.slice(..));
                     render_pass.draw(0..4, 0..1);

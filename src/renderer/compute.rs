@@ -23,6 +23,25 @@
 
 use bytemuck::{Pod, Zeroable};
 
+/// Uniforms for the accumulation display shader
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+pub struct AccumulationDisplayUniforms {
+    pub log_scale: f32,
+    pub gamma: f32,
+    pub _padding: [f32; 2],
+}
+
+impl Default for AccumulationDisplayUniforms {
+    fn default() -> Self {
+        Self {
+            log_scale: 1.0,
+            gamma: 0.6,
+            _padding: [0.0; 2],
+        }
+    }
+}
+
 /// Uniforms for the attractor compute shader
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]

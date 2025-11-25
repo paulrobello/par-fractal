@@ -298,9 +298,18 @@ fn fs_copy(input: VertexOutput) -> @location(0) vec4<f32> {
 // Accumulation Display - Visualize accumulated hit counts with log scaling
 // ============================================================================
 
+struct AccumulationDisplayUniforms {
+    log_scale: f32,
+    gamma: f32,
+    _padding: vec2<f32>,
+}
+
 // This shader uses a separate bind group with only the uint accumulation texture
 @group(0) @binding(0)
 var t_accum: texture_2d<u32>;
+
+@group(1) @binding(0)
+var<uniform> accum_uniforms: AccumulationDisplayUniforms;
 
 @fragment
 fn fs_accumulation_display(input: VertexOutput) -> @location(0) vec4<f32> {
@@ -321,14 +330,12 @@ fn fs_accumulation_display(input: VertexOutput) -> @location(0) vec4<f32> {
     }
 
     // Apply log scaling for better contrast across large dynamic range
-    // Adaptive max based on hit count for better dynamic range
-    let log_scale = 0.5;
-    let max_value = 5000.0;
-    let log_value = log(1.0 + hit_count * log_scale) / log(1.0 + max_value * log_scale);
+    // log_scale from uniforms controls the compression (higher = more compressed)
+    let max_value = 5000.0 / accum_uniforms.log_scale;
+    let log_value = log(1.0 + hit_count) / log(1.0 + max_value);
 
-    // Apply gamma correction (make mid-tones brighter)
-    let gamma = 0.6;
-    let adjusted = pow(clamp(log_value, 0.0, 1.0), gamma);
+    // Apply gamma correction (from uniforms)
+    let adjusted = pow(clamp(log_value, 0.0, 1.0), accum_uniforms.gamma);
 
     // Classic "fire" palette - similar to classic fractal viewers
     // Goes from black -> dark red -> red -> orange -> yellow -> white
