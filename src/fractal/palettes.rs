@@ -242,6 +242,306 @@ impl ColorPalette {
         ],
     };
 
+    // === Xfractint Palettes ===
+    // Imported from xfractint-20.04p16/maps/
+
+    pub const XF_ALTERN: ColorPalette = ColorPalette {
+        name: "Alternating Grey",
+        colors: [
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.753, 0.737, 0.737),
+            Vec3::new(0.502, 0.486, 0.486),
+            Vec3::new(0.251, 0.235, 0.235),
+            Vec3::new(0.0, 0.0, 0.0),
+        ],
+    };
+
+    pub const XF_BLUES: ColorPalette = ColorPalette {
+        name: "Blues",
+        colors: [
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.0, 0.776, 0.984),
+            Vec3::new(0.345, 0.988, 0.988),
+            Vec3::new(0.0, 0.024, 0.988),
+            Vec3::new(0.0, 0.0, 0.0),
+        ],
+    };
+
+    pub const XF_CHROMA: ColorPalette = ColorPalette {
+        name: "Chromatic",
+        colors: [
+            Vec3::new(0.188, 0.188, 0.188),
+            Vec3::new(0.212, 0.878, 0.212),
+            Vec3::new(0.173, 0.188, 0.188),
+            Vec3::new(0.196, 0.878, 0.196),
+            Vec3::new(0.157, 0.188, 0.188),
+        ],
+    };
+
+    pub const XF_DEFAULT: ColorPalette = ColorPalette {
+        name: "Default",
+        colors: [
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.988, 0.486, 0.518),
+            Vec3::new(0.11, 0.165, 0.439),
+            Vec3::new(0.047, 0.251, 0.0),
+            Vec3::new(0.0, 0.0, 0.0),
+        ],
+    };
+
+    pub const XF_DEFAULTW: ColorPalette = ColorPalette {
+        name: "Default White",
+        colors: [
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.957, 0.235, 0.361),
+            Vec3::new(0.612, 0.549, 0.486),
+            Vec3::new(0.267, 0.863, 0.612),
+            Vec3::new(0.988, 0.988, 0.988),
+        ],
+    };
+
+    pub const XF_FIRESTRM: ColorPalette = ColorPalette {
+        name: "Fire Storm",
+        colors: [
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.997, 0.295, 0.206),
+            Vec3::new(0.449, 0.957, 0.094),
+            Vec3::new(0.004, 0.703, 0.794),
+            Vec3::new(0.553, 0.043, 0.902),
+        ],
+    };
+
+    pub const XF_FROTH3: ColorPalette = ColorPalette {
+        name: "Froth 3",
+        colors: [
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.455, 0.0, 0.0),
+            Vec3::new(0.0, 0.565, 0.0),
+            Vec3::new(0.0, 0.0, 0.675),
+            Vec3::new(0.0, 0.0, 0.345),
+        ],
+    };
+
+    pub const XF_FROTH316: ColorPalette = ColorPalette {
+        name: "Froth 3-16",
+        colors: [
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.529, 0.0, 0.0),
+            Vec3::new(0.0, 0.745, 0.0),
+            Vec3::new(0.0, 0.0, 0.949),
+            Vec3::new(0.0, 0.0, 0.314),
+        ],
+    };
+
+    pub const XF_FROTH6: ColorPalette = ColorPalette {
+        name: "Froth 6",
+        colors: [
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.663, 0.0, 0.0),
+            Vec3::new(0.0, 0.98, 0.0),
+            Vec3::new(0.0, 0.0, 0.639),
+            Vec3::new(0.988, 0.988, 0.988),
+        ],
+    };
+
+    pub const XF_FROTH616: ColorPalette = ColorPalette {
+        name: "Froth 6-16",
+        colors: [
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.718, 0.0, 0.0),
+            Vec3::new(0.0, 0.808, 0.0),
+            Vec3::new(0.0, 0.898, 0.898),
+            Vec3::new(0.988, 0.988, 0.988),
+        ],
+    };
+
+    pub const XF_GAMMA1: ColorPalette = ColorPalette {
+        name: "Gamma 1",
+        colors: [
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.502, 0.486, 0.51),
+            Vec3::new(0.706, 0.698, 0.682),
+            Vec3::new(0.859, 0.851, 0.875),
+            Vec3::new(0.988, 0.988, 0.988),
+        ],
+    };
+
+    pub const XF_GAMMA2: ColorPalette = ColorPalette {
+        name: "Gamma 2",
+        colors: [
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.239, 0.247, 0.267),
+            Vec3::new(0.494, 0.494, 0.494),
+            Vec3::new(0.753, 0.737, 0.729),
+            Vec3::new(0.988, 0.988, 0.988),
+        ],
+    };
+
+    pub const XF_GLASSES1: ColorPalette = ColorPalette {
+        name: "3D Glasses 1",
+        colors: [
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.498, 0.0, 0.0),
+            Vec3::new(0.494, 0.0, 0.0),
+            Vec3::new(0.0, 0.0, 0.49),
+            Vec3::new(0.0, 0.0, 0.988),
+        ],
+    };
+
+    pub const XF_GLASSES2: ColorPalette = ColorPalette {
+        name: "3D Glasses 2",
+        colors: [
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.235, 0.0, 0.235),
+            Vec3::new(0.471, 0.0, 0.471),
+            Vec3::new(0.706, 0.0, 0.706),
+            Vec3::new(0.941, 0.0, 0.941),
+        ],
+    };
+
+    pub const XF_GOODEGA: ColorPalette = ColorPalette {
+        name: "Good EGA",
+        colors: [
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.988, 0.988, 0.165),
+            Vec3::new(0.494, 0.165, 0.0),
+            Vec3::new(0.988, 0.988, 0.494),
+            Vec3::new(0.988, 0.329, 0.0),
+        ],
+    };
+
+    pub const XF_GREEN: ColorPalette = ColorPalette {
+        name: "Green",
+        colors: [
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.0, 0.737, 0.0),
+            Vec3::new(0.0, 0.486, 0.0),
+            Vec3::new(0.0, 0.235, 0.0),
+            Vec3::new(0.0, 0.0, 0.0),
+        ],
+    };
+
+    pub const XF_GREY: ColorPalette = ColorPalette {
+        name: "Grey",
+        colors: [
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.753, 0.753, 0.753),
+            Vec3::new(0.502, 0.502, 0.502),
+            Vec3::new(0.251, 0.251, 0.251),
+            Vec3::new(0.0, 0.0, 0.0),
+        ],
+    };
+
+    pub const XF_GRID: ColorPalette = ColorPalette {
+        name: "Grid",
+        colors: [
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.25, 0.0, 1.0),
+            Vec3::new(0.5, 0.0, 1.0),
+            Vec3::new(0.75, 0.0, 1.0),
+            Vec3::new(1.0, 0.0, 1.0),
+        ],
+    };
+
+    pub const XF_HEADACH2: ColorPalette = ColorPalette {
+        name: "Headache 2",
+        colors: [
+            Vec3::new(0.941, 0.0, 0.0),
+            Vec3::new(0.471, 0.494, 0.118),
+            Vec3::new(0.0, 0.502, 0.486),
+            Vec3::new(0.486, 0.494, 0.369),
+            Vec3::new(0.0, 0.502, 0.502),
+        ],
+    };
+
+    pub const XF_HEADACHE: ColorPalette = ColorPalette {
+        name: "Headache",
+        colors: [
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.235, 0.624, 0.176),
+            Vec3::new(0.478, 0.494, 0.243),
+            Vec3::new(0.729, 0.616, 0.184),
+            Vec3::new(0.0, 0.502, 0.502),
+        ],
+    };
+
+    pub const XF_LANDSCAP: ColorPalette = ColorPalette {
+        name: "Landscape",
+        colors: [
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.0, 0.0, 0.659),
+            Vec3::new(0.251, 0.251, 0.0),
+            Vec3::new(0.251, 0.035, 0.0),
+            Vec3::new(1.0, 1.0, 1.0),
+        ],
+    };
+
+    pub const XF_LYAPUNOV: ColorPalette = ColorPalette {
+        name: "Lyapunov",
+        colors: [
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.753, 0.518, 0.0),
+            Vec3::new(0.502, 0.267, 0.0),
+            Vec3::new(0.251, 0.016, 0.0),
+            Vec3::new(0.0, 0.0, 0.0),
+        ],
+    };
+
+    pub const XF_NEON: ColorPalette = ColorPalette {
+        name: "XF Neon",
+        colors: [
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.008, 0.004, 0.004),
+            Vec3::new(0.0, 0.518, 0.0),
+            Vec3::new(0.965, 0.965, 0.0),
+            Vec3::new(0.0, 0.0, 0.0),
+        ],
+    };
+
+    pub const XF_PAINTJET: ColorPalette = ColorPalette {
+        name: "PaintJet",
+        colors: [
+            Vec3::new(0.094, 0.078, 0.047),
+            Vec3::new(0.753, 0.812, 0.302),
+            Vec3::new(0.125, 0.267, 0.408),
+            Vec3::new(0.376, 0.616, 0.341),
+            Vec3::new(0.157, 0.455, 0.769),
+        ],
+    };
+
+    pub const XF_ROYAL: ColorPalette = ColorPalette {
+        name: "Royal",
+        colors: [
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.482, 0.012, 0.627),
+            Vec3::new(0.988, 0.988, 0.98),
+            Vec3::new(0.984, 0.969, 0.0),
+            Vec3::new(0.235, 0.0, 0.314),
+        ],
+    };
+
+    pub const XF_TOPO: ColorPalette = ColorPalette {
+        name: "Topo",
+        colors: [
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.216, 0.518, 0.043),
+            Vec3::new(0.486, 0.8, 0.337),
+            Vec3::new(0.91, 0.859, 0.341),
+            Vec3::new(0.988, 0.988, 0.988),
+        ],
+    };
+
+    pub const XF_VOLCANO: ColorPalette = ColorPalette {
+        name: "Volcano",
+        colors: [
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.988, 0.98, 0.0),
+            Vec3::new(0.988, 0.745, 0.51),
+            Vec3::new(0.988, 0.012, 0.0),
+            Vec3::new(0.235, 0.235, 0.235),
+        ],
+    };
+
     pub const ALL: &'static [ColorPalette] = &[
         Self::FIRE,
         Self::OCEAN,
@@ -264,6 +564,34 @@ impl ColorPalette {
         Self::GALAXY,
         Self::MINT,
         Self::CHERRY,
+        // Xfractint palettes
+        Self::XF_ALTERN,
+        Self::XF_BLUES,
+        Self::XF_CHROMA,
+        Self::XF_DEFAULT,
+        Self::XF_DEFAULTW,
+        Self::XF_FIRESTRM,
+        Self::XF_FROTH3,
+        Self::XF_FROTH316,
+        Self::XF_FROTH6,
+        Self::XF_FROTH616,
+        Self::XF_GAMMA1,
+        Self::XF_GAMMA2,
+        Self::XF_GLASSES1,
+        Self::XF_GLASSES2,
+        Self::XF_GOODEGA,
+        Self::XF_GREEN,
+        Self::XF_GREY,
+        Self::XF_GRID,
+        Self::XF_HEADACH2,
+        Self::XF_HEADACHE,
+        Self::XF_LANDSCAP,
+        Self::XF_LYAPUNOV,
+        Self::XF_NEON,
+        Self::XF_PAINTJET,
+        Self::XF_ROYAL,
+        Self::XF_TOPO,
+        Self::XF_VOLCANO,
     ];
 
     /// Create a custom palette from Vec3 colors and a String name

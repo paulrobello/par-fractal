@@ -24,7 +24,6 @@ use winit::window::Window;
 #[cfg(feature = "native")]
 use crate::video_recorder::{VideoFormat, VideoRecorder};
 
-
 pub struct App {
     window: Arc<Window>,
     renderer: Renderer,

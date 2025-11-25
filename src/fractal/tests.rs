@@ -72,12 +72,13 @@ fn test_palette_prev_wraps() {
 
     params.prev_palette();
     assert_eq!(params.palette_index, ColorPalette::ALL.len() - 1);
-    assert_eq!(params.palette.name, "Cherry"); // Last palette after adding new ones
+    assert_eq!(params.palette.name, "Volcano"); // Last palette (xfractint)
 }
 
 #[test]
 fn test_all_palettes_exist() {
-    assert_eq!(ColorPalette::ALL.len(), 21);
+    // 21 original + 27 xfractint palettes = 48 total
+    assert_eq!(ColorPalette::ALL.len(), 48);
     // Original 6 palettes
     assert_eq!(ColorPalette::ALL[0].name, "Fire");
     assert_eq!(ColorPalette::ALL[1].name, "Ocean");
@@ -102,6 +103,9 @@ fn test_all_palettes_exist() {
     assert_eq!(ColorPalette::ALL[18].name, "Galaxy");
     assert_eq!(ColorPalette::ALL[19].name, "Mint");
     assert_eq!(ColorPalette::ALL[20].name, "Cherry");
+    // Xfractint palettes (first and last)
+    assert_eq!(ColorPalette::ALL[21].name, "Alternating Grey");
+    assert_eq!(ColorPalette::ALL[47].name, "Volcano");
 }
 
 #[test]
