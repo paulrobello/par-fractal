@@ -3,9 +3,12 @@ use egui::Context;
 
 /// Toast notification UI methods
 impl UI {
-    /// Show a simple toast notification without a file path
+    /// Show a simple toast notification without a file path.
+    /// Replaces any existing simple toasts (without file paths) to prevent stacking.
     pub fn show_toast(&mut self, message: String) {
-        self.toasts.push(Toast::new(message, 4.0));
+        // Remove existing simple toasts (those without file paths) to prevent stacking
+        self.toasts.retain(|toast| toast.file_path.is_some());
+        self.toasts.push(Toast::new(message, 2.0));
     }
 
     pub fn show_toast_with_file(&mut self, message: String, file_path: String) {
