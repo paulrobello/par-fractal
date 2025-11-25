@@ -83,6 +83,17 @@ impl App {
             drop(data);
             buffer.unmap();
 
+            // Convert BGRA to RGBA if surface format is Bgra
+            // (macOS/Windows typically use Bgra8UnormSrgb)
+            let format = self.renderer.config.format;
+            if format == wgpu::TextureFormat::Bgra8Unorm
+                || format == wgpu::TextureFormat::Bgra8UnormSrgb
+            {
+                for pixel in image_data.chunks_exact_mut(4) {
+                    pixel.swap(0, 2); // Swap B and R
+                }
+            }
+
             // Generate filename with fractal type and timestamp
             let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
             let fractal_name = self.fractal_params.fractal_type.filename_safe_name();
@@ -199,6 +210,16 @@ impl App {
 
             drop(data);
             buffer.unmap();
+
+            // Convert BGRA to RGBA if surface format is Bgra
+            let format = self.renderer.config.format;
+            if format == wgpu::TextureFormat::Bgra8Unorm
+                || format == wgpu::TextureFormat::Bgra8UnormSrgb
+            {
+                for pixel in frame_data.chunks_exact_mut(4) {
+                    pixel.swap(0, 2); // Swap B and R
+                }
+            }
 
             // Add frame to video recorder
             if let Err(e) = self.video_recorder.add_frame(frame_data) {

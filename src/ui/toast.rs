@@ -8,6 +8,16 @@ pub struct Toast {
 }
 
 impl Toast {
+    /// Create a new toast notification without a file path
+    pub fn new(message: String, duration_secs: f32) -> Self {
+        Self {
+            message,
+            file_path: None,
+            created_at: web_time::Instant::now(),
+            duration_secs,
+        }
+    }
+
     pub fn with_file_path(message: String, file_path: String, duration_secs: f32) -> Self {
         Self {
             message,

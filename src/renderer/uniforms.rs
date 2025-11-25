@@ -5,7 +5,7 @@ use glam::Mat4;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
-pub(super) struct Uniforms {
+pub struct Uniforms {
     // Camera (3D mode)
     view_proj: [[f32; 4]; 4],
     inv_view_proj: [[f32; 4]; 4],
@@ -137,8 +137,14 @@ pub(super) struct Uniforms {
     _padding_end2: [f32; 4], // 16 bytes (reduced by 16 for aspect_ratio field)
 }
 
+impl Default for Uniforms {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Uniforms {
-    pub(super) fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             view_proj: Mat4::IDENTITY.to_cols_array_2d(),
             inv_view_proj: Mat4::IDENTITY.to_cols_array_2d(),
@@ -248,7 +254,7 @@ impl Uniforms {
         }
     }
 
-    pub(super) fn update(&mut self, camera: &Camera, params: &FractalParams, time: f32) {
+    pub fn update(&mut self, camera: &Camera, params: &FractalParams, time: f32) {
         let view_proj = camera.build_view_projection_matrix();
         self.view_proj = view_proj.to_cols_array_2d();
         self.inv_view_proj = view_proj.inverse().to_cols_array_2d();
@@ -455,6 +461,15 @@ impl Uniforms {
         self.lod_zone1 = params.lod_config.distance_zones[0];
         self.lod_zone2 = params.lod_config.distance_zones[1];
         self.lod_zone3 = params.lod_config.distance_zones[2];
+    }
+
+    /// Creates a new Uniforms struct populated from camera and fractal parameters.
+    /// This is useful for high-resolution rendering where we need immutable access to the renderer.
+    #[cfg(target_arch = "wasm32")]
+    pub fn from_camera_and_params(camera: &Camera, params: &FractalParams, time: f32) -> Self {
+        let mut uniforms = Self::new();
+        uniforms.update(camera, params, time);
+        uniforms
     }
 }
 

@@ -610,18 +610,40 @@ impl UI {
                             if filtered_user.is_empty() && !search_lower.is_empty() {
                                 ui.label("No matching user presets found");
                             } else {
+                                let mut refresh_presets = false;
                                 egui::ScrollArea::vertical()
                                     .id_salt("user_presets_scroll")
                                     .max_height(150.0)
                                     .show(ui, |ui| {
                                         for preset_name in filtered_user.iter() {
-                                            if ui.button(*preset_name).clicked() {
-                                                if let Ok(preset) = PresetGallery::load_preset(preset_name) {
-                                                    preset_to_load = Some(preset);
+                                            ui.horizontal(|ui| {
+                                                if ui.button(*preset_name).clicked() {
+                                                    println!("User preset button clicked: {}", preset_name);
+                                                    match PresetGallery::load_preset(preset_name) {
+                                                        Ok(preset) => {
+                                                            println!("Preset loaded successfully: {}", preset.name);
+                                                            preset_to_load = Some(preset);
+                                                        }
+                                                        Err(e) => {
+                                                            eprintln!("Failed to load preset '{}': {}", preset_name, e);
+                                                        }
+                                                    }
                                                 }
-                                            }
+                                                // Add delete button
+                                                if ui.small_button("🗑").on_hover_text("Delete preset").clicked() {
+                                                    #[cfg(not(target_arch = "wasm32"))]
+                                                    if let Err(e) = PresetGallery::delete_preset(preset_name) {
+                                                        eprintln!("Failed to delete preset: {}", e);
+                                                    } else {
+                                                        refresh_presets = true;
+                                                    }
+                                                }
+                                            });
                                         }
                                     });
+                                if refresh_presets {
+                                    self.user_presets = PresetGallery::list_user_presets().unwrap_or_default();
+                                }
                             }
                         }
 
@@ -2605,84 +2627,93 @@ impl UI {
                         changed = true;
                     }
 
-                    ui.separator();
-                    ui.heading("Video & GIF Recording")
-                        .on_hover_text("Record animated videos or GIFs of your fractals");
+                    // Video recording section - native only
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        ui.separator();
+                        ui.heading("Video & GIF Recording")
+                            .on_hover_text("Record animated videos or GIFs of your fractals");
 
-                    ui.horizontal(|ui| {
-                        ui.label("Format:");
-                        ui.add_enabled(
-                            !is_recording,
-                            egui::RadioButton::new(self.video_format == VideoFormat::MP4, "MP4"),
-                        )
-                        .clicked()
-                        .then(|| self.video_format = VideoFormat::MP4);
-                        ui.add_enabled(
-                            !is_recording,
-                            egui::RadioButton::new(self.video_format == VideoFormat::WebM, "WebM"),
-                        )
-                        .clicked()
-                        .then(|| self.video_format = VideoFormat::WebM);
-                        ui.add_enabled(
-                            !is_recording,
-                            egui::RadioButton::new(self.video_format == VideoFormat::GIF, "GIF"),
-                        )
-                        .clicked()
-                        .then(|| self.video_format = VideoFormat::GIF);
-                    });
+                        ui.horizontal(|ui| {
+                            ui.label("Format:");
+                            ui.add_enabled(
+                                !is_recording,
+                                egui::RadioButton::new(self.video_format == VideoFormat::MP4, "MP4"),
+                            )
+                            .clicked()
+                            .then(|| self.video_format = VideoFormat::MP4);
+                            ui.add_enabled(
+                                !is_recording,
+                                egui::RadioButton::new(
+                                    self.video_format == VideoFormat::WebM,
+                                    "WebM",
+                                ),
+                            )
+                            .clicked()
+                            .then(|| self.video_format = VideoFormat::WebM);
+                            ui.add_enabled(
+                                !is_recording,
+                                egui::RadioButton::new(self.video_format == VideoFormat::GIF, "GIF"),
+                            )
+                            .clicked()
+                            .then(|| self.video_format = VideoFormat::GIF);
+                        });
 
-                    ui.horizontal(|ui| {
-                        ui.label("FPS:");
-                        let fps_range = if self.video_format == VideoFormat::GIF {
-                            10..=30 // GIFs typically use lower FPS
-                        } else {
-                            24..=60
-                        };
-                        ui.add_enabled(
-                            !is_recording,
-                            egui::Slider::new(&mut self.video_fps, fps_range).text("fps"),
-                        );
-                    });
+                        ui.horizontal(|ui| {
+                            ui.label("FPS:");
+                            let fps_range = if self.video_format == VideoFormat::GIF {
+                                10..=30 // GIFs typically use lower FPS
+                            } else {
+                                24..=60
+                            };
+                            ui.add_enabled(
+                                !is_recording,
+                                egui::Slider::new(&mut self.video_fps, fps_range).text("fps"),
+                            );
+                        });
 
-                    // Clamp FPS when switching to GIF
-                    if self.video_format == VideoFormat::GIF && self.video_fps > 30 {
-                        self.video_fps = 30;
-                    } else if self.video_format != VideoFormat::GIF && self.video_fps < 24 {
-                        self.video_fps = 24;
-                    }
+                        // Clamp FPS when switching to GIF
+                        if self.video_format == VideoFormat::GIF && self.video_fps > 30 {
+                            self.video_fps = 30;
+                        } else if self.video_format != VideoFormat::GIF && self.video_fps < 24 {
+                            self.video_fps = 24;
+                        }
 
-                    ui.horizontal(|ui| {
-                        if !is_recording {
-                            if ui
-                                .button("🔴 Start Recording")
-                                .on_hover_text("Begin recording (requires ffmpeg)")
+                        ui.horizontal(|ui| {
+                            if !is_recording {
+                                if ui
+                                    .button("🔴 Start Recording")
+                                    .on_hover_text("Begin recording (requires ffmpeg)")
+                                    .clicked()
+                                {
+                                    start_recording = true;
+                                }
+                            } else if ui
+                                .button("⏹ Stop Recording")
+                                .on_hover_text("Stop recording and save")
                                 .clicked()
                             {
-                                start_recording = true;
+                                stop_recording = true;
                             }
-                        } else if ui
-                            .button("⏹ Stop Recording")
-                            .on_hover_text("Stop recording and save")
-                            .clicked()
-                        {
-                            stop_recording = true;
-                        }
-                    });
+                        });
 
-                    ui.label("Output: {fractal}_YYYYMMDD_HHMMSS.{mp4,webm,gif}")
-                        .on_hover_text("Saved to current directory. {fractal} = fractal type name");
-
-                    if self.video_format == VideoFormat::GIF {
-                        ui.label("ℹ GIF: Optimized palette, looped, great for social media")
+                        ui.label("Output: {fractal}_YYYYMMDD_HHMMSS.{mp4,webm,gif}")
                             .on_hover_text(
-                                "GIFs use palette-based encoding with dithering for best quality",
+                                "Saved to current directory. {fractal} = fractal type name",
                             );
-                    }
 
-                    if !is_recording {
-                        ui.label("⚠ Requires ffmpeg to be installed").on_hover_text(
-                            "Install ffmpeg from your package manager or ffmpeg.org",
-                        );
+                        if self.video_format == VideoFormat::GIF {
+                            ui.label("ℹ GIF: Optimized palette, looped, great for social media")
+                                .on_hover_text(
+                                    "GIFs use palette-based encoding with dithering for best quality",
+                                );
+                        }
+
+                        if !is_recording {
+                            ui.label("⚠ Requires ffmpeg to be installed").on_hover_text(
+                                "Install ffmpeg from your package manager or ffmpeg.org",
+                            );
+                        }
                     }
                 });
         }

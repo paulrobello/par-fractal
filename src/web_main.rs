@@ -97,9 +97,10 @@ pub async fn main_web() {
         }
     };
 
-    // Create window attached to canvas
+    // Create window attached to canvas with explicit size
     let window_attrs = winit::window::Window::default_attributes()
         .with_title("Par Fractal")
+        .with_inner_size(winit::dpi::PhysicalSize::new(width, height))
         .with_canvas(Some(canvas));
 
     let winit_window = match event_loop.create_window(window_attrs) {

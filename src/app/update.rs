@@ -155,8 +155,25 @@ impl App {
             }
         }
         #[cfg(target_arch = "wasm32")]
-        if self.save_hires_render.take().is_some() {
-            log::warn!("High-resolution rendering not yet supported on web");
+        if let Some((width, height)) = self.save_hires_render.take() {
+            log::info!("Starting high-resolution render at {}x{}...", width, height);
+            let fractal_name = self
+                .fractal_params
+                .fractal_type
+                .filename_safe_name()
+                .to_string();
+            let show_toast: Box<dyn Fn(String) + Send + 'static> = Box::new(move |msg: String| {
+                log::info!("{}", msg);
+            });
+            super::capture_web::render_high_resolution_web(
+                &self.renderer,
+                &self.camera,
+                &self.fractal_params,
+                width,
+                height,
+                fractal_name,
+                show_toast,
+            );
         }
 
         // Update palette animation

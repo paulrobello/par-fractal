@@ -119,14 +119,27 @@ trunk serve
 | Post-processing | Yes | Yes |
 | Camera controls | Yes | Yes |
 | LOD system | Yes | Yes |
-| Settings persistence | YAML files | Not yet implemented |
-| User presets | YAML files | Not yet implemented |
-| Camera bookmarks | YAML files | Not yet implemented |
-| Custom palettes | YAML files | Not yet implemented |
-| Screenshots | Save to disk | Not yet implemented |
-| Video recording | ffmpeg | Disabled |
-| File import/export | rfd dialogs | Not yet implemented |
+| Settings persistence | YAML files | localStorage |
+| User presets | YAML files | localStorage |
+| Camera bookmarks | YAML files | localStorage |
+| Custom palettes | YAML files | localStorage |
+| Screenshots | Save to disk | PNG blob download |
+| High-res render | Save to disk | PNG blob download |
+| Video recording | ffmpeg | Not supported (too slow in WASM) |
+| File import/export | rfd dialogs | Blob download |
 | GPU selection | Manual | Browser-managed |
+
+---
+
+## Current Issues (2025-11-24)
+
+### Web Video Recording - REMOVED
+
+**Status**: Feature removed from web build.
+
+**Reason**: GIF encoding using NeuQuant color quantization is too slow in WASM. Even with async yielding, encoding a 30-frame recording at 1720x941 takes several minutes and produces jittery results due to inconsistent frame capture timing.
+
+**Alternative**: Users can take screenshots on web. For video recording, use the native desktop build with ffmpeg.
 
 ---
 

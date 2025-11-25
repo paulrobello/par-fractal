@@ -24,22 +24,6 @@ use winit::window::Window;
 #[cfg(feature = "native")]
 use crate::video_recorder::{VideoFormat, VideoRecorder};
 
-/// Stub video recorder for web builds
-#[cfg(target_arch = "wasm32")]
-pub struct VideoRecorder;
-
-#[cfg(target_arch = "wasm32")]
-impl VideoRecorder {
-    pub fn is_recording(&self) -> bool {
-        false
-    }
-    pub fn is_available(&self) -> bool {
-        false
-    }
-    pub fn frame_count(&self) -> u32 {
-        0
-    }
-}
 
 pub struct App {
     window: Arc<Window>,
@@ -69,8 +53,6 @@ pub struct App {
     camera_transition: CameraTransition,
     smooth_transitions_enabled: bool,
     #[cfg(feature = "native")]
-    video_recorder: VideoRecorder,
-    #[cfg(target_arch = "wasm32")]
     video_recorder: VideoRecorder,
     screenshot_delay: Option<f32>, // CLI option: take screenshot after N seconds
     exit_delay: Option<f32>,       // CLI option: exit after N seconds
@@ -199,7 +181,17 @@ impl App {
         preset_name: Option<String>,
     ) -> Result<Self, String> {
         let window = Arc::new(window);
-        let size = window.inner_size();
+        let mut size = window.inner_size();
+
+        // Ensure we have valid dimensions (fallback for web where size might be 0x0 initially)
+        if size.width == 0 || size.height == 0 {
+            log::warn!(
+                "Window size is {}x{}, using fallback 800x600",
+                size.width,
+                size.height
+            );
+            size = winit::dpi::PhysicalSize::new(800, 600);
+        }
 
         log::info!(
             "Initializing renderer with size {}x{}",
@@ -246,8 +238,6 @@ impl App {
             },
         );
 
-        let video_recorder = VideoRecorder;
-
         Ok(Self {
             window,
             renderer,
@@ -275,7 +265,6 @@ impl App {
             start_time: web_time::Instant::now(),
             camera_transition: CameraTransition::new(),
             smooth_transitions_enabled: true,
-            video_recorder,
             screenshot_delay,
             exit_delay,
             screenshot_taken: false,

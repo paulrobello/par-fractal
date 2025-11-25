@@ -226,7 +226,7 @@ impl App {
         #[cfg(not(target_arch = "wasm32"))]
         let is_recording = self.video_recorder.is_recording();
         #[cfg(target_arch = "wasm32")]
-        let is_recording = false;
+        let is_recording = false; // Video recording not supported on web
 
         if should_screenshot || is_recording {
             // Submit the fractal rendering first
@@ -267,7 +267,7 @@ impl App {
 
             #[cfg(not(target_arch = "wasm32"))]
             if is_recording {
-                // Capture video frame (fractal only)
+                // Capture video frame (fractal only) - native only
                 self.capture_video_frame(&output.texture);
             }
 
@@ -283,6 +283,11 @@ impl App {
         // Render UI
         let raw_input = self.egui_state.take_egui_input(self.window.as_ref());
         let full_output = self.egui_state.egui_ctx().run(raw_input, |ctx| {
+            #[cfg(not(target_arch = "wasm32"))]
+            let is_rec = self.video_recorder.is_recording();
+            #[cfg(target_arch = "wasm32")]
+            let is_rec = false; // Video recording not supported on web
+
             let (
                 changed,
                 screenshot_requested,
@@ -300,7 +305,7 @@ impl App {
                 &mut self.fractal_params,
                 self.camera.position,
                 self.camera.target,
-                self.video_recorder.is_recording(),
+                is_rec,
             );
 
             // Render command palette overlay (always on top)
@@ -482,9 +487,7 @@ impl App {
                     }
                 }
             }
-            // Suppress unused warnings on web
-            #[cfg(target_arch = "wasm32")]
-            let _ = (start_recording, stop_recording);
+            // Video recording not supported on web - UI section is hidden via cfg
 
             // Mark settings for auto-save (debounced)
             if changed {
@@ -512,8 +515,7 @@ impl App {
                 self.video_recorder.frame_count(),
                 self.video_recorder.filename(),
             );
-            #[cfg(target_arch = "wasm32")]
-            self.ui.render_recording_indicator(ctx, false, 0, "");
+            // No recording indicator on web - video recording not supported
             self.ui.render_lod_debug_overlay(ctx, &self.fractal_params);
         });
 

@@ -730,6 +730,25 @@ impl PresetGallery {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
+    pub fn delete_preset(filename: &str) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(config_dir) = directories::ProjectDirs::from("com", "fractal", "par-fractal") {
+            let preset_file = config_dir
+                .config_dir()
+                .join("presets")
+                .join(format!("{}.yaml", filename));
+            if preset_file.exists() {
+                fs::remove_file(&preset_file)?;
+                println!("Preset '{}' deleted", filename);
+                Ok(())
+            } else {
+                Err(format!("Preset '{}' not found", filename).into())
+            }
+        } else {
+            Err("Could not determine config directory".into())
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn list_user_presets() -> Result<Vec<String>, Box<dyn std::error::Error>> {
         if let Some(config_dir) = directories::ProjectDirs::from("com", "fractal", "par-fractal") {
             let presets_dir = config_dir.config_dir().join("presets");

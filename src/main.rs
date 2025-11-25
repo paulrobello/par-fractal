@@ -28,13 +28,25 @@ fn print_help() {
 fn clear_settings() {
     if let Some(config_dir) = directories::ProjectDirs::from("com", "fractal", "par-fractal") {
         let config_path = config_dir.config_dir();
-        if config_path.exists() {
-            match std::fs::remove_dir_all(config_path) {
-                Ok(_) => println!("Settings cleared: {}", config_path.display()),
+        let settings_file = config_path.join("settings.yaml");
+
+        // Only delete settings.yaml, preserve presets and other user data
+        if settings_file.exists() {
+            match std::fs::remove_file(&settings_file) {
+                Ok(_) => println!("Settings cleared: {}", settings_file.display()),
                 Err(e) => eprintln!("Failed to clear settings: {}", e),
             }
         } else {
             println!("No settings to clear");
+        }
+
+        // Note: User presets in {}/presets/ are preserved
+        let presets_dir = config_path.join("presets");
+        if presets_dir.exists() {
+            println!(
+                "Note: User presets in {} are preserved",
+                presets_dir.display()
+            );
         }
     }
 }

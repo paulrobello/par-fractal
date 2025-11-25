@@ -1,6 +1,6 @@
 [package]
 name = "par-fractal"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 authors = ["Paul Robello <probello@gmail.com>"]
 description = "Cross-platform GPU-accelerated fractal renderer with 2D and 3D support"
@@ -102,7 +102,7 @@ gloo-timers = { version = "0.3", optional = true, features = ["futures"] }
 getrandom = { version = "0.3", optional = true, features = ["wasm_js"] }
 
 [dependencies.web-sys]
-version = "0.3"
+version = "0.3.82"
 optional = true
 features = [
     "Window",
@@ -119,6 +119,22 @@ features = [
     "FileList",
     "FileReader",
     "console",
+    # WebCodecs API for video encoding
+    "VideoEncoder",
+    "VideoEncoderInit",
+    "VideoEncoderConfig",
+    "VideoEncoderEncodeOptions",
+    "VideoFrame",
+    "VideoFrameInit",
+    "VideoFrameBufferInit",
+    "VideoPixelFormat",
+    "EncodedVideoChunk",
+    "EncodedVideoChunkType",
+    "EncodedVideoChunkMetadata",
+    "CodecState",
+    "VideoColorSpace",
+    "VideoColorSpaceInit",
+    "Performance",
 ]
 
 [profile.release]
