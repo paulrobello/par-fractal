@@ -626,32 +626,14 @@ impl Renderer {
         });
 
         // Accumulation display pipeline (for visualizing accumulated attractor data)
-        // Requires special bind group layout for uint texture
+        // Simple bind group layout with only the uint accumulation texture
         let accumulation_texture_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("Accumulation Display Texture Layout"),
                 entries: &[
-                    // binding 0: unused (for compatibility with other shaders)
+                    // binding 0: uint accumulation texture
                     wgpu::BindGroupLayoutEntry {
                         binding: 0,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Texture {
-                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                            view_dimension: wgpu::TextureViewDimension::D2,
-                            multisampled: false,
-                        },
-                        count: None,
-                    },
-                    // binding 1: sampler (unused but needed for layout compatibility)
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                        count: None,
-                    },
-                    // binding 2: uint accumulation texture
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 2,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Texture {
                             sample_type: wgpu::TextureSampleType::Uint,
@@ -900,26 +882,15 @@ impl Renderer {
 
         // Create bind group for sampling the accumulation texture
         // Use the layout from the accumulation_display_pipeline which was created in initialization
-        // The layout has 3 bindings: 0 = float texture (use scene_view as placeholder),
-        // 1 = sampler, 2 = uint accumulation texture
+        // The layout has only 1 binding: the uint accumulation texture
         let accumulation_display_bind_group =
             self.device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("Accumulation Display Bind Group"),
                 layout: &self.accumulation_display_pipeline.get_bind_group_layout(0),
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: wgpu::BindingResource::TextureView(&self.scene_view), // Placeholder
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::Sampler(&self.sampler),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 2,
-                        resource: wgpu::BindingResource::TextureView(&accumulation_texture.view),
-                    },
-                ],
+                entries: &[wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&accumulation_texture.view),
+                }],
             });
 
         self.attractor_compute = Some(attractor_compute);

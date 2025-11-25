@@ -298,11 +298,8 @@ fn fs_copy(input: VertexOutput) -> @location(0) vec4<f32> {
 // Accumulation Display - Visualize accumulated hit counts with log scaling
 // ============================================================================
 
-// Note: This shader uses t_scene which is texture_2d<f32>, but the accumulation
-// texture is r32uint. We need a separate binding for uint textures.
-// For now, we'll use textureLoad with integer coords calculated from tex_coords.
-
-@group(0) @binding(2)
+// This shader uses a separate bind group with only the uint accumulation texture
+@group(0) @binding(0)
 var t_accum: texture_2d<u32>;
 
 @fragment
