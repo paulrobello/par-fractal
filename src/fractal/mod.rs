@@ -119,6 +119,18 @@ pub struct FractalParams {
     // LOD (Level of Detail) System
     pub lod_config: LODConfig,
     pub lod_state: LODState,
+
+    // Strange Attractor Accumulation Mode
+    /// Enable compute shader accumulation for strange attractors
+    pub attractor_accumulation_enabled: bool,
+    /// Number of orbit iterations per frame (higher = more detail but slower)
+    pub attractor_iterations_per_frame: u32,
+    /// Total accumulated iterations (display only)
+    pub attractor_total_iterations: u64,
+    /// Log scale factor for density display
+    pub attractor_log_scale: f32,
+    /// Flag to clear accumulation on next frame
+    pub attractor_pending_clear: bool,
 }
 
 impl Default for FractalParams {
@@ -212,6 +224,13 @@ impl Default for FractalParams {
             // LOD system (disabled by default)
             lod_config: LODConfig::default(),
             lod_state: LODState::default(),
+
+            // Strange attractor accumulation (disabled by default)
+            attractor_accumulation_enabled: false,
+            attractor_iterations_per_frame: 100_000,
+            attractor_total_iterations: 0,
+            attractor_log_scale: 1.0,
+            attractor_pending_clear: false,
         }
     }
 }
@@ -293,6 +312,9 @@ impl FractalParams {
             lod_config: self.lod_config.clone(),
             custom_width: default_custom_width(),
             custom_height: default_custom_height(),
+            attractor_accumulation_enabled: self.attractor_accumulation_enabled,
+            attractor_iterations_per_frame: self.attractor_iterations_per_frame,
+            attractor_log_scale: self.attractor_log_scale,
         }
     }
 
@@ -414,6 +436,11 @@ impl FractalParams {
             fxaa_enabled: settings.fxaa_enabled,
             lod_config: settings.lod_config,
             lod_state: LODState::default(),
+            attractor_accumulation_enabled: settings.attractor_accumulation_enabled,
+            attractor_iterations_per_frame: settings.attractor_iterations_per_frame,
+            attractor_total_iterations: 0, // Always reset on load
+            attractor_log_scale: settings.attractor_log_scale,
+            attractor_pending_clear: false,
         }
     }
 

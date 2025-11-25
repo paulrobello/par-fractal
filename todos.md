@@ -1,36 +1,54 @@
 # Par-Fractal TODOs
 
-## Future Enhancements
+## In Progress
 
-### Strange Attractor Texture-Based Accumulation
+### Strange Attractor Texture-Based Accumulation (Infrastructure Complete)
 **Priority**: Medium
 **Complexity**: High
+**Status**: Infrastructure implemented, render loop integration pending
 
-Implement true texture-based accumulation for strange attractors to enable much higher iteration counts (millions) while maintaining 60 FPS.
+The modular compute shader system and UI controls have been implemented. The remaining work is to wire the compute passes into the main render loop.
 
-**Current limitation**: Per-pixel rendering requires every pixel to compute the full orbit, limiting practical iteration counts to ~2000-4000 before FPS drops significantly.
+**Implemented components**:
+- `src/renderer/compute.rs` - Modular compute infrastructure:
+  - `AccumulationTexture` - Reusable storage texture abstraction for accumulation effects
+  - `AttractorComputePipeline` - Compute pipeline for attractor iteration
+  - `AttractorComputeUniforms` - Uniform buffer for compute parameters
+  - Helper functions for bind group layouts
+- `src/shaders/attractor_compute.wgsl` - Compute shader supporting all 9 2D strange attractors:
+  - Hopalong, Hénon, Martin, Gingerbreadman, Latoocarfian, Chip, Quadruptwo, Threeply, Icon
+  - Pseudo-random orbit initialization
+  - Per-thread orbit iteration with divergence handling
+  - World-to-screen coordinate transformation
+  - Pixel hit count accumulation
+- `src/shaders/attractor_display.wgsl` - Display shader:
+  - Log scaling for density visualization
+  - Palette-based coloring
+  - Gamma correction
+- UI controls in `src/ui/mod.rs`:
+  - Enable/disable accumulation mode
+  - Iterations per frame slider (10k-1M)
+  - Log scale adjustment
+  - Total iterations counter
+  - Clear accumulation button
+- FractalParams fields for accumulation settings
 
-**Proposed approach**:
-1. Use compute shaders to iterate the attractor and write orbit points directly to an accumulation texture
-2. Each frame, compute a batch of orbit points (e.g., 100k-1M) and increment the corresponding texture pixels
-3. Display the accumulation texture with log scaling for contrast
-4. Decouples iteration count from pixel count - can accumulate indefinitely at 60 FPS
-5. Add UI controls for:
-   - Batch size per frame
-   - Clear/reset accumulation
-   - Total accumulated iterations display
+**Remaining work**:
+1. Add compute pipeline and accumulation texture to Renderer struct
+2. Wire compute dispatch into render loop (before scene render pass)
+3. Use accumulation texture as scene source when mode is enabled
+4. Handle texture resize and clear operations
+5. Test and optimize performance
 
-**Benefits**:
-- Millions of iterations at 60 FPS
-- Progressive refinement (image gets more detailed over time)
-- Classic attractor visualization style (density histogram)
-
-**Files likely affected**:
-- `src/shaders/` - New compute shader for attractor iteration
-- `src/renderer/` - Accumulation texture management
-- `src/ui/` - Controls for accumulation mode
+**Files affected**:
+- `src/renderer/mod.rs` - Add compute fields to Renderer
+- `src/renderer/initialization.rs` - Initialize compute pipeline
+- `src/app/render.rs` - Add compute dispatch pass
+- `src/app/update.rs` - Handle accumulation clear requests
 
 ---
+
+## Future Enhancements
 
 ### 3D Strange Attractors (Currently Disabled)
 **Priority**: Low

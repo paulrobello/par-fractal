@@ -1,4 +1,5 @@
 // Module declarations
+pub mod compute;
 mod initialization;
 pub mod uniforms;
 mod update;

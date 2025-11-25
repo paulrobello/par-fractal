@@ -1259,6 +1259,39 @@ impl UI {
                                     params.zoom_2d = 1.0;
                                     changed = true;
                                 }
+
+                                // Accumulation mode for strange attractors
+                                if params.fractal_type.is_2d_attractor() {
+                                    ui.separator();
+                                    ui.label("🎯 Accumulation Mode (Experimental)");
+                                    ui.label("Uses compute shaders for millions of iterations at 60 FPS");
+
+                                    changed |= ui.checkbox(&mut params.attractor_accumulation_enabled, "Enable Accumulation")
+                                        .on_hover_text("Use GPU compute shaders for progressive rendering\nAllows millions of iterations while maintaining 60 FPS")
+                                        .changed();
+
+                                    if params.attractor_accumulation_enabled {
+                                        changed |= ui.add(egui::Slider::new(&mut params.attractor_iterations_per_frame, 10_000..=1_000_000)
+                                            .text("Iterations/Frame")
+                                            .logarithmic(true))
+                                            .on_hover_text("Number of orbit iterations per frame\nHigher = faster accumulation, lower FPS")
+                                            .changed();
+
+                                        changed |= ui.add(egui::Slider::new(&mut params.attractor_log_scale, 0.1..=10.0)
+                                            .text("Log Scale")
+                                            .logarithmic(true))
+                                            .on_hover_text("Log scaling for density display\nHigher = more contrast in sparse areas")
+                                            .changed();
+
+                                        ui.label(format!("Total Iterations: {:}", params.attractor_total_iterations));
+
+                                        if ui.button("Clear Accumulation").on_hover_text("Reset accumulated density").clicked() {
+                                            params.attractor_pending_clear = true;
+                                            params.attractor_total_iterations = 0;
+                                            changed = true;
+                                        }
+                                    }
+                                }
                             });
                         self.ui_state.params_2d_open = response.openness > 0.0;
                     }

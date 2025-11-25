@@ -133,6 +133,22 @@ pub struct Settings {
     // LOD system
     #[serde(default)]
     pub lod_config: LODConfig,
+
+    // Strange attractor accumulation mode
+    #[serde(default)]
+    pub attractor_accumulation_enabled: bool,
+    #[serde(default = "default_attractor_iterations_per_frame")]
+    pub attractor_iterations_per_frame: u32,
+    #[serde(default = "default_attractor_log_scale")]
+    pub attractor_log_scale: f32,
+}
+
+fn default_attractor_iterations_per_frame() -> u32 {
+    100_000
+}
+
+fn default_attractor_log_scale() -> f32 {
+    1.0
 }
 
 // Preset categories for organization
