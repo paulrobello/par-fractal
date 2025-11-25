@@ -303,7 +303,7 @@ struct AccumulationDisplayUniforms {
     gamma: f32,
     palette_offset: f32,
     _padding: f32,
-    palette: array<vec4<f32>, 5>,
+    palette: array<vec4<f32>, 8>,
 }
 
 // This shader uses a separate bind group with only the uint accumulation texture
@@ -313,19 +313,19 @@ var t_accum: texture_2d<u32>;
 @group(1) @binding(0)
 var<uniform> accum_uniforms: AccumulationDisplayUniforms;
 
-// Sample from the uniform palette (5 colors)
+// Sample from the uniform palette (8 colors)
 fn sample_accum_palette(t: f32) -> vec3<f32> {
     // Apply palette offset and wrap
     let t_offset = fract(t + accum_uniforms.palette_offset);
 
-    // Map t from [0,1] to palette indices [0,4]
-    let scaled = t_offset * 4.0;
+    // Map t from [0,1] to palette indices [0,7]
+    let scaled = t_offset * 7.0;  // 8 colors = 7 segments
     let idx = i32(floor(scaled));
     let frac = fract(scaled);
 
     // Clamp indices to valid range
-    let i0 = clamp(idx, 0, 4);
-    let i1 = clamp(idx + 1, 0, 4);
+    let i0 = clamp(idx, 0, 7);
+    let i1 = clamp(idx + 1, 0, 7);
 
     // Interpolate between colors
     let c0 = accum_uniforms.palette[i0].rgb;

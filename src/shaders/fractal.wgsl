@@ -20,7 +20,7 @@ struct Uniforms {
     fractal_min_radius: f32,
     _padding2: vec2<f32>,
 
-    palette: array<vec4<f32>, 5>,
+    palette: array<vec4<f32>, 8>,
 
     ambient_occlusion: u32,
     soft_shadows: u32,
@@ -125,7 +125,7 @@ struct Uniforms {
     _reserved4: u32,
 
     // Padding to align struct to 832 bytes (52 × 16)
-    _padding_end: array<vec4<f32>, 6>,  // 96 bytes
+    _padding_end: array<vec4<f32>, 3>,  // 48 bytes (reduced from 96 to account for 3 extra palette colors)
     _padding_end2: vec4<f32>,           // 16 bytes
 }
 
@@ -157,17 +157,17 @@ fn get_palette_color(t: f32) -> vec3<f32> {
     // Apply palette offset for animation, wrapping around with fract
     let t_animated = fract(t + uniforms.palette_offset);
     let t_clamped = clamp(t_animated, 0.0, 1.0);
-    let scaled = t_clamped * 4.0;
+    let scaled = t_clamped * 7.0;  // 8 colors = 7 segments
     let index = u32(floor(scaled));
-    let fract = scaled - f32(index);
+    let fract_val = scaled - f32(index);
 
-    if (index >= 4u) {
-        return uniforms.palette[4].rgb;
+    if (index >= 7u) {
+        return uniforms.palette[7].rgb;
     }
 
     let c1 = uniforms.palette[index].rgb;
     let c2 = uniforms.palette[index + 1u].rgb;
-    return mix(c1, c2, fract);
+    return mix(c1, c2, fract_val);
 }
 
 // ============================================================================

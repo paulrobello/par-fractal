@@ -4,7 +4,7 @@ use std::fs;
 
 #[derive(Debug, Clone, Copy)]
 pub struct ColorPalette {
-    pub colors: [Vec3; 5],
+    pub colors: [Vec3; 8],
     pub name: &'static str,
 }
 
@@ -12,22 +12,28 @@ impl ColorPalette {
     pub const FIRE: ColorPalette = ColorPalette {
         name: "Fire",
         colors: [
-            Vec3::new(0.0, 0.0, 0.0), // Black
-            Vec3::new(0.5, 0.0, 0.5), // Purple
-            Vec3::new(1.0, 0.0, 0.0), // Red
-            Vec3::new(1.0, 0.5, 0.0), // Orange
-            Vec3::new(1.0, 1.0, 0.0), // Yellow
+            Vec3::new(0.0, 0.0, 0.0),   // Black
+            Vec3::new(0.25, 0.0, 0.25), // Deep purple
+            Vec3::new(0.5, 0.0, 0.5),   // Purple
+            Vec3::new(0.75, 0.0, 0.25), // Magenta
+            Vec3::new(1.0, 0.0, 0.0),   // Red
+            Vec3::new(1.0, 0.5, 0.0),   // Orange
+            Vec3::new(1.0, 0.75, 0.0),  // Light orange
+            Vec3::new(1.0, 1.0, 0.0),   // Yellow
         ],
     };
 
     pub const OCEAN: ColorPalette = ColorPalette {
         name: "Ocean",
         colors: [
-            Vec3::new(0.0, 0.0, 0.1), // Deep blue
-            Vec3::new(0.0, 0.2, 0.4), // Dark blue
-            Vec3::new(0.0, 0.4, 0.7), // Blue
-            Vec3::new(0.0, 0.7, 0.9), // Light blue
-            Vec3::new(0.5, 1.0, 1.0), // Cyan
+            Vec3::new(0.0, 0.0, 0.1),    // Deep blue
+            Vec3::new(0.0, 0.1, 0.25),   // Very dark blue
+            Vec3::new(0.0, 0.2, 0.4),    // Dark blue
+            Vec3::new(0.0, 0.3, 0.55),   // Blue
+            Vec3::new(0.0, 0.4, 0.7),    // Medium blue
+            Vec3::new(0.0, 0.7, 0.9),    // Light blue
+            Vec3::new(0.25, 0.85, 0.95), // Cyan-blue
+            Vec3::new(0.5, 1.0, 1.0),    // Cyan
         ],
     };
 
@@ -35,43 +41,55 @@ impl ColorPalette {
         name: "Rainbow",
         colors: [
             Vec3::new(1.0, 0.0, 0.0), // Red
+            Vec3::new(1.0, 0.5, 0.0), // Orange
             Vec3::new(1.0, 1.0, 0.0), // Yellow
             Vec3::new(0.0, 1.0, 0.0), // Green
+            Vec3::new(0.0, 1.0, 1.0), // Cyan
             Vec3::new(0.0, 0.0, 1.0), // Blue
-            Vec3::new(0.5, 0.0, 0.5), // Purple
+            Vec3::new(0.5, 0.0, 1.0), // Indigo
+            Vec3::new(1.0, 0.0, 0.5), // Pink
         ],
     };
 
     pub const FOREST: ColorPalette = ColorPalette {
         name: "Forest",
         colors: [
-            Vec3::new(0.1, 0.2, 0.1), // Dark green
-            Vec3::new(0.2, 0.4, 0.2), // Green
-            Vec3::new(0.4, 0.6, 0.3), // Light green
-            Vec3::new(0.6, 0.8, 0.4), // Yellow-green
-            Vec3::new(0.8, 0.9, 0.6), // Pale green
+            Vec3::new(0.05, 0.1, 0.05), // Very dark green
+            Vec3::new(0.1, 0.2, 0.1),   // Dark green
+            Vec3::new(0.2, 0.35, 0.15), // Forest green
+            Vec3::new(0.3, 0.5, 0.2),   // Green
+            Vec3::new(0.4, 0.6, 0.3),   // Light green
+            Vec3::new(0.5, 0.7, 0.35),  // Yellow-green
+            Vec3::new(0.65, 0.8, 0.45), // Pale green
+            Vec3::new(0.8, 0.9, 0.6),   // Very pale green
         ],
     };
 
     pub const SUNSET: ColorPalette = ColorPalette {
         name: "Sunset",
         colors: [
-            Vec3::new(0.2, 0.0, 0.4), // Purple
-            Vec3::new(0.8, 0.2, 0.3), // Pink
-            Vec3::new(1.0, 0.4, 0.2), // Orange
-            Vec3::new(1.0, 0.7, 0.3), // Light orange
-            Vec3::new(1.0, 0.9, 0.6), // Yellow
+            Vec3::new(0.1, 0.0, 0.2),   // Deep purple
+            Vec3::new(0.2, 0.0, 0.4),   // Purple
+            Vec3::new(0.5, 0.1, 0.35),  // Pink-purple
+            Vec3::new(0.8, 0.2, 0.3),   // Pink
+            Vec3::new(1.0, 0.4, 0.2),   // Orange
+            Vec3::new(1.0, 0.55, 0.25), // Light orange
+            Vec3::new(1.0, 0.7, 0.3),   // Yellow-orange
+            Vec3::new(1.0, 0.9, 0.6),   // Yellow
         ],
     };
 
     pub const GRAYSCALE: ColorPalette = ColorPalette {
         name: "Grayscale",
         colors: [
-            Vec3::new(0.0, 0.0, 0.0),    // Black
-            Vec3::new(0.25, 0.25, 0.25), // Dark gray
-            Vec3::new(0.5, 0.5, 0.5),    // Gray
-            Vec3::new(0.75, 0.75, 0.75), // Light gray
-            Vec3::new(1.0, 1.0, 1.0),    // White
+            Vec3::new(0.0, 0.0, 0.0),       // Black
+            Vec3::new(0.143, 0.143, 0.143), // Dark gray 1
+            Vec3::new(0.286, 0.286, 0.286), // Dark gray 2
+            Vec3::new(0.429, 0.429, 0.429), // Medium gray 1
+            Vec3::new(0.571, 0.571, 0.571), // Medium gray 2
+            Vec3::new(0.714, 0.714, 0.714), // Light gray 1
+            Vec3::new(0.857, 0.857, 0.857), // Light gray 2
+            Vec3::new(1.0, 1.0, 1.0),       // White
         ],
     };
 
@@ -80,8 +98,11 @@ impl ColorPalette {
         name: "Viridis",
         colors: [
             Vec3::new(0.267, 0.005, 0.329), // Dark purple
-            Vec3::new(0.283, 0.141, 0.458), // Purple
+            Vec3::new(0.275, 0.073, 0.394), // Purple
+            Vec3::new(0.283, 0.141, 0.458), // Purple-blue
+            Vec3::new(0.206, 0.354, 0.505), // Blue-teal
             Vec3::new(0.128, 0.567, 0.551), // Teal
+            Vec3::new(0.249, 0.678, 0.467), // Green-teal
             Vec3::new(0.369, 0.788, 0.382), // Green
             Vec3::new(0.993, 0.906, 0.144), // Yellow
         ],
@@ -91,8 +112,11 @@ impl ColorPalette {
         name: "Plasma",
         colors: [
             Vec3::new(0.050, 0.030, 0.529), // Deep blue
+            Vec3::new(0.295, 0.051, 0.609), // Purple-blue
             Vec3::new(0.540, 0.071, 0.689), // Purple
-            Vec3::new(0.885, 0.218, 0.478), // Magenta
+            Vec3::new(0.712, 0.145, 0.584), // Magenta
+            Vec3::new(0.885, 0.218, 0.478), // Pink-magenta
+            Vec3::new(0.952, 0.378, 0.350), // Orange-pink
             Vec3::new(0.988, 0.553, 0.235), // Orange
             Vec3::new(0.940, 0.975, 0.131), // Yellow
         ],
@@ -102,8 +126,11 @@ impl ColorPalette {
         name: "Inferno",
         colors: [
             Vec3::new(0.000, 0.000, 0.014), // Black
+            Vec3::new(0.171, 0.033, 0.167), // Very dark purple
             Vec3::new(0.341, 0.065, 0.319), // Dark purple
+            Vec3::new(0.563, 0.126, 0.250), // Red-purple
             Vec3::new(0.785, 0.186, 0.180), // Red
+            Vec3::new(0.887, 0.370, 0.140), // Orange-red
             Vec3::new(0.988, 0.553, 0.100), // Orange
             Vec3::new(0.988, 0.998, 0.645), // Yellow
         ],
@@ -113,8 +140,11 @@ impl ColorPalette {
         name: "Magma",
         colors: [
             Vec3::new(0.001, 0.000, 0.014), // Black
+            Vec3::new(0.171, 0.033, 0.197), // Very dark purple
             Vec3::new(0.341, 0.065, 0.380), // Purple
+            Vec3::new(0.538, 0.140, 0.356), // Pink-purple
             Vec3::new(0.735, 0.215, 0.331), // Pink-red
+            Vec3::new(0.864, 0.420, 0.379), // Orange-pink
             Vec3::new(0.992, 0.624, 0.427), // Orange
             Vec3::new(0.987, 0.991, 0.750), // Pale yellow
         ],
@@ -123,33 +153,42 @@ impl ColorPalette {
     pub const COPPER: ColorPalette = ColorPalette {
         name: "Copper",
         colors: [
-            Vec3::new(0.0, 0.0, 0.0),   // Black
-            Vec3::new(0.4, 0.25, 0.16), // Dark brown
-            Vec3::new(0.7, 0.44, 0.28), // Brown
-            Vec3::new(1.0, 0.63, 0.40), // Copper
-            Vec3::new(1.0, 0.78, 0.50), // Light copper
+            Vec3::new(0.0, 0.0, 0.0),     // Black
+            Vec3::new(0.2, 0.125, 0.08),  // Very dark brown
+            Vec3::new(0.4, 0.25, 0.16),   // Dark brown
+            Vec3::new(0.55, 0.345, 0.22), // Medium brown
+            Vec3::new(0.7, 0.44, 0.28),   // Brown
+            Vec3::new(0.85, 0.535, 0.34), // Light brown
+            Vec3::new(1.0, 0.63, 0.40),   // Copper
+            Vec3::new(1.0, 0.78, 0.50),   // Light copper
         ],
     };
 
     pub const COOL: ColorPalette = ColorPalette {
         name: "Cool",
         colors: [
-            Vec3::new(0.0, 1.0, 1.0),   // Cyan
-            Vec3::new(0.25, 0.75, 1.0), // Light blue
-            Vec3::new(0.5, 0.5, 1.0),   // Blue-purple
-            Vec3::new(0.75, 0.25, 1.0), // Purple
-            Vec3::new(1.0, 0.0, 1.0),   // Magenta
+            Vec3::new(0.0, 1.0, 1.0),     // Cyan
+            Vec3::new(0.125, 0.875, 1.0), // Cyan-blue
+            Vec3::new(0.25, 0.75, 1.0),   // Light blue
+            Vec3::new(0.375, 0.625, 1.0), // Blue
+            Vec3::new(0.5, 0.5, 1.0),     // Blue-purple
+            Vec3::new(0.625, 0.375, 1.0), // Purple-blue
+            Vec3::new(0.75, 0.25, 1.0),   // Purple
+            Vec3::new(1.0, 0.0, 1.0),     // Magenta
         ],
     };
 
     pub const HOT: ColorPalette = ColorPalette {
         name: "Hot",
         colors: [
-            Vec3::new(0.0, 0.0, 0.0), // Black
-            Vec3::new(0.5, 0.0, 0.0), // Dark red
-            Vec3::new(1.0, 0.5, 0.0), // Orange
-            Vec3::new(1.0, 1.0, 0.5), // Yellow
-            Vec3::new(1.0, 1.0, 1.0), // White
+            Vec3::new(0.0, 0.0, 0.0),   // Black
+            Vec3::new(0.25, 0.0, 0.0),  // Very dark red
+            Vec3::new(0.5, 0.0, 0.0),   // Dark red
+            Vec3::new(0.75, 0.25, 0.0), // Red-orange
+            Vec3::new(1.0, 0.5, 0.0),   // Orange
+            Vec3::new(1.0, 0.75, 0.25), // Light orange
+            Vec3::new(1.0, 1.0, 0.5),   // Yellow
+            Vec3::new(1.0, 1.0, 1.0),   // White
         ],
     };
 
@@ -158,8 +197,11 @@ impl ColorPalette {
         name: "Neon",
         colors: [
             Vec3::new(1.0, 0.0, 1.0), // Magenta
+            Vec3::new(0.5, 0.5, 1.0), // Light purple
             Vec3::new(0.0, 1.0, 1.0), // Cyan
+            Vec3::new(0.0, 1.0, 0.5), // Green-cyan
             Vec3::new(0.0, 1.0, 0.0), // Green
+            Vec3::new(0.5, 1.0, 0.0), // Yellow-green
             Vec3::new(1.0, 1.0, 0.0), // Yellow
             Vec3::new(1.0, 0.2, 0.8), // Pink
         ],
@@ -168,102 +210,129 @@ impl ColorPalette {
     pub const PURPLE_DREAM: ColorPalette = ColorPalette {
         name: "Purple Dream",
         colors: [
-            Vec3::new(0.1, 0.0, 0.2), // Dark purple
-            Vec3::new(0.4, 0.0, 0.6), // Purple
-            Vec3::new(0.7, 0.3, 0.9), // Violet
-            Vec3::new(0.9, 0.6, 1.0), // Lavender
-            Vec3::new(1.0, 0.9, 1.0), // Pale purple
+            Vec3::new(0.05, 0.0, 0.1),   // Very dark purple
+            Vec3::new(0.1, 0.0, 0.2),    // Dark purple
+            Vec3::new(0.25, 0.0, 0.4),   // Deep purple
+            Vec3::new(0.4, 0.0, 0.6),    // Purple
+            Vec3::new(0.55, 0.15, 0.75), // Violet
+            Vec3::new(0.7, 0.3, 0.9),    // Light violet
+            Vec3::new(0.85, 0.6, 1.0),   // Lavender
+            Vec3::new(1.0, 0.9, 1.0),    // Pale purple
         ],
     };
 
     pub const EARTH: ColorPalette = ColorPalette {
         name: "Earth",
         colors: [
-            Vec3::new(0.2, 0.15, 0.1), // Dark brown
-            Vec3::new(0.4, 0.3, 0.2),  // Brown
-            Vec3::new(0.6, 0.5, 0.3),  // Tan
-            Vec3::new(0.5, 0.6, 0.3),  // Olive
-            Vec3::new(0.7, 0.8, 0.5),  // Beige-green
+            Vec3::new(0.1, 0.075, 0.05), // Very dark brown
+            Vec3::new(0.2, 0.15, 0.1),   // Dark brown
+            Vec3::new(0.3, 0.225, 0.15), // Brown
+            Vec3::new(0.4, 0.3, 0.2),    // Medium brown
+            Vec3::new(0.5, 0.4, 0.25),   // Tan
+            Vec3::new(0.55, 0.55, 0.3),  // Olive
+            Vec3::new(0.65, 0.7, 0.4),   // Light olive
+            Vec3::new(0.75, 0.85, 0.55), // Beige-green
         ],
     };
 
     pub const ICE: ColorPalette = ColorPalette {
         name: "Ice",
         colors: [
-            Vec3::new(0.9, 0.95, 1.0),  // Pale blue
-            Vec3::new(0.7, 0.85, 0.95), // Light blue
-            Vec3::new(0.5, 0.7, 0.9),   // Blue
-            Vec3::new(0.3, 0.5, 0.8),   // Deep blue
-            Vec3::new(0.2, 0.3, 0.6),   // Dark blue
+            Vec3::new(0.1, 0.15, 0.4),   // Dark blue
+            Vec3::new(0.2, 0.3, 0.6),    // Deep blue
+            Vec3::new(0.3, 0.5, 0.8),    // Blue
+            Vec3::new(0.5, 0.7, 0.9),    // Light blue
+            Vec3::new(0.7, 0.85, 0.95),  // Pale blue
+            Vec3::new(0.85, 0.92, 0.97), // Very pale blue
+            Vec3::new(0.9, 0.95, 1.0),   // Ice blue
+            Vec3::new(1.0, 1.0, 1.0),    // White
         ],
     };
 
     pub const LAVA: ColorPalette = ColorPalette {
         name: "Lava",
         colors: [
-            Vec3::new(0.1, 0.0, 0.0), // Almost black
-            Vec3::new(0.5, 0.0, 0.0), // Dark red
-            Vec3::new(0.8, 0.2, 0.0), // Red
-            Vec3::new(1.0, 0.5, 0.0), // Orange
-            Vec3::new(1.0, 0.8, 0.2), // Yellow-orange
+            Vec3::new(0.05, 0.0, 0.0), // Almost black
+            Vec3::new(0.1, 0.0, 0.0),  // Very dark red
+            Vec3::new(0.3, 0.0, 0.0),  // Dark red
+            Vec3::new(0.5, 0.0, 0.0),  // Red
+            Vec3::new(0.7, 0.1, 0.0),  // Red-orange
+            Vec3::new(0.85, 0.3, 0.0), // Orange-red
+            Vec3::new(1.0, 0.5, 0.0),  // Orange
+            Vec3::new(1.0, 0.8, 0.2),  // Yellow-orange
         ],
     };
 
     pub const GALAXY: ColorPalette = ColorPalette {
         name: "Galaxy",
         colors: [
-            Vec3::new(0.05, 0.0, 0.15), // Deep space blue
-            Vec3::new(0.2, 0.0, 0.5),   // Purple
-            Vec3::new(0.5, 0.1, 0.7),   // Violet
-            Vec3::new(0.8, 0.3, 0.8),   // Pink-purple
-            Vec3::new(1.0, 0.7, 0.9),   // Pink
+            Vec3::new(0.025, 0.0, 0.075), // Deep space
+            Vec3::new(0.05, 0.0, 0.15),   // Very dark blue
+            Vec3::new(0.15, 0.0, 0.35),   // Dark purple
+            Vec3::new(0.3, 0.0, 0.5),     // Purple
+            Vec3::new(0.5, 0.1, 0.7),     // Violet
+            Vec3::new(0.7, 0.25, 0.8),    // Pink-purple
+            Vec3::new(0.85, 0.45, 0.85),  // Light pink
+            Vec3::new(1.0, 0.7, 0.9),     // Pale pink
         ],
     };
 
     pub const MINT: ColorPalette = ColorPalette {
         name: "Mint",
         colors: [
-            Vec3::new(0.0, 0.3, 0.3),  // Dark teal
-            Vec3::new(0.2, 0.5, 0.5),  // Teal
-            Vec3::new(0.4, 0.7, 0.6),  // Mint
-            Vec3::new(0.6, 0.9, 0.8),  // Light mint
-            Vec3::new(0.8, 1.0, 0.95), // Pale mint
+            Vec3::new(0.0, 0.15, 0.15), // Very dark teal
+            Vec3::new(0.0, 0.3, 0.3),   // Dark teal
+            Vec3::new(0.1, 0.4, 0.4),   // Teal
+            Vec3::new(0.2, 0.5, 0.5),   // Medium teal
+            Vec3::new(0.3, 0.6, 0.55),  // Mint
+            Vec3::new(0.5, 0.8, 0.7),   // Light mint
+            Vec3::new(0.7, 0.92, 0.85), // Pale mint
+            Vec3::new(0.85, 1.0, 0.95), // Very pale mint
         ],
     };
 
     pub const CHERRY: ColorPalette = ColorPalette {
         name: "Cherry",
         colors: [
-            Vec3::new(0.3, 0.0, 0.1),  // Dark red
-            Vec3::new(0.6, 0.0, 0.2),  // Cherry red
-            Vec3::new(0.9, 0.2, 0.4),  // Red-pink
-            Vec3::new(1.0, 0.5, 0.6),  // Pink
-            Vec3::new(1.0, 0.8, 0.85), // Pale pink
+            Vec3::new(0.15, 0.0, 0.05), // Very dark red
+            Vec3::new(0.3, 0.0, 0.1),   // Dark red
+            Vec3::new(0.45, 0.0, 0.15), // Deep cherry
+            Vec3::new(0.6, 0.0, 0.2),   // Cherry red
+            Vec3::new(0.75, 0.1, 0.3),  // Red-pink
+            Vec3::new(0.9, 0.3, 0.45),  // Pink
+            Vec3::new(1.0, 0.55, 0.65), // Light pink
+            Vec3::new(1.0, 0.8, 0.85),  // Pale pink
         ],
     };
 
     // === Xfractint Palettes ===
-    // Imported from xfractint-20.04p16/maps/
+    // Imported from xfractint-20.04p16/maps/ - expanded to 8 colors
 
     pub const XF_ALTERN: ColorPalette = ColorPalette {
         name: "Alternating Grey",
         colors: [
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(0.753, 0.737, 0.737),
-            Vec3::new(0.502, 0.486, 0.486),
-            Vec3::new(0.251, 0.235, 0.235),
-            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.000, 0.000, 0.000),
+            Vec3::new(0.863, 0.847, 0.847),
+            Vec3::new(0.706, 0.706, 0.706),
+            Vec3::new(0.565, 0.565, 0.565),
+            Vec3::new(0.408, 0.424, 0.424),
+            Vec3::new(0.267, 0.282, 0.282),
+            Vec3::new(0.141, 0.125, 0.157),
+            Vec3::new(0.000, 0.000, 0.000),
         ],
     };
 
     pub const XF_BLUES: ColorPalette = ColorPalette {
         name: "Blues",
         colors: [
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(0.0, 0.776, 0.984),
-            Vec3::new(0.345, 0.988, 0.988),
-            Vec3::new(0.0, 0.024, 0.988),
-            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.000, 0.000, 0.000),
+            Vec3::new(0.000, 0.094, 0.800),
+            Vec3::new(0.235, 0.831, 0.988),
+            Vec3::new(0.722, 0.988, 0.988),
+            Vec3::new(0.000, 0.973, 0.988),
+            Vec3::new(0.000, 0.220, 0.988),
+            Vec3::new(0.000, 0.000, 0.580),
+            Vec3::new(0.000, 0.000, 0.000),
         ],
     };
 
@@ -271,9 +340,12 @@ impl ColorPalette {
         name: "Chromatic",
         colors: [
             Vec3::new(0.188, 0.188, 0.188),
-            Vec3::new(0.212, 0.878, 0.212),
-            Vec3::new(0.173, 0.188, 0.188),
-            Vec3::new(0.196, 0.878, 0.196),
+            Vec3::new(0.188, 0.376, 0.878),
+            Vec3::new(0.596, 0.878, 0.596),
+            Vec3::new(0.878, 0.251, 0.188),
+            Vec3::new(0.816, 0.188, 0.878),
+            Vec3::new(0.188, 0.878, 0.596),
+            Vec3::new(0.878, 0.878, 0.376),
             Vec3::new(0.157, 0.188, 0.188),
         ],
     };
@@ -281,21 +353,27 @@ impl ColorPalette {
     pub const XF_DEFAULT: ColorPalette = ColorPalette {
         name: "Default",
         colors: [
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(0.988, 0.486, 0.518),
-            Vec3::new(0.11, 0.165, 0.439),
-            Vec3::new(0.047, 0.251, 0.0),
-            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.000, 0.000, 0.000),
+            Vec3::new(0.988, 0.000, 0.988),
+            Vec3::new(0.486, 0.988, 0.486),
+            Vec3::new(0.439, 0.000, 0.329),
+            Vec3::new(0.220, 0.439, 0.267),
+            Vec3::new(0.251, 0.000, 0.125),
+            Vec3::new(0.125, 0.251, 0.188),
+            Vec3::new(0.000, 0.000, 0.000),
         ],
     };
 
     pub const XF_DEFAULTW: ColorPalette = ColorPalette {
         name: "Default White",
         colors: [
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(0.957, 0.235, 0.361),
-            Vec3::new(0.612, 0.549, 0.486),
-            Vec3::new(0.267, 0.863, 0.612),
+            Vec3::new(0.000, 0.000, 0.000),
+            Vec3::new(0.988, 0.612, 0.235),
+            Vec3::new(0.235, 0.486, 0.361),
+            Vec3::new(0.486, 0.235, 0.486),
+            Vec3::new(0.612, 0.863, 0.486),
+            Vec3::new(0.863, 0.612, 0.612),
+            Vec3::new(0.988, 0.361, 0.737),
             Vec3::new(0.988, 0.988, 0.988),
         ],
     };
@@ -303,10 +381,13 @@ impl ColorPalette {
     pub const XF_FIRESTRM: ColorPalette = ColorPalette {
         name: "Fire Storm",
         colors: [
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(0.997, 0.295, 0.206),
-            Vec3::new(0.449, 0.957, 0.094),
-            Vec3::new(0.004, 0.703, 0.794),
+            Vec3::new(0.000, 0.000, 0.000),
+            Vec3::new(0.918, 0.055, 0.529),
+            Vec3::new(0.976, 0.392, 0.129),
+            Vec3::new(0.671, 0.820, 0.008),
+            Vec3::new(0.243, 1.000, 0.255),
+            Vec3::new(0.004, 0.800, 0.694),
+            Vec3::new(0.137, 0.380, 0.980),
             Vec3::new(0.553, 0.043, 0.902),
         ],
     };
@@ -314,32 +395,41 @@ impl ColorPalette {
     pub const XF_FROTH3: ColorPalette = ColorPalette {
         name: "Froth 3",
         colors: [
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(0.455, 0.0, 0.0),
-            Vec3::new(0.0, 0.565, 0.0),
-            Vec3::new(0.0, 0.0, 0.675),
-            Vec3::new(0.0, 0.0, 0.345),
+            Vec3::new(0.000, 0.000, 0.000),
+            Vec3::new(0.596, 0.000, 0.000),
+            Vec3::new(0.408, 0.000, 0.000),
+            Vec3::new(0.000, 0.659, 0.000),
+            Vec3::new(0.000, 0.471, 0.000),
+            Vec3::new(0.000, 0.000, 0.816),
+            Vec3::new(0.000, 0.000, 0.533),
+            Vec3::new(0.000, 0.000, 0.345),
         ],
     };
 
     pub const XF_FROTH316: ColorPalette = ColorPalette {
         name: "Froth 3-16",
         colors: [
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(0.529, 0.0, 0.0),
-            Vec3::new(0.0, 0.745, 0.0),
-            Vec3::new(0.0, 0.0, 0.949),
-            Vec3::new(0.0, 0.0, 0.314),
+            Vec3::new(0.000, 0.000, 0.000),
+            Vec3::new(0.831, 0.000, 0.000),
+            Vec3::new(0.486, 0.000, 0.000),
+            Vec3::new(0.000, 0.988, 0.000),
+            Vec3::new(0.000, 0.659, 0.000),
+            Vec3::new(0.000, 0.314, 0.000),
+            Vec3::new(0.000, 0.000, 0.831),
+            Vec3::new(0.000, 0.000, 0.314),
         ],
     };
 
     pub const XF_FROTH6: ColorPalette = ColorPalette {
         name: "Froth 6",
         colors: [
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(0.663, 0.0, 0.0),
-            Vec3::new(0.0, 0.98, 0.0),
-            Vec3::new(0.0, 0.0, 0.639),
+            Vec3::new(0.000, 0.000, 0.000),
+            Vec3::new(0.439, 0.000, 0.439),
+            Vec3::new(0.533, 0.000, 0.000),
+            Vec3::new(0.612, 0.612, 0.000),
+            Vec3::new(0.000, 0.706, 0.000),
+            Vec3::new(0.000, 0.000, 0.784),
+            Vec3::new(0.000, 0.878, 0.878),
             Vec3::new(0.988, 0.988, 0.988),
         ],
     };
@@ -347,10 +437,13 @@ impl ColorPalette {
     pub const XF_FROTH616: ColorPalette = ColorPalette {
         name: "Froth 6-16",
         colors: [
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(0.718, 0.0, 0.0),
-            Vec3::new(0.0, 0.808, 0.0),
-            Vec3::new(0.0, 0.898, 0.898),
+            Vec3::new(0.000, 0.000, 0.000),
+            Vec3::new(0.627, 0.000, 0.627),
+            Vec3::new(0.627, 0.000, 0.000),
+            Vec3::new(0.627, 0.627, 0.000),
+            Vec3::new(0.000, 0.627, 0.000),
+            Vec3::new(0.000, 0.000, 0.627),
+            Vec3::new(0.000, 0.627, 0.627),
             Vec3::new(0.988, 0.988, 0.988),
         ],
     };
@@ -358,10 +451,13 @@ impl ColorPalette {
     pub const XF_GAMMA1: ColorPalette = ColorPalette {
         name: "Gamma 1",
         colors: [
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(0.502, 0.486, 0.51),
-            Vec3::new(0.706, 0.698, 0.682),
-            Vec3::new(0.859, 0.851, 0.875),
+            Vec3::new(0.000, 0.000, 0.000),
+            Vec3::new(0.361, 0.376, 0.376),
+            Vec3::new(0.518, 0.533, 0.502),
+            Vec3::new(0.659, 0.643, 0.627),
+            Vec3::new(0.753, 0.737, 0.769),
+            Vec3::new(0.831, 0.831, 0.863),
+            Vec3::new(0.910, 0.910, 0.941),
             Vec3::new(0.988, 0.988, 0.988),
         ],
     };
@@ -369,10 +465,13 @@ impl ColorPalette {
     pub const XF_GAMMA2: ColorPalette = ColorPalette {
         name: "Gamma 2",
         colors: [
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(0.239, 0.247, 0.267),
-            Vec3::new(0.494, 0.494, 0.494),
-            Vec3::new(0.753, 0.737, 0.729),
+            Vec3::new(0.000, 0.000, 0.000),
+            Vec3::new(0.141, 0.141, 0.125),
+            Vec3::new(0.282, 0.282, 0.251),
+            Vec3::new(0.424, 0.424, 0.408),
+            Vec3::new(0.549, 0.565, 0.580),
+            Vec3::new(0.706, 0.706, 0.706),
+            Vec3::new(0.863, 0.831, 0.863),
             Vec3::new(0.988, 0.988, 0.988),
         ],
     };
@@ -380,121 +479,154 @@ impl ColorPalette {
     pub const XF_GLASSES1: ColorPalette = ColorPalette {
         name: "3D Glasses 1",
         colors: [
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(0.498, 0.0, 0.0),
-            Vec3::new(0.494, 0.0, 0.0),
-            Vec3::new(0.0, 0.0, 0.49),
-            Vec3::new(0.0, 0.0, 0.988),
+            Vec3::new(0.000, 0.000, 0.000),
+            Vec3::new(0.282, 0.000, 0.000),
+            Vec3::new(0.565, 0.000, 0.000),
+            Vec3::new(0.847, 0.000, 0.000),
+            Vec3::new(0.000, 0.000, 0.125),
+            Vec3::new(0.000, 0.000, 0.424),
+            Vec3::new(0.000, 0.000, 0.706),
+            Vec3::new(0.000, 0.000, 0.988),
         ],
     };
 
     pub const XF_GLASSES2: ColorPalette = ColorPalette {
         name: "3D Glasses 2",
         colors: [
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(0.235, 0.0, 0.235),
-            Vec3::new(0.471, 0.0, 0.471),
-            Vec3::new(0.706, 0.0, 0.706),
-            Vec3::new(0.941, 0.0, 0.941),
+            Vec3::new(0.000, 0.000, 0.000),
+            Vec3::new(0.251, 0.000, 0.125),
+            Vec3::new(0.502, 0.000, 0.251),
+            Vec3::new(0.816, 0.000, 0.376),
+            Vec3::new(0.063, 0.000, 0.565),
+            Vec3::new(0.376, 0.000, 0.690),
+            Vec3::new(0.627, 0.000, 0.816),
+            Vec3::new(0.941, 0.000, 0.941),
         ],
     };
 
     pub const XF_GOODEGA: ColorPalette = ColorPalette {
         name: "Good EGA",
         colors: [
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(0.988, 0.988, 0.165),
-            Vec3::new(0.494, 0.165, 0.0),
+            Vec3::new(0.000, 0.000, 0.000),
+            Vec3::new(0.988, 0.329, 0.000),
+            Vec3::new(0.988, 0.494, 0.000),
+            Vec3::new(0.988, 0.659, 0.000),
+            Vec3::new(0.988, 0.824, 0.000),
+            Vec3::new(0.988, 0.988, 0.000),
             Vec3::new(0.988, 0.988, 0.494),
-            Vec3::new(0.988, 0.329, 0.0),
+            Vec3::new(0.988, 0.988, 0.988),
         ],
     };
 
     pub const XF_GREEN: ColorPalette = ColorPalette {
         name: "Green",
         colors: [
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(0.0, 0.737, 0.0),
-            Vec3::new(0.0, 0.486, 0.0),
-            Vec3::new(0.0, 0.235, 0.0),
-            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.000, 0.000, 0.000),
+            Vec3::new(0.000, 0.847, 0.000),
+            Vec3::new(0.000, 0.706, 0.000),
+            Vec3::new(0.000, 0.565, 0.000),
+            Vec3::new(0.000, 0.424, 0.000),
+            Vec3::new(0.000, 0.282, 0.000),
+            Vec3::new(0.000, 0.125, 0.000),
+            Vec3::new(0.000, 0.000, 0.000),
         ],
     };
 
     pub const XF_GREY: ColorPalette = ColorPalette {
         name: "Grey",
         colors: [
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(0.753, 0.753, 0.753),
-            Vec3::new(0.502, 0.502, 0.502),
-            Vec3::new(0.251, 0.251, 0.251),
-            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.000, 0.000, 0.000),
+            Vec3::new(0.863, 0.863, 0.863),
+            Vec3::new(0.718, 0.718, 0.718),
+            Vec3::new(0.576, 0.576, 0.576),
+            Vec3::new(0.431, 0.431, 0.431),
+            Vec3::new(0.290, 0.290, 0.290),
+            Vec3::new(0.145, 0.145, 0.145),
+            Vec3::new(0.000, 0.000, 0.000),
         ],
     };
 
     pub const XF_GRID: ColorPalette = ColorPalette {
         name: "Grid",
         colors: [
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(0.25, 0.0, 1.0),
-            Vec3::new(0.5, 0.0, 1.0),
-            Vec3::new(0.75, 0.0, 1.0),
-            Vec3::new(1.0, 0.0, 1.0),
+            Vec3::new(0.000, 0.000, 0.000),
+            Vec3::new(0.143, 0.000, 1.000),
+            Vec3::new(0.286, 0.000, 1.000),
+            Vec3::new(0.429, 0.000, 1.000),
+            Vec3::new(0.571, 0.000, 1.000),
+            Vec3::new(0.714, 0.000, 1.000),
+            Vec3::new(0.857, 0.000, 1.000),
+            Vec3::new(1.000, 0.000, 1.000),
         ],
     };
 
     pub const XF_HEADACH2: ColorPalette = ColorPalette {
         name: "Headache 2",
         colors: [
-            Vec3::new(0.941, 0.0, 0.0),
-            Vec3::new(0.471, 0.494, 0.118),
-            Vec3::new(0.0, 0.502, 0.486),
-            Vec3::new(0.486, 0.494, 0.369),
-            Vec3::new(0.0, 0.502, 0.502),
+            Vec3::new(0.941, 0.000, 0.000),
+            Vec3::new(0.941, 0.125, 0.000),
+            Vec3::new(0.941, 0.267, 0.000),
+            Vec3::new(0.957, 0.408, 0.000),
+            Vec3::new(0.000, 0.424, 0.565),
+            Vec3::new(0.000, 0.282, 0.706),
+            Vec3::new(0.000, 0.141, 0.847),
+            Vec3::new(0.000, 0.502, 0.502),
         ],
     };
 
     pub const XF_HEADACHE: ColorPalette = ColorPalette {
         name: "Headache",
         colors: [
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(0.235, 0.624, 0.176),
-            Vec3::new(0.478, 0.494, 0.243),
-            Vec3::new(0.729, 0.616, 0.184),
-            Vec3::new(0.0, 0.502, 0.502),
+            Vec3::new(0.000, 0.000, 0.000),
+            Vec3::new(0.000, 0.863, 0.125),
+            Vec3::new(0.000, 0.722, 0.267),
+            Vec3::new(0.957, 0.408, 0.000),
+            Vec3::new(0.957, 0.549, 0.000),
+            Vec3::new(0.000, 0.282, 0.706),
+            Vec3::new(0.000, 0.141, 0.847),
+            Vec3::new(0.000, 0.502, 0.502),
         ],
     };
 
     pub const XF_LANDSCAP: ColorPalette = ColorPalette {
         name: "Landscape",
         colors: [
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(0.0, 0.0, 0.659),
-            Vec3::new(0.251, 0.251, 0.0),
-            Vec3::new(0.251, 0.035, 0.0),
-            Vec3::new(1.0, 1.0, 1.0),
+            Vec3::new(0.000, 0.000, 0.000),
+            Vec3::new(0.000, 0.000, 0.659),
+            Vec3::new(0.000, 0.000, 0.659),
+            Vec3::new(0.251, 0.325, 0.000),
+            Vec3::new(0.251, 0.180, 0.000),
+            Vec3::new(0.251, 0.055, 0.000),
+            Vec3::new(0.824, 0.824, 1.000),
+            Vec3::new(1.000, 1.000, 1.000),
         ],
     };
 
     pub const XF_LYAPUNOV: ColorPalette = ColorPalette {
         name: "Lyapunov",
         colors: [
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(0.753, 0.518, 0.0),
-            Vec3::new(0.502, 0.267, 0.0),
-            Vec3::new(0.251, 0.016, 0.0),
-            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.000, 0.000, 0.000),
+            Vec3::new(0.863, 0.627, 0.000),
+            Vec3::new(0.722, 0.486, 0.000),
+            Vec3::new(0.565, 0.329, 0.000),
+            Vec3::new(0.424, 0.188, 0.000),
+            Vec3::new(0.282, 0.047, 0.000),
+            Vec3::new(0.141, 0.000, 0.000),
+            Vec3::new(0.000, 0.000, 0.000),
         ],
     };
 
     pub const XF_NEON: ColorPalette = ColorPalette {
         name: "XF Neon",
         colors: [
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(0.008, 0.004, 0.004),
-            Vec3::new(0.0, 0.518, 0.0),
-            Vec3::new(0.965, 0.965, 0.0),
-            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.000, 0.000, 0.000),
+            Vec3::new(0.878, 0.282, 0.424),
+            Vec3::new(0.000, 0.000, 0.000),
+            Vec3::new(0.000, 0.894, 0.000),
+            Vec3::new(0.000, 0.000, 0.000),
+            Vec3::new(0.675, 0.675, 0.000),
+            Vec3::new(0.188, 0.188, 0.000),
+            Vec3::new(0.000, 0.000, 0.000),
         ],
     };
 
@@ -502,9 +634,12 @@ impl ColorPalette {
         name: "PaintJet",
         colors: [
             Vec3::new(0.094, 0.078, 0.047),
-            Vec3::new(0.753, 0.812, 0.302),
-            Vec3::new(0.125, 0.267, 0.408),
-            Vec3::new(0.376, 0.616, 0.341),
+            Vec3::new(0.769, 0.267, 0.282),
+            Vec3::new(0.941, 0.910, 0.282),
+            Vec3::new(0.737, 0.188, 0.424),
+            Vec3::new(0.094, 0.078, 0.047),
+            Vec3::new(0.769, 0.267, 0.282),
+            Vec3::new(0.941, 0.910, 0.282),
             Vec3::new(0.157, 0.455, 0.769),
         ],
     };
@@ -512,21 +647,27 @@ impl ColorPalette {
     pub const XF_ROYAL: ColorPalette = ColorPalette {
         name: "Royal",
         colors: [
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(0.482, 0.012, 0.627),
-            Vec3::new(0.988, 0.988, 0.98),
-            Vec3::new(0.984, 0.969, 0.0),
-            Vec3::new(0.235, 0.0, 0.314),
+            Vec3::new(0.000, 0.000, 0.000),
+            Vec3::new(0.361, 0.000, 0.486),
+            Vec3::new(0.549, 0.141, 0.675),
+            Vec3::new(0.847, 0.722, 0.878),
+            Vec3::new(0.988, 0.988, 0.706),
+            Vec3::new(0.988, 0.988, 0.125),
+            Vec3::new(0.659, 0.549, 0.141),
+            Vec3::new(0.235, 0.000, 0.314),
         ],
     };
 
     pub const XF_TOPO: ColorPalette = ColorPalette {
         name: "Topo",
         colors: [
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(0.216, 0.518, 0.043),
-            Vec3::new(0.486, 0.8, 0.337),
-            Vec3::new(0.91, 0.859, 0.341),
+            Vec3::new(0.000, 0.000, 0.000),
+            Vec3::new(0.267, 0.518, 0.910),
+            Vec3::new(0.235, 0.549, 0.063),
+            Vec3::new(0.392, 0.706, 0.220),
+            Vec3::new(0.580, 0.894, 0.424),
+            Vec3::new(0.910, 0.894, 0.408),
+            Vec3::new(0.910, 0.675, 0.141),
             Vec3::new(0.988, 0.988, 0.988),
         ],
     };
@@ -534,10 +675,13 @@ impl ColorPalette {
     pub const XF_VOLCANO: ColorPalette = ColorPalette {
         name: "Volcano",
         colors: [
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(0.988, 0.98, 0.0),
-            Vec3::new(0.988, 0.745, 0.51),
-            Vec3::new(0.988, 0.012, 0.0),
+            Vec3::new(0.000, 0.000, 0.000),
+            Vec3::new(0.988, 0.110, 0.000),
+            Vec3::new(0.988, 0.988, 0.235),
+            Vec3::new(0.988, 0.894, 0.800),
+            Vec3::new(0.988, 0.596, 0.235),
+            Vec3::new(0.988, 0.157, 0.000),
+            Vec3::new(0.706, 0.000, 0.000),
             Vec3::new(0.235, 0.235, 0.235),
         ],
     };
@@ -596,7 +740,7 @@ impl ColorPalette {
 
     /// Create a custom palette from Vec3 colors and a String name
     #[allow(dead_code)]
-    pub fn custom(name: String, colors: [Vec3; 5]) -> CustomPalette {
+    pub fn custom(name: String, colors: [Vec3; 8]) -> CustomPalette {
         CustomPalette::new(name, colors)
     }
 }
@@ -605,11 +749,11 @@ impl ColorPalette {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CustomPalette {
     pub name: String,
-    pub colors: [[f32; 3]; 5],
+    pub colors: [[f32; 3]; 8],
 }
 
 impl CustomPalette {
-    pub fn new(name: String, colors: [Vec3; 5]) -> Self {
+    pub fn new(name: String, colors: [Vec3; 8]) -> Self {
         Self {
             name,
             colors: [
@@ -618,11 +762,14 @@ impl CustomPalette {
                 colors[2].to_array(),
                 colors[3].to_array(),
                 colors[4].to_array(),
+                colors[5].to_array(),
+                colors[6].to_array(),
+                colors[7].to_array(),
             ],
         }
     }
 
-    pub fn to_color_palette(&self) -> (String, [Vec3; 5]) {
+    pub fn to_color_palette(&self) -> (String, [Vec3; 8]) {
         (
             self.name.clone(),
             [
@@ -631,6 +778,9 @@ impl CustomPalette {
                 Vec3::from_array(self.colors[2]),
                 Vec3::from_array(self.colors[3]),
                 Vec3::from_array(self.colors[4]),
+                Vec3::from_array(self.colors[5]),
+                Vec3::from_array(self.colors[6]),
+                Vec3::from_array(self.colors[7]),
             ],
         )
     }
@@ -699,8 +849,8 @@ impl CustomPalette {
                 return Err("Need at least 2 valid colors".to_string());
             }
 
-            // Sample 5 colors evenly from the palette
-            let colors = Self::sample_colors(&rgb_values, 5);
+            // Sample 8 colors evenly from the palette
+            let colors = Self::sample_colors(&rgb_values, 8);
             Ok(Self::new(name, colors))
         } else {
             // Try parsing as simple text format (one RGB per line, 0-255 or 0.0-1.0)
@@ -745,14 +895,14 @@ impl CustomPalette {
                 );
             }
 
-            let colors = Self::sample_colors(&rgb_values, 5);
+            let colors = Self::sample_colors(&rgb_values, 8);
             Ok(Self::new(name, colors))
         }
     }
 
     /// Sample N colors evenly from a color list using linear interpolation
-    fn sample_colors(colors: &[Vec3], n: usize) -> [Vec3; 5] {
-        let mut result = [Vec3::ZERO; 5];
+    fn sample_colors(colors: &[Vec3], n: usize) -> [Vec3; 8] {
+        let mut result = [Vec3::ZERO; 8];
         if colors.is_empty() {
             return result;
         }
@@ -762,7 +912,7 @@ impl CustomPalette {
             result.fill(colors[0]);
         } else {
             // Sample evenly across the palette
-            for (i, slot) in result.iter_mut().enumerate().take(n.min(5)) {
+            for (i, slot) in result.iter_mut().enumerate().take(n.min(8)) {
                 let t = i as f32 / (n - 1).max(1) as f32;
                 let idx_f = t * (colors.len() - 1) as f32;
                 let idx = idx_f.floor() as usize;

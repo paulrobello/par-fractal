@@ -31,8 +31,8 @@ pub struct AccumulationDisplayUniforms {
     pub gamma: f32,
     pub palette_offset: f32,
     pub _padding: f32,
-    /// 5 palette colors, each as [r, g, b, a] (alpha unused but needed for alignment)
-    pub palette: [[f32; 4]; 5],
+    /// 8 palette colors, each as [r, g, b, a] (alpha unused but needed for alignment)
+    pub palette: [[f32; 4]; 8],
 }
 
 impl Default for AccumulationDisplayUniforms {
@@ -42,13 +42,16 @@ impl Default for AccumulationDisplayUniforms {
             gamma: 0.6,
             palette_offset: 0.0,
             _padding: 0.0,
-            // Default fire palette
+            // Default fire palette (8 colors)
             palette: [
-                [0.0, 0.0, 0.0, 1.0], // Black
-                [0.5, 0.0, 0.5, 1.0], // Purple
-                [1.0, 0.0, 0.0, 1.0], // Red
-                [1.0, 0.5, 0.0, 1.0], // Orange
-                [1.0, 1.0, 0.0, 1.0], // Yellow
+                [0.0, 0.0, 0.0, 1.0],   // Black
+                [0.25, 0.0, 0.25, 1.0], // Deep purple
+                [0.5, 0.0, 0.5, 1.0],   // Purple
+                [0.75, 0.0, 0.25, 1.0], // Magenta
+                [1.0, 0.0, 0.0, 1.0],   // Red
+                [1.0, 0.5, 0.0, 1.0],   // Orange
+                [1.0, 0.75, 0.0, 1.0],  // Light orange
+                [1.0, 1.0, 0.0, 1.0],   // Yellow
             ],
         }
     }

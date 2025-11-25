@@ -76,7 +76,7 @@ pub struct UI {
     bookmark_to_delete: Option<String>,
     // Custom palette editor
     custom_palette_name: String,
-    custom_palette_colors: [[f32; 3]; 5],
+    custom_palette_colors: [[f32; 3]; 8],
     custom_palettes: Vec<String>,
     last_custom_palette_list_update: web_time::Instant,
     custom_palette_to_delete: Option<String>,
@@ -137,11 +137,14 @@ impl UI {
             bookmark_to_delete: None,
             custom_palette_name: String::new(),
             custom_palette_colors: [
+                [0.0, 0.0, 0.0], // Black
                 [1.0, 0.0, 0.0], // Red
                 [1.0, 0.5, 0.0], // Orange
                 [1.0, 1.0, 0.0], // Yellow
                 [0.0, 1.0, 0.0], // Green
+                [0.0, 1.0, 1.0], // Cyan
                 [0.0, 0.0, 1.0], // Blue
+                [1.0, 0.0, 1.0], // Magenta
             ],
             custom_palettes: CustomPaletteGallery::list_palettes().unwrap_or_default(),
             last_custom_palette_list_update: web_time::Instant::now(),
@@ -1031,10 +1034,10 @@ impl UI {
                             ui.separator();
                             ui.collapsing("Custom Palette Editor", |ui| {
                                 ui.label("Create your own color palettes")
-                                    .on_hover_text("Design custom 5-color gradients");
+                                    .on_hover_text("Design custom 8-color gradients");
 
-                                // Color picker for each of the 5 palette colors
-                                for i in 0..5 {
+                                // Color picker for each of the 8 palette colors
+                                for i in 0..8 {
                                     ui.horizontal(|ui| {
                                         ui.label(format!("Color {}:", i + 1));
                                         if ui.color_edit_button_rgb(&mut self.custom_palette_colors[i])
@@ -1080,6 +1083,9 @@ impl UI {
                                             Vec3::from_array(self.custom_palette_colors[2]),
                                             Vec3::from_array(self.custom_palette_colors[3]),
                                             Vec3::from_array(self.custom_palette_colors[4]),
+                                            Vec3::from_array(self.custom_palette_colors[5]),
+                                            Vec3::from_array(self.custom_palette_colors[6]),
+                                            Vec3::from_array(self.custom_palette_colors[7]),
                                         ];
                                         let custom_palette = CustomPalette::new(
                                             self.custom_palette_name.clone(),
@@ -1101,7 +1107,7 @@ impl UI {
                                     if ui.button("📋 Copy from Current")
                                         .on_hover_text("Copy colors from the currently selected palette")
                                         .clicked() {
-                                        for i in 0..5 {
+                                        for i in 0..8 {
                                             self.custom_palette_colors[i] = params.palette.colors[i].to_array();
                                         }
                                     }

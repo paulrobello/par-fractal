@@ -140,6 +140,24 @@ impl App {
                         palette_colors[4].z,
                         1.0,
                     ],
+                    [
+                        palette_colors[5].x,
+                        palette_colors[5].y,
+                        palette_colors[5].z,
+                        1.0,
+                    ],
+                    [
+                        palette_colors[6].x,
+                        palette_colors[6].y,
+                        palette_colors[6].z,
+                        1.0,
+                    ],
+                    [
+                        palette_colors[7].x,
+                        palette_colors[7].y,
+                        palette_colors[7].z,
+                        1.0,
+                    ],
                 ],
             };
             self.renderer.queue.write_buffer(

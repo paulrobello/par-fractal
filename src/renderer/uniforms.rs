@@ -32,7 +32,7 @@ pub struct Uniforms {
     _padding2: [f32; 2], // Adjusted for alignment
 
     // Color palette
-    palette: [[f32; 4]; 5], // 5 colors with padding
+    palette: [[f32; 4]; 8], // 8 colors with padding
 
     // Rendering flags
     ambient_occlusion: u32,
@@ -139,7 +139,7 @@ pub struct Uniforms {
     _reserved4: u32,
 
     // Padding for 16-byte alignment
-    _padding_end: [f32; 24], // 96 bytes
+    _padding_end: [f32; 12], // 48 bytes (reduced from 96 to account for 3 extra palette colors)
     _padding_end2: [f32; 4], // 16 bytes
 }
 
@@ -169,7 +169,7 @@ impl Uniforms {
             fractal_fold: 1.0,
             fractal_min_radius: 0.5,
             _padding2: [0.0; 2],
-            palette: [[0.0; 4]; 5],
+            palette: [[0.0; 4]; 8],
             ambient_occlusion: 1,
             soft_shadows: 1,
             depth_of_field: 0,
@@ -260,7 +260,7 @@ impl Uniforms {
             _reserved3: 0,
             _reserved4: 0,
 
-            _padding_end: [0.0; 24],
+            _padding_end: [0.0; 12],
             _padding_end2: [0.0; 4],
         }
     }
