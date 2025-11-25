@@ -1058,7 +1058,7 @@ impl UI {
                                             (color[2] * 255.0) as u8,
                                         );
                                         let (rect, _response) = ui.allocate_exact_size(
-                                            egui::vec2(30.0, 30.0),
+                                            egui::vec2(20.0, 20.0),
                                             egui::Sense::hover()
                                         );
                                         ui.painter().rect_filled(rect, 2.0, color32);
