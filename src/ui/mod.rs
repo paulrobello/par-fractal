@@ -435,21 +435,14 @@ impl UI {
                         };
                         ui.horizontal(|ui| {
                             attractor_button(ui, FractalType::Hopalong2D, "Hopalong", "Hopalong attractor - intricate web patterns");
-                            attractor_button(ui, FractalType::Henon2D, "Hénon", "Hénon attractor - classic chaotic system");
-                        });
-                        ui.horizontal(|ui| {
                             attractor_button(ui, FractalType::Martin2D, "Martin", "Martin attractor - spiral/flower patterns");
+                        });
+                        ui.horizontal(|ui| {
                             attractor_button(ui, FractalType::Gingerbreadman2D, "Gingerbread", "Gingerbreadman - simple formula, complex output");
-                        });
-                        ui.horizontal(|ui| {
-                            attractor_button(ui, FractalType::Latoocarfian2D, "Latoocarfian", "Latoocarfian - intricate trigonometric patterns");
-                            attractor_button(ui, FractalType::Icon2D, "Icon", "Icon - rotational symmetry patterns");
-                        });
-                        ui.horizontal(|ui| {
                             attractor_button(ui, FractalType::Chip2D, "Chip", "Chip - log/cos/atan hopalong variant");
-                            attractor_button(ui, FractalType::Quadruptwo2D, "Quadruptwo", "Quadruptwo - log/sin/atan hopalong variant");
                         });
                         ui.horizontal(|ui| {
+                            attractor_button(ui, FractalType::Quadruptwo2D, "Quadruptwo", "Quadruptwo - log/sin/atan hopalong variant");
                             attractor_button(ui, FractalType::Threeply2D, "Threeply", "Threeply - trigonometric hopalong variant");
                         });
 
@@ -1225,17 +1218,13 @@ impl UI {
                             .default_open(self.ui_state.params_2d_open)
                             .show(ui, |ui| {
                                 // Hide iterations slider for Collatz (doesn't affect it)
-                                if params.fractal_type != FractalType::Collatz2D {
-                                    // Strange attractors need much higher iteration counts for detail
-                                    let (max_iter, tooltip) = if params.fractal_type.is_2d_attractor() {
-                                        (100000u32, "Number of orbit points to plot\nHigher = more detail but slower")
-                                    } else {
-                                        (1024u32, "Number of iterations before considering a point escaped\nHigher = more detail but slower")
-                                    };
-                                    changed |= ui.add(egui::Slider::new(&mut params.max_iterations, 1..=max_iter)
+                                // Hide max iterations for strange attractors (they use accumulation mode)
+                                // and for Collatz which doesn't use iterations
+                                if params.fractal_type != FractalType::Collatz2D && !params.fractal_type.is_2d_attractor() {
+                                    changed |= ui.add(egui::Slider::new(&mut params.max_iterations, 1..=1024)
                                         .text("Max Iterations")
                                         .logarithmic(true))
-                                        .on_hover_text(tooltip)
+                                        .on_hover_text("Number of iterations before considering a point escaped\nHigher = more detail but slower")
                                         .changed();
                                 }
 
@@ -1254,7 +1243,7 @@ impl UI {
 
                                 ui.label(format!("Center: ({:.6}, {:.6})", params.center_2d[0], params.center_2d[1]))
                                     .on_hover_text("Current view center (drag to pan)");
-                                ui.label(format!("Zoom: {:.2e}", params.zoom_2d))
+                                ui.label(format!("Zoom: {:.4}", params.zoom_2d))
                                     .on_hover_text("Current zoom level (scroll to zoom)");
                                 if ui.button("Reset View").on_hover_text("Reset center and zoom [R]").clicked() {
                                     params.center_2d = [0.0, 0.0];
@@ -1262,36 +1251,117 @@ impl UI {
                                     changed = true;
                                 }
 
-                                // Accumulation mode for strange attractors
+                                // Accumulation controls for strange attractors (always enabled)
                                 if params.fractal_type.is_2d_attractor() {
-                                    ui.separator();
-                                    ui.label("🎯 Accumulation Mode (Experimental)");
-                                    ui.label("Uses compute shaders for millions of iterations at 60 FPS");
+                                    // Ensure accumulation is always enabled for strange attractors
+                                    params.attractor_accumulation_enabled = true;
 
-                                    changed |= ui.checkbox(&mut params.attractor_accumulation_enabled, "Enable Accumulation")
-                                        .on_hover_text("Use GPU compute shaders for progressive rendering\nAllows millions of iterations while maintaining 60 FPS")
+                                    ui.separator();
+                                    ui.label("🎯 Accumulation Settings");
+
+                                    changed |= ui.add(egui::Slider::new(&mut params.attractor_iterations_per_frame, 10_000..=1_000_000)
+                                        .text("Iterations/Frame")
+                                        .logarithmic(true))
+                                        .on_hover_text("Number of orbit iterations per frame\nHigher = faster accumulation, lower FPS")
                                         .changed();
 
-                                    if params.attractor_accumulation_enabled {
-                                        changed |= ui.add(egui::Slider::new(&mut params.attractor_iterations_per_frame, 10_000..=1_000_000)
-                                            .text("Iterations/Frame")
-                                            .logarithmic(true))
-                                            .on_hover_text("Number of orbit iterations per frame\nHigher = faster accumulation, lower FPS")
-                                            .changed();
+                                    changed |= ui.add(egui::Slider::new(&mut params.attractor_log_scale, 0.5..=5.0)
+                                        .text("Density Scale"))
+                                        .on_hover_text("Controls saturation point (hits needed for white)\n0.5 = ~30 hits, 1.0 = ~100, 2.0 = ~1000, 3.0 = ~10k")
+                                        .changed();
 
-                                        changed |= ui.add(egui::Slider::new(&mut params.attractor_log_scale, 0.1..=10.0)
-                                            .text("Log Scale")
-                                            .logarithmic(true))
-                                            .on_hover_text("Log scaling for density display\nHigher = more contrast in sparse areas")
-                                            .changed();
+                                    ui.label(format!("Total Iterations: {}", params.attractor_total_iterations));
 
-                                        ui.label(format!("Total Iterations: {:}", params.attractor_total_iterations));
+                                    if ui.button("Clear Accumulation").on_hover_text("Reset accumulated density").clicked() {
+                                        params.attractor_pending_clear = true;
+                                        params.attractor_total_iterations = 0;
+                                        changed = true;
+                                    }
 
-                                        if ui.button("Clear Accumulation").on_hover_text("Reset accumulated density").clicked() {
-                                            params.attractor_pending_clear = true;
-                                            params.attractor_total_iterations = 0;
-                                            changed = true;
+                                    // Attractor-specific parameter controls
+                                    ui.separator();
+                                    ui.label("🔧 Attractor Parameters");
+
+                                    match params.fractal_type {
+                                        FractalType::Hopalong2D => {
+                                            // Hopalong: a, b, c parameters (range 0-10 typical)
+                                            changed |= ui.add(egui::Slider::new(&mut params.julia_c[0], -10.0..=10.0)
+                                                .text("a"))
+                                                .on_hover_text("Hopalong parameter a")
+                                                .changed();
+                                            changed |= ui.add(egui::Slider::new(&mut params.julia_c[1], -10.0..=10.0)
+                                                .text("b"))
+                                                .on_hover_text("Hopalong parameter b")
+                                                .changed();
+                                            changed |= ui.add(egui::Slider::new(&mut params.power, -10.0..=10.0)
+                                                .text("c"))
+                                                .on_hover_text("Hopalong parameter c")
+                                                .changed();
                                         }
+                                        FractalType::Martin2D => {
+                                            // Martin: just parameter a
+                                            changed |= ui.add(egui::Slider::new(&mut params.julia_c[0], -10.0..=10.0)
+                                                .text("a"))
+                                                .on_hover_text("Martin parameter a (pi produces classic pattern)")
+                                                .changed();
+                                        }
+                                        FractalType::Gingerbreadman2D => {
+                                            ui.label("No adjustable parameters");
+                                        }
+                                        FractalType::Chip2D => {
+                                            // Chip: a, b, c parameters
+                                            changed |= ui.add(egui::Slider::new(&mut params.julia_c[0], -100.0..=100.0)
+                                                .text("a"))
+                                                .on_hover_text("Chip parameter a")
+                                                .changed();
+                                            changed |= ui.add(egui::Slider::new(&mut params.julia_c[1], -100.0..=100.0)
+                                                .text("b"))
+                                                .on_hover_text("Chip parameter b")
+                                                .changed();
+                                            changed |= ui.add(egui::Slider::new(&mut params.power, -100.0..=100.0)
+                                                .text("c"))
+                                                .on_hover_text("Chip parameter c")
+                                                .changed();
+                                        }
+                                        FractalType::Quadruptwo2D => {
+                                            // Quadruptwo: a, b, c parameters
+                                            changed |= ui.add(egui::Slider::new(&mut params.julia_c[0], -100.0..=100.0)
+                                                .text("a"))
+                                                .on_hover_text("Quadruptwo parameter a (default: 34)")
+                                                .changed();
+                                            changed |= ui.add(egui::Slider::new(&mut params.julia_c[1], -100.0..=100.0)
+                                                .text("b"))
+                                                .on_hover_text("Quadruptwo parameter b (default: 1)")
+                                                .changed();
+                                            changed |= ui.add(egui::Slider::new(&mut params.power, -100.0..=100.0)
+                                                .text("c"))
+                                                .on_hover_text("Quadruptwo parameter c (default: 5)")
+                                                .changed();
+                                        }
+                                        FractalType::Threeply2D => {
+                                            // Threeply: a, b, c parameters
+                                            changed |= ui.add(egui::Slider::new(&mut params.julia_c[0], -100.0..=100.0)
+                                                .text("a"))
+                                                .on_hover_text("Threeply parameter a (default: -55)")
+                                                .changed();
+                                            changed |= ui.add(egui::Slider::new(&mut params.julia_c[1], -100.0..=100.0)
+                                                .text("b"))
+                                                .on_hover_text("Threeply parameter b (default: -1)")
+                                                .changed();
+                                            changed |= ui.add(egui::Slider::new(&mut params.power, -100.0..=100.0)
+                                                .text("c"))
+                                                .on_hover_text("Threeply parameter c (default: -42)")
+                                                .changed();
+                                        }
+                                        _ => {}
+                                    }
+
+                                    // Reset to defaults button
+                                    if ui.button("Reset Parameters").on_hover_text("Reset attractor parameters to defaults").clicked() {
+                                        params.switch_fractal(params.fractal_type);
+                                        params.attractor_pending_clear = true;
+                                        params.attractor_total_iterations = 0;
+                                        changed = true;
                                     }
                                 }
                             });

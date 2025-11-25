@@ -29,7 +29,10 @@ use bytemuck::{Pod, Zeroable};
 pub struct AccumulationDisplayUniforms {
     pub log_scale: f32,
     pub gamma: f32,
-    pub _padding: [f32; 2],
+    pub palette_offset: f32,
+    pub _padding: f32,
+    /// 5 palette colors, each as [r, g, b, a] (alpha unused but needed for alignment)
+    pub palette: [[f32; 4]; 5],
 }
 
 impl Default for AccumulationDisplayUniforms {
@@ -37,7 +40,16 @@ impl Default for AccumulationDisplayUniforms {
         Self {
             log_scale: 1.0,
             gamma: 0.6,
-            _padding: [0.0; 2],
+            palette_offset: 0.0,
+            _padding: 0.0,
+            // Default fire palette
+            palette: [
+                [0.0, 0.0, 0.0, 1.0], // Black
+                [0.5, 0.0, 0.5, 1.0], // Purple
+                [1.0, 0.0, 0.0, 1.0], // Red
+                [1.0, 0.5, 0.0, 1.0], // Orange
+                [1.0, 1.0, 0.0, 1.0], // Yellow
+            ],
         }
     }
 }

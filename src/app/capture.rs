@@ -406,6 +406,11 @@ impl App {
                 });
 
         // Pass 1: Render fractal to scene texture
+        // For strange attractors with accumulation, use the accumulation display pipeline
+        let use_accumulation = self.fractal_params.attractor_accumulation_enabled
+            && self.fractal_params.fractal_type.is_2d_attractor()
+            && self.renderer.accumulation_display_bind_group.is_some();
+
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("HR Fractal Pass"),
@@ -422,10 +427,28 @@ impl App {
                 occlusion_query_set: None,
                 timestamp_writes: None,
             });
-            pass.set_pipeline(&self.renderer.render_pipeline);
-            pass.set_bind_group(0, &self.renderer.uniform_bind_group, &[]);
-            pass.set_vertex_buffer(0, self.renderer.vertex_buffer.slice(..));
-            pass.draw(0..4, 0..1);
+
+            if use_accumulation {
+                // Use accumulation display pipeline for strange attractors
+                // This samples the existing accumulation texture
+                if let Some(ref bind_group) = self.renderer.accumulation_display_bind_group {
+                    pass.set_pipeline(&self.renderer.accumulation_display_pipeline);
+                    pass.set_bind_group(0, bind_group, &[]);
+                    pass.set_bind_group(
+                        1,
+                        &self.renderer.accumulation_display_uniform_bind_group,
+                        &[],
+                    );
+                    pass.set_vertex_buffer(0, self.renderer.postprocess_vertex_buffer.slice(..));
+                    pass.draw(0..4, 0..1);
+                }
+            } else {
+                // Standard fractal rendering
+                pass.set_pipeline(&self.renderer.render_pipeline);
+                pass.set_bind_group(0, &self.renderer.uniform_bind_group, &[]);
+                pass.set_vertex_buffer(0, self.renderer.vertex_buffer.slice(..));
+                pass.draw(0..4, 0..1);
+            }
         }
 
         // Pass 2: Extract bright pixels for bloom

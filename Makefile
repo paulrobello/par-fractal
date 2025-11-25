@@ -24,9 +24,9 @@ help:
 	@echo "  release-build      - Build optimized release binary with info"
 	@echo ""
 	@echo "Running:"
-	@echo "  run                - Run the application in debug mode"
-	@echo "  run-release        - Run the application in release mode (recommended)"
-	@echo "  r                  - Shortcut for run-release"
+	@echo "  run                - Run the application in release mode (recommended)"
+	@echo "  run-debug          - Run the application in debug mode"
+	@echo "  r                  - Shortcut for run (release mode)"
 	@echo "  run-reset          - Run in release mode with settings cleared"
 	@echo ""
 	@echo "Testing:"
@@ -109,6 +109,10 @@ release-build:
 # ============================================================================
 
 run:
+	@echo "Running in release mode..."
+	cargo run --release
+
+run-debug:
 	@echo "Running in debug mode..."
 	cargo run
 
@@ -412,7 +416,7 @@ run-windows-vulkan:
 # Quick shortcuts
 # ============================================================================
 
-r: run-release
+r: run
 b: build
 t: test
 c: check

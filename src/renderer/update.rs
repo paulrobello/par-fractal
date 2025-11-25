@@ -21,7 +21,9 @@ impl Renderer {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Rgba16Float,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                | wgpu::TextureUsages::TEXTURE_BINDING
+                | wgpu::TextureUsages::COPY_SRC,
             view_formats: &[],
         });
 
@@ -175,6 +177,14 @@ impl Renderer {
 
             // Recreate intermediate textures for multi-pass rendering
             self.recreate_textures();
+
+            // Recreate accumulation texture if it exists (for strange attractors)
+            // This ensures the accumulation matches the new window size
+            if self.accumulation_texture.is_some() {
+                // Clear the existing texture and let it be recreated on next frame
+                self.accumulation_texture = None;
+                self.accumulation_display_bind_group = None;
+            }
         }
     }
 

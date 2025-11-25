@@ -34,14 +34,11 @@ pub enum FractalType {
 
     // 2D Fractals - Strange Attractors (from xfractint)
     Hopalong2D,
-    Henon2D,
     Martin2D,
     Gingerbreadman2D,
-    Latoocarfian2D,
     Chip2D,
     Quadruptwo2D,
     Threeply2D,
-    Icon2D,
 
     // 3D Fractals - Strange Attractors
     Pickover3D,
@@ -55,14 +52,11 @@ impl FractalType {
         matches!(
             self,
             FractalType::Hopalong2D
-                | FractalType::Henon2D
                 | FractalType::Martin2D
                 | FractalType::Gingerbreadman2D
-                | FractalType::Latoocarfian2D
                 | FractalType::Chip2D
                 | FractalType::Quadruptwo2D
                 | FractalType::Threeply2D
-                | FractalType::Icon2D
         )
     }
 
@@ -71,14 +65,11 @@ impl FractalType {
     pub fn attractor_index(&self) -> u32 {
         match self {
             FractalType::Hopalong2D => 0,
-            FractalType::Henon2D => 1,
-            FractalType::Martin2D => 2,
-            FractalType::Gingerbreadman2D => 3,
-            FractalType::Latoocarfian2D => 4,
-            FractalType::Chip2D => 5,
-            FractalType::Quadruptwo2D => 6,
-            FractalType::Threeply2D => 7,
-            FractalType::Icon2D => 8,
+            FractalType::Martin2D => 1,
+            FractalType::Gingerbreadman2D => 2,
+            FractalType::Chip2D => 3,
+            FractalType::Quadruptwo2D => 4,
+            FractalType::Threeply2D => 5,
             _ => 0,
         }
     }
@@ -114,14 +105,11 @@ impl FractalType {
             FractalType::SierpinskiGasket3D => "sierpinski_gasket",
             // Strange Attractors 2D
             FractalType::Hopalong2D => "hopalong",
-            FractalType::Henon2D => "henon",
             FractalType::Martin2D => "martin",
             FractalType::Gingerbreadman2D => "gingerbreadman",
-            FractalType::Latoocarfian2D => "latoocarfian",
             FractalType::Chip2D => "chip",
             FractalType::Quadruptwo2D => "quadruptwo",
             FractalType::Threeply2D => "threeply",
-            FractalType::Icon2D => "icon",
             // Strange Attractors 3D
             FractalType::Pickover3D => "pickover",
             FractalType::Lorenz3D => "lorenz",

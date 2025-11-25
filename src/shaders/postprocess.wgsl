@@ -301,7 +301,9 @@ fn fs_copy(input: VertexOutput) -> @location(0) vec4<f32> {
 struct AccumulationDisplayUniforms {
     log_scale: f32,
     gamma: f32,
-    _padding: vec2<f32>,
+    palette_offset: f32,
+    _padding: f32,
+    palette: array<vec4<f32>, 5>,
 }
 
 // This shader uses a separate bind group with only the uint accumulation texture
@@ -310,6 +312,27 @@ var t_accum: texture_2d<u32>;
 
 @group(1) @binding(0)
 var<uniform> accum_uniforms: AccumulationDisplayUniforms;
+
+// Sample from the uniform palette (5 colors)
+fn sample_accum_palette(t: f32) -> vec3<f32> {
+    // Apply palette offset and wrap
+    let t_offset = fract(t + accum_uniforms.palette_offset);
+
+    // Map t from [0,1] to palette indices [0,4]
+    let scaled = t_offset * 4.0;
+    let idx = i32(floor(scaled));
+    let frac = fract(scaled);
+
+    // Clamp indices to valid range
+    let i0 = clamp(idx, 0, 4);
+    let i1 = clamp(idx + 1, 0, 4);
+
+    // Interpolate between colors
+    let c0 = accum_uniforms.palette[i0].rgb;
+    let c1 = accum_uniforms.palette[i1].rgb;
+
+    return mix(c0, c1, frac);
+}
 
 @fragment
 fn fs_accumulation_display(input: VertexOutput) -> @location(0) vec4<f32> {
@@ -330,39 +353,20 @@ fn fs_accumulation_display(input: VertexOutput) -> @location(0) vec4<f32> {
     }
 
     // Apply log scaling for better contrast across large dynamic range
-    // log_scale from uniforms controls the compression (higher = more compressed)
-    let max_value = 5000.0 / accum_uniforms.log_scale;
-    let log_value = log(1.0 + hit_count) / log(1.0 + max_value);
+    // log_scale controls the saturation point (how many hits = white):
+    // - log_scale = 0.5: saturates at ~30 hits (shows fine structure)
+    // - log_scale = 1.0: saturates at ~100 hits (balanced)
+    // - log_scale = 2.0: saturates at ~1000 hits (moderate density)
+    // - log_scale = 3.0: saturates at ~10000 hits (high density only)
+    // - log_scale = 5.0: saturates at ~1M hits (extreme density only)
+    let saturation_hits = pow(10.0, accum_uniforms.log_scale + 1.0);
+    let normalized = log(1.0 + hit_count) / log(1.0 + saturation_hits);
 
-    // Apply gamma correction (from uniforms)
-    let adjusted = pow(clamp(log_value, 0.0, 1.0), accum_uniforms.gamma);
+    // Apply gamma correction for fine-tuning contrast
+    let adjusted = pow(clamp(normalized, 0.0, 1.0), accum_uniforms.gamma);
 
-    // Classic "fire" palette - similar to classic fractal viewers
-    // Goes from black -> dark red -> red -> orange -> yellow -> white
-    var color: vec3<f32>;
-    let t = adjusted;
-
-    if (t < 0.2) {
-        // Black to dark purple/blue
-        let s = t * 5.0;
-        color = mix(vec3<f32>(0.0, 0.0, 0.0), vec3<f32>(0.1, 0.0, 0.3), s);
-    } else if (t < 0.4) {
-        // Dark purple to magenta
-        let s = (t - 0.2) * 5.0;
-        color = mix(vec3<f32>(0.1, 0.0, 0.3), vec3<f32>(0.6, 0.0, 0.4), s);
-    } else if (t < 0.6) {
-        // Magenta to orange
-        let s = (t - 0.4) * 5.0;
-        color = mix(vec3<f32>(0.6, 0.0, 0.4), vec3<f32>(1.0, 0.4, 0.0), s);
-    } else if (t < 0.8) {
-        // Orange to yellow
-        let s = (t - 0.6) * 5.0;
-        color = mix(vec3<f32>(1.0, 0.4, 0.0), vec3<f32>(1.0, 0.9, 0.2), s);
-    } else {
-        // Yellow to white
-        let s = (t - 0.8) * 5.0;
-        color = mix(vec3<f32>(1.0, 0.9, 0.2), vec3<f32>(1.0, 1.0, 1.0), s);
-    }
+    // Sample from the user-selected palette
+    let color = sample_accum_palette(adjusted);
 
     return vec4<f32>(color, 1.0);
 }

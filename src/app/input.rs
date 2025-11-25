@@ -399,10 +399,12 @@ impl App {
 
                         let aspect =
                             self.renderer.size.width as f64 / self.renderer.size.height as f64;
+                        // Scale factor matches shader: world = screen * 2 / (zoom * height)
+                        // delta is already normalized by width/height, so multiply by 2
                         self.fractal_params.center_2d[0] -=
-                            delta_x * 4.0 / self.fractal_params.zoom_2d as f64 * aspect;
+                            delta_x * 2.0 / self.fractal_params.zoom_2d as f64 * aspect;
                         self.fractal_params.center_2d[1] +=
-                            delta_y * 4.0 / self.fractal_params.zoom_2d as f64;
+                            delta_y * 2.0 / self.fractal_params.zoom_2d as f64;
                     }
                     self.last_mouse_pos = Some(current_pos);
                     true

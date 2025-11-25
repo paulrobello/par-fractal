@@ -64,13 +64,6 @@ fn hopalong_step(x: f32, y: f32, a: f32, b: f32, c: f32) -> vec2<f32> {
     return vec2<f32>(x_new, y_new);
 }
 
-// Hénon attractor: x' = 1 + y - a*x², y' = b*x
-fn henon_step(x: f32, y: f32, a: f32, b: f32) -> vec2<f32> {
-    let x_new = 1.0 + y - a * x * x;
-    let y_new = b * x;
-    return vec2<f32>(x_new, y_new);
-}
-
 // Martin attractor: x' = y - sin(x), y' = a - x
 fn martin_step(x: f32, y: f32, a: f32) -> vec2<f32> {
     let x_new = y - sin(x);
@@ -85,13 +78,6 @@ fn gingerbreadman_step(x: f32, y: f32) -> vec2<f32> {
     return vec2<f32>(x_new, y_new);
 }
 
-// Latoocarfian: x' = sin(y*b) + c*sin(x*b), y' = sin(x*a) + d*sin(y*a)
-fn latoocarfian_step(x: f32, y: f32, a: f32, b: f32, c: f32, d: f32) -> vec2<f32> {
-    let x_new = sin(y * b) + c * sin(x * b);
-    let y_new = sin(x * a) + d * sin(y * a);
-    return vec2<f32>(x_new, y_new);
-}
-
 // Chip: x' = y - sign(x)*cos(log²(|b*x - c|))*arctan(log²(|c*x - b|)), y' = a - x
 fn chip_step(x: f32, y: f32, a: f32, b: f32, c: f32) -> vec2<f32> {
     let log1 = log(max(abs(b * x - c), 0.001));
@@ -101,11 +87,12 @@ fn chip_step(x: f32, y: f32, a: f32, b: f32, c: f32) -> vec2<f32> {
     return vec2<f32>(x_new, y_new);
 }
 
-// Quadruptwo: x' = y - sign(x)*sin(log(|b*x - c|))*arctan(log²(|c*x - b|)), y' = a - x
+// Quadruptwo: x' = y - sign(x)*sin(ln|b*x - c|)*atan(|c*x - b|²), y' = a - x
+// Reference: https://www.jamesh.id.au/fractals/orbit/quadruptwo.html
 fn quadruptwo_step(x: f32, y: f32, a: f32, b: f32, c: f32) -> vec2<f32> {
     let log1 = log(max(abs(b * x - c), 0.001));
-    let log2 = log(max(abs(c * x - b), 0.001));
-    let x_new = y - sign(x) * sin(log1) * atan(log2 * log2);
+    let term2 = abs(c * x - b);
+    let x_new = y - sign(x) * sin(log1) * atan(term2 * term2);
     let y_new = a - x;
     return vec2<f32>(x_new, y_new);
 }
@@ -119,19 +106,30 @@ fn threeply_step(x: f32, y: f32, a: f32, b: f32, c: f32) -> vec2<f32> {
 }
 
 // Icon fractal with rotational symmetry
+// Based on "Symmetry in Chaos" by Michael Field and Martin Golubitsky
+// Formula: z_new = p*z + gamma*z^(n-1) where p = lambda + alpha*|z|^2 + beta*Re(z^n)
 fn icon_step(x: f32, y: f32, lambda: f32, alpha: f32, beta: f32, gamma: f32, omega: f32, degree: i32) -> vec2<f32> {
-    // Compute z^(degree-2) where z = x + iy
-    var zn_real = 1.0;
-    var zn_imag = 0.0;
+    let zzbar = x * x + y * y;
+    var p = alpha * zzbar + lambda;
+
+    // Compute z^(degree-1) where z = x + iy
+    // Start with z^1 = z, then multiply (degree-2) more times to get z^(degree-1)
+    var zreal = x;
+    var zimag = y;
     for (var j = 0; j < degree - 2; j = j + 1) {
-        let temp = zn_real * x - zn_imag * y;
-        zn_imag = zn_real * y + zn_imag * x;
-        zn_real = temp;
+        let za = zreal * x - zimag * y;
+        let zb = zimag * x + zreal * y;
+        zreal = za;
+        zimag = zb;
     }
 
-    let r_sq = x * x + y * y;
-    let x_new = lambda * x + alpha * (x * x - y * y) - beta * (x * zn_real - y * zn_imag) + gamma * r_sq * x + omega;
-    let y_new = lambda * y + 2.0 * alpha * x * y - beta * (x * zn_imag + y * zn_real) + gamma * r_sq * y;
+    // zn = Re(z * z^(degree-1)) = Re(z^degree) computed as x*zreal - y*zimag
+    // This is x*Re(z^(n-1)) - y*Im(z^(n-1)) = Re(conj(z) * z^(n-1)) ... actually this is x*zreal - y*zimag
+    let zn = x * zreal - y * zimag;
+    p = p + beta * zn;
+
+    let x_new = p * x + gamma * zreal - omega * y;
+    let y_new = p * y - gamma * zimag + omega * x;
 
     return vec2<f32>(x_new, y_new);
 }
@@ -140,7 +138,8 @@ fn icon_step(x: f32, y: f32, lambda: f32, alpha: f32, beta: f32, gamma: f32, ome
 fn world_to_screen(world: vec2<f32>) -> vec2<i32> {
     // Apply view transform: center and zoom
     let view_x = (world.x - uniforms.center_x) * uniforms.zoom * f32(uniforms.height) / 2.0;
-    let view_y = (world.y - uniforms.center_y) * uniforms.zoom * f32(uniforms.height) / 2.0;
+    // Flip Y axis: screen Y increases downward, world Y increases upward
+    let view_y = -(world.y - uniforms.center_y) * uniforms.zoom * f32(uniforms.height) / 2.0;
 
     // Convert to screen coordinates (center of screen is origin)
     let screen_x = i32(view_x + f32(uniforms.width) / 2.0);
@@ -166,28 +165,22 @@ fn attractor_step(pos: vec2<f32>) -> vec2<f32> {
         case 0u: { // Hopalong
             return hopalong_step(pos.x, pos.y, a, b, c);
         }
-        case 1u: { // Henon
-            return henon_step(pos.x, pos.y, a, b);
-        }
-        case 2u: { // Martin
+        case 1u: { // Martin
             return martin_step(pos.x, pos.y, a);
         }
-        case 3u: { // Gingerbreadman
+        case 2u: { // Gingerbreadman
             return gingerbreadman_step(pos.x, pos.y);
         }
-        case 4u: { // Latoocarfian
-            return latoocarfian_step(pos.x, pos.y, a, b, c, d);
-        }
-        case 5u: { // Chip
+        case 3u: { // Chip
             return chip_step(pos.x, pos.y, a, b, c);
         }
-        case 6u: { // Quadruptwo
+        case 4u: { // Quadruptwo
             return quadruptwo_step(pos.x, pos.y, a, b, c);
         }
-        case 7u: { // Threeply
+        case 5u: { // Threeply
             return threeply_step(pos.x, pos.y, a, b, c);
         }
-        case 8u: { // Icon
+        case 6u: { // Icon
             return icon_step(pos.x, pos.y, a, b, c, d, 0.0, 5);
         }
         default: {

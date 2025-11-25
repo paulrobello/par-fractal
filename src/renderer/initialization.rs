@@ -897,39 +897,47 @@ impl Renderer {
 
     /// Initialize the compute shader infrastructure for strange attractor accumulation.
     /// This is called lazily when accumulation mode is first enabled.
+    /// Also handles recreation of textures when window is resized.
     pub fn init_accumulation_compute(&mut self) {
-        if self.attractor_compute.is_some() {
-            return; // Already initialized
+        // Initialize compute pipeline if needed (doesn't depend on window size)
+        if self.attractor_compute.is_none() {
+            self.attractor_compute = Some(AttractorComputePipeline::new(&self.device));
         }
 
-        // Create compute pipeline
-        let attractor_compute = AttractorComputePipeline::new(&self.device);
+        // Check if accumulation texture needs (re)creation due to missing or wrong size
+        let needs_texture = match &self.accumulation_texture {
+            None => true,
+            Some(tex) => tex.width != self.size.width || tex.height != self.size.height,
+        };
 
-        // Create accumulation texture
-        let accumulation_texture = AccumulationTexture::new(
-            &self.device,
-            self.size.width,
-            self.size.height,
-            &attractor_compute.storage_layout,
-            "Attractor Accumulation Texture",
-        );
+        if needs_texture {
+            let attractor_compute = self.attractor_compute.as_ref().unwrap();
 
-        // Create bind group for sampling the accumulation texture
-        // Use the layout from the accumulation_display_pipeline which was created in initialization
-        // The layout has only 1 binding: the uint accumulation texture
-        let accumulation_display_bind_group =
-            self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("Accumulation Display Bind Group"),
-                layout: &self.accumulation_display_pipeline.get_bind_group_layout(0),
-                entries: &[wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&accumulation_texture.view),
-                }],
-            });
+            // Create accumulation texture with current window size
+            let accumulation_texture = AccumulationTexture::new(
+                &self.device,
+                self.size.width,
+                self.size.height,
+                &attractor_compute.storage_layout,
+                "Attractor Accumulation Texture",
+            );
 
-        self.attractor_compute = Some(attractor_compute);
-        self.accumulation_texture = Some(accumulation_texture);
-        self.accumulation_display_bind_group = Some(accumulation_display_bind_group);
+            // Create bind group for sampling the accumulation texture
+            // Use the layout from the accumulation_display_pipeline which was created in initialization
+            // The layout has only 1 binding: the uint accumulation texture
+            let accumulation_display_bind_group =
+                self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: Some("Accumulation Display Bind Group"),
+                    layout: &self.accumulation_display_pipeline.get_bind_group_layout(0),
+                    entries: &[wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&accumulation_texture.view),
+                    }],
+                });
+
+            self.accumulation_texture = Some(accumulation_texture);
+            self.accumulation_display_bind_group = Some(accumulation_display_bind_group);
+        }
     }
 
     // Helper: Create a render texture

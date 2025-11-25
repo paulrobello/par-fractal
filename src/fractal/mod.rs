@@ -131,6 +131,12 @@ pub struct FractalParams {
     pub attractor_log_scale: f32,
     /// Flag to clear accumulation on next frame
     pub attractor_pending_clear: bool,
+    /// Last view center for detecting pan (triggers auto-clear)
+    pub attractor_last_center: [f64; 2],
+    /// Last zoom level for detecting zoom (triggers auto-clear)
+    pub attractor_last_zoom: f32,
+    /// Last julia_c parameters (triggers auto-clear on change)
+    pub attractor_last_julia_c: [f32; 2],
 }
 
 impl Default for FractalParams {
@@ -229,8 +235,11 @@ impl Default for FractalParams {
             attractor_accumulation_enabled: false,
             attractor_iterations_per_frame: 100_000,
             attractor_total_iterations: 0,
-            attractor_log_scale: 1.0,
+            attractor_log_scale: 4.0,
             attractor_pending_clear: false,
+            attractor_last_center: [0.0, 0.0],
+            attractor_last_zoom: 1.0,
+            attractor_last_julia_c: [-0.7, 0.27015],
         }
     }
 }
@@ -337,14 +346,11 @@ impl FractalParams {
             | FractalType::Magnet2D
             | FractalType::Collatz2D
             | FractalType::Hopalong2D
-            | FractalType::Henon2D
             | FractalType::Martin2D
             | FractalType::Gingerbreadman2D
-            | FractalType::Latoocarfian2D
             | FractalType::Chip2D
             | FractalType::Quadruptwo2D
-            | FractalType::Threeply2D
-            | FractalType::Icon2D => RenderMode::TwoD,
+            | FractalType::Threeply2D => RenderMode::TwoD,
             FractalType::Mandelbulb3D
             | FractalType::MengerSponge3D
             | FractalType::SierpinskiPyramid3D
@@ -441,6 +447,9 @@ impl FractalParams {
             attractor_total_iterations: 0, // Always reset on load
             attractor_log_scale: settings.attractor_log_scale,
             attractor_pending_clear: false,
+            attractor_last_center: settings.center_2d,
+            attractor_last_zoom: settings.zoom_2d,
+            attractor_last_julia_c: settings.julia_c,
         }
     }
 
@@ -506,14 +515,11 @@ impl FractalParams {
             | FractalType::Magnet2D
             | FractalType::Collatz2D
             | FractalType::Hopalong2D
-            | FractalType::Henon2D
             | FractalType::Martin2D
             | FractalType::Gingerbreadman2D
-            | FractalType::Latoocarfian2D
             | FractalType::Chip2D
             | FractalType::Quadruptwo2D
-            | FractalType::Threeply2D
-            | FractalType::Icon2D => RenderMode::TwoD,
+            | FractalType::Threeply2D => RenderMode::TwoD,
             FractalType::Mandelbulb3D
             | FractalType::MengerSponge3D
             | FractalType::SierpinskiPyramid3D
@@ -587,13 +593,6 @@ impl FractalParams {
                 // julia_c used for parameters: x=a, y=b (c defaults to 0)
                 self.julia_c = [0.4, 1.0];
             }
-            FractalType::Henon2D => {
-                self.center_2d = [0.0, 0.0];
-                self.zoom_2d = 0.5;
-                self.max_iterations = 1000;
-                // julia_c: x=a, y=b
-                self.julia_c = [1.4, 0.3];
-            }
             FractalType::Martin2D => {
                 self.center_2d = [0.0, 0.0];
                 self.zoom_2d = 0.05;
@@ -605,15 +604,6 @@ impl FractalParams {
                 self.center_2d = [2.0, 2.0];
                 self.zoom_2d = 0.15;
                 self.max_iterations = 1000;
-            }
-            FractalType::Latoocarfian2D => {
-                self.center_2d = [0.0, 0.0];
-                self.zoom_2d = 0.4;
-                self.max_iterations = 1000;
-                // julia_c: x=a, y=b (c,d use power as c, fractal_fold as d)
-                self.julia_c = [-0.966918, 2.879879];
-                self.power = 0.765145;
-                self.fractal_fold = 0.744728;
             }
             FractalType::Chip2D => {
                 self.center_2d = [0.0, 0.0];
@@ -631,21 +621,10 @@ impl FractalParams {
             }
             FractalType::Threeply2D => {
                 self.center_2d = [0.0, 0.0];
-                self.zoom_2d = 0.0002;
+                self.zoom_2d = 1.0;
                 self.max_iterations = 1000;
                 self.julia_c = [-55.0, -1.0];
                 self.power = -42.0;
-            }
-            FractalType::Icon2D => {
-                self.center_2d = [0.0, 0.0];
-                self.zoom_2d = 0.3;
-                self.max_iterations = 1000;
-                // lambda, alpha via julia_c; beta, gamma, omega via power, fold, min_radius
-                self.julia_c = [-2.34, 2.0];
-                self.power = 0.2; // beta
-                self.fractal_fold = 0.1; // gamma
-                self.fractal_min_radius = 0.0; // omega
-                self.fractal_scale = 5.0; // degree (symmetry)
             }
             // 3D Strange Attractors
             FractalType::Pickover3D => {

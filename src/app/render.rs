@@ -25,8 +25,35 @@ impl App {
             && self.fractal_params.fractal_type.is_2d_attractor();
 
         if use_accumulation {
-            // Initialize compute infrastructure if needed
+            // Check if texture needs recreation (None or wrong size)
+            let texture_needs_recreation = match &self.renderer.accumulation_texture {
+                None => true,
+                Some(tex) => {
+                    tex.width != self.renderer.size.width || tex.height != self.renderer.size.height
+                }
+            };
+
+            // Initialize compute infrastructure if needed (handles resize too)
             self.renderer.init_accumulation_compute();
+
+            // Reset iteration counter if texture was just recreated
+            if texture_needs_recreation {
+                self.fractal_params.attractor_total_iterations = 0;
+            }
+
+            // Auto-clear when view parameters change (zoom, pan, or attractor params)
+            let view_changed = self.fractal_params.center_2d
+                != self.fractal_params.attractor_last_center
+                || self.fractal_params.zoom_2d != self.fractal_params.attractor_last_zoom
+                || self.fractal_params.julia_c != self.fractal_params.attractor_last_julia_c;
+
+            if view_changed {
+                self.fractal_params.attractor_pending_clear = true;
+                // Update last values
+                self.fractal_params.attractor_last_center = self.fractal_params.center_2d;
+                self.fractal_params.attractor_last_zoom = self.fractal_params.zoom_2d;
+                self.fractal_params.attractor_last_julia_c = self.fractal_params.julia_c;
+            }
 
             // Handle clear request
             if self.fractal_params.attractor_pending_clear {
@@ -75,11 +102,45 @@ impl App {
                     self.fractal_params.attractor_iterations_per_frame as u64;
             }
 
-            // Update accumulation display uniforms
+            // Update accumulation display uniforms with palette from fractal params
+            let palette_colors = self.fractal_params.palette.colors;
             let display_uniforms = AccumulationDisplayUniforms {
                 log_scale: self.fractal_params.attractor_log_scale,
                 gamma: 0.6,
-                _padding: [0.0; 2],
+                palette_offset: self.fractal_params.palette_offset,
+                _padding: 0.0,
+                palette: [
+                    [
+                        palette_colors[0].x,
+                        palette_colors[0].y,
+                        palette_colors[0].z,
+                        1.0,
+                    ],
+                    [
+                        palette_colors[1].x,
+                        palette_colors[1].y,
+                        palette_colors[1].z,
+                        1.0,
+                    ],
+                    [
+                        palette_colors[2].x,
+                        palette_colors[2].y,
+                        palette_colors[2].z,
+                        1.0,
+                    ],
+                    [
+                        palette_colors[3].x,
+                        palette_colors[3].y,
+                        palette_colors[3].z,
+                        1.0,
+                    ],
+                    [
+                        palette_colors[4].x,
+                        palette_colors[4].y,
+                        palette_colors[4].z,
+                        1.0,
+                    ],
+                ],
             };
             self.renderer.queue.write_buffer(
                 &self.renderer.accumulation_display_uniform_buffer,

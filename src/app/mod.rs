@@ -301,8 +301,19 @@ impl App {
     fn reset_view(&mut self) {
         match self.fractal_params.render_mode {
             RenderMode::TwoD => {
-                self.fractal_params.center_2d = [0.0, 0.0];
-                self.fractal_params.zoom_2d = 1.0;
+                // Re-apply fractal defaults (this sets the correct center and zoom for each fractal type)
+                let current_type = self.fractal_params.fractal_type;
+                self.fractal_params.switch_fractal(current_type);
+
+                // Clear accumulation for strange attractors and sync tracking values
+                if self.fractal_params.attractor_accumulation_enabled {
+                    self.fractal_params.attractor_pending_clear = true;
+                    self.fractal_params.attractor_total_iterations = 0;
+                    // Sync tracking to the reset values
+                    self.fractal_params.attractor_last_center = self.fractal_params.center_2d;
+                    self.fractal_params.attractor_last_zoom = self.fractal_params.zoom_2d;
+                    self.fractal_params.attractor_last_julia_c = self.fractal_params.julia_c;
+                }
             }
             RenderMode::ThreeD => {
                 let size = self.renderer.size;

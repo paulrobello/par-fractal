@@ -170,42 +170,55 @@ trunk serve
 
 ## Strange Attractor Compute Shader Accumulation (2025-11-25)
 
-### Status: PARTIALLY COMPLETE - Two Issues Remain
+### Status: COMPLETE
 
-A compute shader-based accumulation system for 2D strange attractors was implemented to enable millions of iterations at 60 FPS. The core functionality works but has two outstanding issues.
+A compute shader-based accumulation system for 2D strange attractors was implemented to enable millions of iterations at 60 FPS. Attractor formulas, UI controls, and screenshot capture are all working.
 
-### What Works
+### Working Features
 - Compute shader iterates attractor orbits and accumulates hit counts to R32Uint texture
 - Auto-enables accumulation when selecting a 2D strange attractor
 - Clear accumulation button works (with proper 256-byte row alignment)
+- **Auto-clear on view change**: Zooming, panning, or changing attractor parameters automatically clears the accumulation to prevent smearing
 - Iterations per frame slider works
 - Total iterations counter displays correctly
-- Display shader renders accumulated data with log scaling visualization
+- Density scale slider controls saturation point (default: 4.0)
+- User-selected palette is used for coloring (not hardcoded)
+- Palette offset animates/shifts the colors
+- Accumulation mode is always enabled for strange attractors (no checkbox)
+- Max iterations slider hidden for strange attractors
+- **UI parameter controls** for all attractors (a, b, c sliders with Reset button)
+- **Accumulation texture resize handling** - properly recreates texture with correct dimensions
+- **Screenshot capture** - works correctly, captures what's displayed on screen
 
-### Outstanding Issues
+### Completed This Session (2025-11-25)
+- Fixed Quadruptwo formula (atan argument was using log² instead of absolute²)
+- Removed Icon attractor (formula was completely wrong, decided to remove)
+- Added UI parameter sliders for all attractors
+- Increased Threeply zoom 10x (now 50x from original)
+- Fixed accumulation texture resize handling (was causing screenshot capture bug)
+- Fixed screenshot capture bug - `init_accumulation_compute()` now properly recreates texture when dimensions change
+- Fixed high-resolution render to use accumulation display pipeline for strange attractors
 
-**Issue 1: Log Scale Slider Has No Visible Effect**
-- Uniform buffer is created and written each frame
-- Shader reads `accum_uniforms.log_scale` but changes aren't visible
-- May be formula issue or uniform binding problem
-- See `handoff.md` for debug approach
+### Removed Attractors
+- Hénon (boring thin curves)
+- Latoocarfian (not interesting)
+- Icon (formula issues, removed)
 
-**Issue 2: Accumulator Uses Fixed Palette**
-- Display shader has hardcoded "fire" palette (black→purple→magenta→orange→yellow→white)
-- Does not use user-selected palette from main uniforms
-- Need to pass palette colors to accumulation display shader
-- See `handoff.md` for implementation options
+### Current Attractors (6 total)
+- Hopalong - working
+- Martin - working
+- Gingerbreadman - working
+- Chip - working
+- Quadruptwo - working (formula fixed)
+- Threeply - working (50x zoom applied)
 
 ### Key Files
-- `src/renderer/compute.rs` - Compute infrastructure
+- `src/renderer/compute.rs` - Compute infrastructure, `AccumulationDisplayUniforms` with palette
 - `src/shaders/attractor_compute.wgsl` - GPU orbit iteration
-- `src/shaders/postprocess.wgsl:297-368` - Display shader with hardcoded palette
-- `src/app/render.rs:23-124` - Render loop integration
+- `src/shaders/postprocess.wgsl:297-374` - Display shader with palette sampling
+- `src/app/render.rs:23-172` - Render loop integration
+- `src/app/render.rs:377-425` - Screenshot capture code
 - `src/renderer/initialization.rs:628-715` - Pipeline setup
-
-### Recent Commits
-- `852dedf` - Connect log scale slider (attempted fix)
-- `b3f73c7` - Auto-enable accumulation, improve palette
-- `4bf6d20` - Fix bytes_per_row alignment
-- `74ea53d` - Simplify bind groups
-- `5b94b7c` - Use R32Uint for GPU compatibility
+- `src/renderer/update.rs:169-187` - Resize handling
+- `src/fractal/mod.rs:591-628` - Default parameters for each attractor
+- `src/ui/mod.rs:1284-1357` - Attractor parameter UI controls
