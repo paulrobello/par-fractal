@@ -4,6 +4,7 @@ mod initialization;
 pub mod uniforms;
 mod update;
 
+use compute::{AccumulationTexture, AttractorComputePipeline};
 use uniforms::*;
 
 #[derive(Debug, Clone)]
@@ -65,4 +66,12 @@ pub struct Renderer {
     pub blur_h_params_bind_group: wgpu::BindGroup,
     pub blur_v_params_bind_group: wgpu::BindGroup,
     pub composite_params_bind_group: wgpu::BindGroup,
+
+    // Compute shader infrastructure for strange attractor accumulation
+    pub attractor_compute: Option<AttractorComputePipeline>,
+    pub accumulation_texture: Option<AccumulationTexture>,
+    pub accumulation_display_pipeline: wgpu::RenderPipeline, // Uses fs_accumulation_display
+    pub accumulation_display_bind_group: Option<wgpu::BindGroup>,
+    /// Layout for sampling the accumulation texture
+    pub accumulation_sample_layout: Option<wgpu::BindGroupLayout>,
 }

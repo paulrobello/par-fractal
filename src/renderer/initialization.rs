@@ -1,4 +1,7 @@
-use super::{BloomUniforms, BlurUniforms, GpuInfo, PostProcessUniforms, Renderer, Uniforms};
+use super::{
+    AccumulationTexture, AttractorComputePipeline, BloomUniforms, BlurUniforms, GpuInfo,
+    PostProcessUniforms, Renderer, Uniforms,
+};
 use wgpu::util::DeviceExt;
 
 /// GPU initialization and setup methods
@@ -622,6 +625,44 @@ impl Renderer {
             multiview: None,
         });
 
+        // Accumulation display pipeline (for visualizing accumulated attractor data)
+        let accumulation_display_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Accumulation Display Layout"),
+                bind_group_layouts: &[&texture_bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+        let accumulation_display_pipeline =
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                cache: None,
+                label: Some("Accumulation Display Pipeline"),
+                layout: Some(&accumulation_display_layout),
+                vertex: wgpu::VertexState {
+                    module: &postprocess_shader,
+                    entry_point: Some("vs_main"),
+                    buffers: std::slice::from_ref(&vertex_buffer_layout),
+                    compilation_options: Default::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &postprocess_shader,
+                    entry_point: Some("fs_accumulation_display"),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: wgpu::TextureFormat::Rgba16Float, // Output to scene_texture
+                        blend: Some(wgpu::BlendState::REPLACE),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                    compilation_options: Default::default(),
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleStrip,
+                    ..Default::default()
+                },
+                depth_stencil: None,
+                multisample: wgpu::MultisampleState::default(),
+                multiview: None,
+            });
+
         // Create bind groups for textures
         let scene_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Scene Bind Group"),
@@ -792,7 +833,84 @@ impl Renderer {
             blur_h_params_bind_group,
             blur_v_params_bind_group,
             composite_params_bind_group,
+
+            // Compute shader infrastructure (initialized lazily when needed)
+            attractor_compute: None,
+            accumulation_texture: None,
+            accumulation_display_pipeline,
+            accumulation_display_bind_group: None,
+            accumulation_sample_layout: None,
         }
+    }
+
+    /// Initialize the compute shader infrastructure for strange attractor accumulation.
+    /// This is called lazily when accumulation mode is first enabled.
+    pub fn init_accumulation_compute(&mut self) {
+        if self.attractor_compute.is_some() {
+            return; // Already initialized
+        }
+
+        // Create compute pipeline
+        let attractor_compute = AttractorComputePipeline::new(&self.device);
+
+        // Create sample bind group layout for the accumulation texture
+        let accumulation_sample_layout =
+            self.device
+                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: Some("Accumulation Sample Layout"),
+                    entries: &[
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Texture {
+                                sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                                view_dimension: wgpu::TextureViewDimension::D2,
+                                multisampled: false,
+                            },
+                            count: None,
+                        },
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 1,
+                            visibility: wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                            count: None,
+                        },
+                    ],
+                });
+
+        // Create accumulation texture
+        let accumulation_texture = AccumulationTexture::new(
+            &self.device,
+            self.size.width,
+            self.size.height,
+            &attractor_compute.storage_layout,
+            &accumulation_sample_layout,
+            &self.sampler,
+            "Attractor Accumulation Texture",
+        );
+
+        // Create bind group for sampling the accumulation texture
+        // Use the layout from the accumulation_display_pipeline which was created in initialization
+        let accumulation_display_bind_group =
+            self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("Accumulation Display Bind Group"),
+                layout: &self.accumulation_display_pipeline.get_bind_group_layout(0),
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&accumulation_texture.view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(&self.sampler),
+                    },
+                ],
+            });
+
+        self.attractor_compute = Some(attractor_compute);
+        self.accumulation_texture = Some(accumulation_texture);
+        self.accumulation_display_bind_group = Some(accumulation_display_bind_group);
+        self.accumulation_sample_layout = Some(accumulation_sample_layout);
     }
 
     // Helper: Create a render texture

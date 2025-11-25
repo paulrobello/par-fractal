@@ -66,6 +66,23 @@ impl FractalType {
         )
     }
 
+    /// Returns the index of the 2D attractor type for the compute shader.
+    /// Returns 0 if not a 2D attractor.
+    pub fn attractor_index(&self) -> u32 {
+        match self {
+            FractalType::Hopalong2D => 0,
+            FractalType::Henon2D => 1,
+            FractalType::Martin2D => 2,
+            FractalType::Gingerbreadman2D => 3,
+            FractalType::Latoocarfian2D => 4,
+            FractalType::Chip2D => 5,
+            FractalType::Quadruptwo2D => 6,
+            FractalType::Threeply2D => 7,
+            FractalType::Icon2D => 8,
+            _ => 0,
+        }
+    }
+
     /// Returns a filename-safe name for this fractal type
     pub fn filename_safe_name(&self) -> &'static str {
         match self {

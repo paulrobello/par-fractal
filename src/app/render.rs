@@ -1,5 +1,6 @@
 use super::App;
 use crate::fractal::FractalParams;
+use crate::renderer::compute::AttractorComputeUniforms;
 
 #[cfg(not(target_arch = "wasm32"))]
 use crate::video_recorder::VideoRecorder;
@@ -19,33 +20,122 @@ impl App {
                     label: Some("Render Encoder"),
                 });
 
-        // Multi-pass rendering pipeline
-        // Pass 1: Render fractal to scene_texture
-        {
-            let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Scene Render Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &self.renderer.scene_view,
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                occlusion_query_set: None,
-                timestamp_writes: None,
-            });
+        // Check if we should use accumulation mode for strange attractors
+        let use_accumulation = self.fractal_params.attractor_accumulation_enabled
+            && self.fractal_params.fractal_type.is_2d_attractor();
 
-            // SAFETY: We drop the render_pass before using encoder again, so this is safe.
-            let mut render_pass: wgpu::RenderPass<'static> =
-                unsafe { std::mem::transmute(render_pass) };
+        if use_accumulation {
+            // Initialize compute infrastructure if needed
+            self.renderer.init_accumulation_compute();
 
-            render_pass.set_pipeline(&self.renderer.render_pipeline);
-            render_pass.set_bind_group(0, &self.renderer.uniform_bind_group, &[]);
-            render_pass.set_vertex_buffer(0, self.renderer.vertex_buffer.slice(..));
-            render_pass.draw(0..4, 0..1);
+            // Handle clear request
+            if self.fractal_params.attractor_pending_clear {
+                if let Some(ref accum_tex) = self.renderer.accumulation_texture {
+                    accum_tex.clear(&self.renderer.device, &self.renderer.queue);
+                }
+                self.fractal_params.attractor_pending_clear = false;
+                self.fractal_params.attractor_total_iterations = 0;
+            }
+
+            // Update compute uniforms
+            if let Some(ref mut compute) = self.renderer.attractor_compute {
+                compute.uniforms = AttractorComputeUniforms {
+                    param_a: self.fractal_params.julia_c[0],
+                    param_b: self.fractal_params.julia_c[1],
+                    param_c: 0.0, // Could expose more params
+                    param_d: 0.0,
+                    center_x: self.fractal_params.center_2d[0] as f32,
+                    center_y: self.fractal_params.center_2d[1] as f32,
+                    zoom: self.fractal_params.zoom_2d,
+                    aspect_ratio: self.renderer.size.width as f32
+                        / self.renderer.size.height as f32,
+                    width: self.renderer.size.width,
+                    height: self.renderer.size.height,
+                    iterations_per_frame: self.fractal_params.attractor_iterations_per_frame,
+                    attractor_type: self.fractal_params.fractal_type.attractor_index(),
+                    total_iterations: self.fractal_params.attractor_total_iterations as u32,
+                    clear_accumulation: 0,
+                    _padding: [0; 2],
+                };
+                compute.update_uniforms(&self.renderer.queue);
+
+                // Dispatch compute shader
+                if let Some(ref accum_tex) = self.renderer.accumulation_texture {
+                    // Number of workgroups: iterations_per_frame / (256 threads * iterations_per_thread)
+                    // Each thread does iterations_per_frame / 256 iterations
+                    // We want ~iterations_per_frame total, so dispatch (iterations / 256) / per_thread
+                    // Simplify: dispatch enough to cover all iterations
+                    let num_workgroups =
+                        (self.fractal_params.attractor_iterations_per_frame / 256).max(1);
+                    compute.dispatch(&mut encoder, &accum_tex.compute_bind_group, num_workgroups);
+                }
+
+                // Update total iterations counter
+                self.fractal_params.attractor_total_iterations +=
+                    self.fractal_params.attractor_iterations_per_frame as u64;
+            }
+
+            // Render accumulation texture to scene_texture
+            // For now, just copy the accumulation data with basic visualization
+            // TODO: Add proper display pipeline with log scaling and palette
+            {
+                let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("Accumulation Display Pass"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: &self.renderer.scene_view,
+                        depth_slice: None,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                            store: wgpu::StoreOp::Store,
+                        },
+                    })],
+                    depth_stencil_attachment: None,
+                    occlusion_query_set: None,
+                    timestamp_writes: None,
+                });
+
+                let mut render_pass: wgpu::RenderPass<'static> =
+                    unsafe { std::mem::transmute(render_pass) };
+
+                // Use the accumulation display pipeline with log scaling visualization
+                if let Some(ref bind_group) = self.renderer.accumulation_display_bind_group {
+                    render_pass.set_pipeline(&self.renderer.accumulation_display_pipeline);
+                    render_pass.set_bind_group(0, bind_group, &[]);
+                    render_pass
+                        .set_vertex_buffer(0, self.renderer.postprocess_vertex_buffer.slice(..));
+                    render_pass.draw(0..4, 0..1);
+                }
+            }
+        } else {
+            // Multi-pass rendering pipeline
+            // Pass 1: Render fractal to scene_texture
+            {
+                let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("Scene Render Pass"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: &self.renderer.scene_view,
+                        depth_slice: None,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                            store: wgpu::StoreOp::Store,
+                        },
+                    })],
+                    depth_stencil_attachment: None,
+                    occlusion_query_set: None,
+                    timestamp_writes: None,
+                });
+
+                // SAFETY: We drop the render_pass before using encoder again, so this is safe.
+                let mut render_pass: wgpu::RenderPass<'static> =
+                    unsafe { std::mem::transmute(render_pass) };
+
+                render_pass.set_pipeline(&self.renderer.render_pipeline);
+                render_pass.set_bind_group(0, &self.renderer.uniform_bind_group, &[]);
+                render_pass.set_vertex_buffer(0, self.renderer.vertex_buffer.slice(..));
+                render_pass.draw(0..4, 0..1);
+            }
         }
 
         // Pass 2-4: Bloom pipeline (always run to keep texture valid)
