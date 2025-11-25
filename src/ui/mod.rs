@@ -904,11 +904,13 @@ impl UI {
                             ui.horizontal(|ui| {
                                 if ui.button("◀ Previous").on_hover_text("Switch to previous palette").clicked() {
                                     params.prev_palette();
+                                    self.show_toast(format!("Palette: {}", params.palette.name));
                                     changed = true;
                                 }
                                 ui.label(params.palette.name);
                                 if ui.button("Next ▶").on_hover_text("Switch to next palette [P]").clicked() {
                                     params.next_palette();
+                                    self.show_toast(format!("Palette: {}", params.palette.name));
                                     changed = true;
                                 }
                             });

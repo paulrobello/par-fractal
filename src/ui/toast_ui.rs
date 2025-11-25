@@ -31,7 +31,7 @@ impl UI {
 
             let area_response =
                 egui::Area::new(egui::Id::new(format!("toast_{:?}", toast.created_at)))
-                    .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, y_offset))
+                    .anchor(egui::Align2::CENTER_TOP, egui::vec2(0.0, 40.0 + y_offset))
                     .order(egui::Order::Foreground)
                     .show(ctx, |ui| {
                         let frame_response = egui::Frame::NONE

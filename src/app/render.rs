@@ -504,7 +504,7 @@ impl App {
                 }
 
                 if let Some(msg) = message {
-                    println!("Command executed: {}", msg);
+                    self.ui.show_toast(msg);
                 }
             }
 
