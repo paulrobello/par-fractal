@@ -313,7 +313,16 @@ impl FractalParams {
             | FractalType::Lyapunov2D
             | FractalType::Nova2D
             | FractalType::Magnet2D
-            | FractalType::Collatz2D => RenderMode::TwoD,
+            | FractalType::Collatz2D
+            | FractalType::Hopalong2D
+            | FractalType::Henon2D
+            | FractalType::Martin2D
+            | FractalType::Gingerbreadman2D
+            | FractalType::Latoocarfian2D
+            | FractalType::Chip2D
+            | FractalType::Quadruptwo2D
+            | FractalType::Threeply2D
+            | FractalType::Icon2D => RenderMode::TwoD,
             FractalType::Mandelbulb3D
             | FractalType::MengerSponge3D
             | FractalType::SierpinskiPyramid3D
@@ -326,7 +335,10 @@ impl FractalParams {
             | FractalType::Kleinian3D
             | FractalType::HybridMandelbulbJulia3D
             | FractalType::QuaternionCubic3D
-            | FractalType::SierpinskiGasket3D => RenderMode::ThreeD,
+            | FractalType::SierpinskiGasket3D
+            | FractalType::Pickover3D
+            | FractalType::Lorenz3D
+            | FractalType::Rossler3D => RenderMode::ThreeD,
         };
 
         Self {
@@ -465,7 +477,16 @@ impl FractalParams {
             | FractalType::Lyapunov2D
             | FractalType::Nova2D
             | FractalType::Magnet2D
-            | FractalType::Collatz2D => RenderMode::TwoD,
+            | FractalType::Collatz2D
+            | FractalType::Hopalong2D
+            | FractalType::Henon2D
+            | FractalType::Martin2D
+            | FractalType::Gingerbreadman2D
+            | FractalType::Latoocarfian2D
+            | FractalType::Chip2D
+            | FractalType::Quadruptwo2D
+            | FractalType::Threeply2D
+            | FractalType::Icon2D => RenderMode::TwoD,
             FractalType::Mandelbulb3D
             | FractalType::MengerSponge3D
             | FractalType::SierpinskiPyramid3D
@@ -478,7 +499,10 @@ impl FractalParams {
             | FractalType::Kleinian3D
             | FractalType::HybridMandelbulbJulia3D
             | FractalType::QuaternionCubic3D
-            | FractalType::SierpinskiGasket3D => RenderMode::ThreeD,
+            | FractalType::SierpinskiGasket3D
+            | FractalType::Pickover3D
+            | FractalType::Lorenz3D
+            | FractalType::Rossler3D => RenderMode::ThreeD,
         };
 
         // Set fractal-specific defaults
@@ -527,6 +551,97 @@ impl FractalParams {
             FractalType::QuaternionCubic3D => {
                 self.fractal_scale = 1.5;
                 self.max_iterations = 8; // Lower for performance
+            }
+            // Strange Attractors 2D - set appropriate view bounds and iterations
+            FractalType::Hopalong2D => {
+                self.center_2d = [0.5, 0.5];
+                self.zoom_2d = 0.3;
+                self.max_iterations = 1000;
+                // julia_c used for parameters: x=a, y=b (c defaults to 0)
+                self.julia_c = [0.4, 1.0];
+            }
+            FractalType::Henon2D => {
+                self.center_2d = [0.0, 0.0];
+                self.zoom_2d = 0.5;
+                self.max_iterations = 1000;
+                // julia_c: x=a, y=b
+                self.julia_c = [1.4, 0.3];
+            }
+            FractalType::Martin2D => {
+                self.center_2d = [0.0, 0.0];
+                self.zoom_2d = 0.05;
+                self.max_iterations = 1000;
+                // julia_c.x = a
+                self.julia_c = [std::f32::consts::PI, 0.0];
+            }
+            FractalType::Gingerbreadman2D => {
+                self.center_2d = [2.0, 2.0];
+                self.zoom_2d = 0.15;
+                self.max_iterations = 1000;
+            }
+            FractalType::Latoocarfian2D => {
+                self.center_2d = [0.0, 0.0];
+                self.zoom_2d = 0.4;
+                self.max_iterations = 1000;
+                // julia_c: x=a, y=b (c,d use power as c, fractal_fold as d)
+                self.julia_c = [-0.966918, 2.879879];
+                self.power = 0.765145;
+                self.fractal_fold = 0.744728;
+            }
+            FractalType::Chip2D => {
+                self.center_2d = [0.0, 0.0];
+                self.zoom_2d = 0.002;
+                self.max_iterations = 1000;
+                self.julia_c = [-15.0, -19.0];
+                self.power = 1.0;
+            }
+            FractalType::Quadruptwo2D => {
+                self.center_2d = [15.0, 17.0];
+                self.zoom_2d = 0.01;
+                self.max_iterations = 1000;
+                self.julia_c = [34.0, 1.0];
+                self.power = 5.0;
+            }
+            FractalType::Threeply2D => {
+                self.center_2d = [0.0, 0.0];
+                self.zoom_2d = 0.0002;
+                self.max_iterations = 1000;
+                self.julia_c = [-55.0, -1.0];
+                self.power = -42.0;
+            }
+            FractalType::Icon2D => {
+                self.center_2d = [0.0, 0.0];
+                self.zoom_2d = 0.3;
+                self.max_iterations = 1000;
+                // lambda, alpha via julia_c; beta, gamma, omega via power, fold, min_radius
+                self.julia_c = [-2.34, 2.0];
+                self.power = 0.2; // beta
+                self.fractal_fold = 0.1; // gamma
+                self.fractal_min_radius = 0.0; // omega
+                self.fractal_scale = 5.0; // degree (symmetry)
+            }
+            // 3D Strange Attractors
+            FractalType::Pickover3D => {
+                self.fractal_scale = 0.3;
+                self.max_iterations = 10000;
+                // a, b, c, d via julia_c.x, julia_c.y, power, fractal_fold
+                self.julia_c = [2.24, 0.43];
+                self.power = -0.65;
+                self.fractal_fold = -2.43;
+            }
+            FractalType::Lorenz3D => {
+                self.fractal_scale = 0.05;
+                self.max_iterations = 10000;
+                // sigma, rho, beta via julia_c.x, julia_c.y, power
+                self.julia_c = [10.0, 28.0];
+                self.power = 2.666667;
+            }
+            FractalType::Rossler3D => {
+                self.fractal_scale = 0.1;
+                self.max_iterations = 10000;
+                // a, b, c via julia_c.x, julia_c.y, power
+                self.julia_c = [0.2, 0.2];
+                self.power = 5.7;
             }
             _ => {}
         }

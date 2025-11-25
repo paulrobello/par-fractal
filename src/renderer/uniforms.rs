@@ -317,6 +317,20 @@ impl Uniforms {
             crate::fractal::FractalType::HybridMandelbulbJulia3D => 23,
             crate::fractal::FractalType::QuaternionCubic3D => 24,
             crate::fractal::FractalType::SierpinskiGasket3D => 25,
+            // 2D Strange Attractors (26-34)
+            crate::fractal::FractalType::Hopalong2D => 26,
+            crate::fractal::FractalType::Henon2D => 27,
+            crate::fractal::FractalType::Martin2D => 28,
+            crate::fractal::FractalType::Gingerbreadman2D => 29,
+            crate::fractal::FractalType::Latoocarfian2D => 30,
+            crate::fractal::FractalType::Chip2D => 31,
+            crate::fractal::FractalType::Quadruptwo2D => 32,
+            crate::fractal::FractalType::Threeply2D => 33,
+            crate::fractal::FractalType::Icon2D => 34,
+            // 3D Strange Attractors (35-37)
+            crate::fractal::FractalType::Pickover3D => 35,
+            crate::fractal::FractalType::Lorenz3D => 36,
+            crate::fractal::FractalType::Rossler3D => 37,
         };
 
         self.render_mode = match params.render_mode {

@@ -900,6 +900,378 @@ fn sinh(x: f32) -> f32 {
 }
 
 // ============================================================================
+// 2D Strange Attractor Functions (from xfractint)
+// ============================================================================
+
+// Hopalong attractor: x' = y - sign(x)*sqrt(|b*x - c|), y' = a - x
+// Parameters: a = julia_c.x, b = julia_c.y, c = 0
+fn hopalong_attractor(coord: vec2<f32>) -> f32 {
+    let a = uniforms.julia_c.x;
+    let b = uniforms.julia_c.y;
+    let c = 0.0;
+
+    var x = 0.1;
+    var y = 0.0;
+    var hit_count = 0.0;
+    let pixel_size = 4.0 / uniforms.zoom;
+
+    // Skip initial transient
+    for (var i = 0u; i < 100u; i = i + 1u) {
+        let x_new = y - sign(x) * sqrt(abs(b * x - c));
+        let y_new = a - x;
+        x = x_new;
+        y = y_new;
+    }
+
+    // Count how many orbit points hit near our coordinate
+    for (var i = 0u; i < uniforms.max_iterations; i = i + 1u) {
+        let x_new = y - sign(x) * sqrt(abs(b * x - c));
+        let y_new = a - x;
+        x = x_new;
+        y = y_new;
+
+        let dist = distance(vec2<f32>(x, y), coord);
+        if (dist < pixel_size) {
+            hit_count += 1.0 - dist / pixel_size;
+        }
+    }
+
+    if (hit_count < 0.5) { return 0.0; }
+    return clamp(hit_count / 10.0, 0.0, 1.0);
+}
+
+// Hénon attractor: x' = 1 + y - a*x², y' = b*x
+// Parameters: a = julia_c.x, b = julia_c.y
+fn henon_attractor(coord: vec2<f32>) -> f32 {
+    let a = uniforms.julia_c.x;
+    let b = uniforms.julia_c.y;
+
+    var x = 0.0;
+    var y = 0.0;
+    var hit_count = 0.0;
+    let pixel_size = 4.0 / uniforms.zoom;
+
+    // Skip initial transient
+    for (var i = 0u; i < 100u; i = i + 1u) {
+        let x_new = 1.0 + y - a * x * x;
+        let y_new = b * x;
+        x = x_new;
+        y = y_new;
+        if (abs(x) > 100.0 || abs(y) > 100.0) {
+            x = 0.1;
+            y = 0.1;
+        }
+    }
+
+    for (var i = 0u; i < uniforms.max_iterations; i = i + 1u) {
+        let x_new = 1.0 + y - a * x * x;
+        let y_new = b * x;
+        x = x_new;
+        y = y_new;
+
+        if (abs(x) > 100.0 || abs(y) > 100.0) { break; }
+
+        let dist = distance(vec2<f32>(x, y), coord);
+        if (dist < pixel_size) {
+            hit_count += 1.0 - dist / pixel_size;
+        }
+    }
+
+    if (hit_count < 0.5) { return 0.0; }
+    return clamp(hit_count / 10.0, 0.0, 1.0);
+}
+
+// Martin attractor: x' = y - sin(x), y' = a - x
+// Parameters: a = julia_c.x
+fn martin_attractor(coord: vec2<f32>) -> f32 {
+    let a = uniforms.julia_c.x;
+
+    var x = 0.1;
+    var y = 0.0;
+    var hit_count = 0.0;
+    let pixel_size = 4.0 / uniforms.zoom;
+
+    // Skip initial transient
+    for (var i = 0u; i < 100u; i = i + 1u) {
+        let x_new = y - sin(x);
+        let y_new = a - x;
+        x = x_new;
+        y = y_new;
+    }
+
+    for (var i = 0u; i < uniforms.max_iterations; i = i + 1u) {
+        let x_new = y - sin(x);
+        let y_new = a - x;
+        x = x_new;
+        y = y_new;
+
+        let dist = distance(vec2<f32>(x, y), coord);
+        if (dist < pixel_size) {
+            hit_count += 1.0 - dist / pixel_size;
+        }
+    }
+
+    if (hit_count < 0.5) { return 0.0; }
+    return clamp(hit_count / 10.0, 0.0, 1.0);
+}
+
+// Gingerbreadman: x' = 1 - y + |x|, y' = x
+fn gingerbreadman_attractor(coord: vec2<f32>) -> f32 {
+    var x = -0.1;
+    var y = 0.0;
+    var hit_count = 0.0;
+    let pixel_size = 4.0 / uniforms.zoom;
+
+    // Skip initial transient
+    for (var i = 0u; i < 50u; i = i + 1u) {
+        let x_new = 1.0 - y + abs(x);
+        let y_new = x;
+        x = x_new;
+        y = y_new;
+    }
+
+    for (var i = 0u; i < uniforms.max_iterations; i = i + 1u) {
+        let x_new = 1.0 - y + abs(x);
+        let y_new = x;
+        x = x_new;
+        y = y_new;
+
+        if (abs(x) > 1000.0 || abs(y) > 1000.0) { break; }
+
+        let dist = distance(vec2<f32>(x, y), coord);
+        if (dist < pixel_size) {
+            hit_count += 1.0 - dist / pixel_size;
+        }
+    }
+
+    if (hit_count < 0.5) { return 0.0; }
+    return clamp(hit_count / 10.0, 0.0, 1.0);
+}
+
+// Latoocarfian: x' = sin(y*b) + c*sin(x*b), y' = sin(x*a) + d*sin(y*a)
+// Parameters: a = julia_c.x, b = julia_c.y, c = power, d = fractal_fold
+fn latoocarfian_attractor(coord: vec2<f32>) -> f32 {
+    let a = uniforms.julia_c.x;
+    let b = uniforms.julia_c.y;
+    let c = uniforms.power;
+    let d = uniforms.fractal_fold;
+
+    var x = 0.1;
+    var y = 0.1;
+    var hit_count = 0.0;
+    let pixel_size = 4.0 / uniforms.zoom;
+
+    // Skip initial transient
+    for (var i = 0u; i < 100u; i = i + 1u) {
+        let x_new = sin(y * b) + c * sin(x * b);
+        let y_new = sin(x * a) + d * sin(y * a);
+        x = x_new;
+        y = y_new;
+    }
+
+    for (var i = 0u; i < uniforms.max_iterations; i = i + 1u) {
+        let x_new = sin(y * b) + c * sin(x * b);
+        let y_new = sin(x * a) + d * sin(y * a);
+        x = x_new;
+        y = y_new;
+
+        let dist = distance(vec2<f32>(x, y), coord);
+        if (dist < pixel_size) {
+            hit_count += 1.0 - dist / pixel_size;
+        }
+    }
+
+    if (hit_count < 0.5) { return 0.0; }
+    return clamp(hit_count / 10.0, 0.0, 1.0);
+}
+
+// Chip: x' = y - sign(x)*cos(log²(|b*x - c|))*arctan(log²(|c*x - b|)), y' = a - x
+// Parameters: a = julia_c.x, b = julia_c.y, c = power
+fn chip_attractor(coord: vec2<f32>) -> f32 {
+    let a = uniforms.julia_c.x;
+    let b = uniforms.julia_c.y;
+    let c = uniforms.power;
+
+    var x = 0.1;
+    var y = 0.0;
+    var hit_count = 0.0;
+    let pixel_size = 4.0 / uniforms.zoom;
+
+    // Skip initial transient
+    for (var i = 0u; i < 100u; i = i + 1u) {
+        let log1 = log(max(abs(b * x - c), 0.001));
+        let log2 = log(max(abs(c * x - b), 0.001));
+        let x_new = y - sign(x) * cos(log1 * log1) * atan(log2 * log2);
+        let y_new = a - x;
+        x = x_new;
+        y = y_new;
+    }
+
+    for (var i = 0u; i < uniforms.max_iterations; i = i + 1u) {
+        let log1 = log(max(abs(b * x - c), 0.001));
+        let log2 = log(max(abs(c * x - b), 0.001));
+        let x_new = y - sign(x) * cos(log1 * log1) * atan(log2 * log2);
+        let y_new = a - x;
+        x = x_new;
+        y = y_new;
+
+        if (abs(x) > 10000.0 || abs(y) > 10000.0) { break; }
+
+        let dist = distance(vec2<f32>(x, y), coord);
+        if (dist < pixel_size) {
+            hit_count += 1.0 - dist / pixel_size;
+        }
+    }
+
+    if (hit_count < 0.5) { return 0.0; }
+    return clamp(hit_count / 10.0, 0.0, 1.0);
+}
+
+// Quadruptwo: x' = y - sign(x)*sin(log(|b*x - c|))*arctan(log²(|c*x - b|)), y' = a - x
+// Parameters: a = julia_c.x, b = julia_c.y, c = power
+fn quadruptwo_attractor(coord: vec2<f32>) -> f32 {
+    let a = uniforms.julia_c.x;
+    let b = uniforms.julia_c.y;
+    let c = uniforms.power;
+
+    var x = 0.1;
+    var y = 0.0;
+    var hit_count = 0.0;
+    let pixel_size = 4.0 / uniforms.zoom;
+
+    // Skip initial transient
+    for (var i = 0u; i < 100u; i = i + 1u) {
+        let log1 = log(max(abs(b * x - c), 0.001));
+        let log2 = log(max(abs(c * x - b), 0.001));
+        let x_new = y - sign(x) * sin(log1) * atan(log2 * log2);
+        let y_new = a - x;
+        x = x_new;
+        y = y_new;
+    }
+
+    for (var i = 0u; i < uniforms.max_iterations; i = i + 1u) {
+        let log1 = log(max(abs(b * x - c), 0.001));
+        let log2 = log(max(abs(c * x - b), 0.001));
+        let x_new = y - sign(x) * sin(log1) * atan(log2 * log2);
+        let y_new = a - x;
+        x = x_new;
+        y = y_new;
+
+        if (abs(x) > 10000.0 || abs(y) > 10000.0) { break; }
+
+        let dist = distance(vec2<f32>(x, y), coord);
+        if (dist < pixel_size) {
+            hit_count += 1.0 - dist / pixel_size;
+        }
+    }
+
+    if (hit_count < 0.5) { return 0.0; }
+    return clamp(hit_count / 10.0, 0.0, 1.0);
+}
+
+// Threeply: x' = y - sign(x)*|sin(x)*cos(b) + c - x*sin(a+b+c)|, y' = a - x
+// Parameters: a = julia_c.x, b = julia_c.y, c = power
+fn threeply_attractor(coord: vec2<f32>) -> f32 {
+    let a = uniforms.julia_c.x;
+    let b = uniforms.julia_c.y;
+    let c = uniforms.power;
+
+    var x = 0.1;
+    var y = 0.0;
+    var hit_count = 0.0;
+    let pixel_size = 4.0 / uniforms.zoom;
+
+    // Skip initial transient
+    for (var i = 0u; i < 100u; i = i + 1u) {
+        let term = sin(x) * cos(b) + c - x * sin(a + b + c);
+        let x_new = y - sign(x) * abs(term);
+        let y_new = a - x;
+        x = x_new;
+        y = y_new;
+    }
+
+    for (var i = 0u; i < uniforms.max_iterations; i = i + 1u) {
+        let term = sin(x) * cos(b) + c - x * sin(a + b + c);
+        let x_new = y - sign(x) * abs(term);
+        let y_new = a - x;
+        x = x_new;
+        y = y_new;
+
+        if (abs(x) > 100000.0 || abs(y) > 100000.0) { break; }
+
+        let dist = distance(vec2<f32>(x, y), coord);
+        if (dist < pixel_size) {
+            hit_count += 1.0 - dist / pixel_size;
+        }
+    }
+
+    if (hit_count < 0.5) { return 0.0; }
+    return clamp(hit_count / 10.0, 0.0, 1.0);
+}
+
+// Icon fractal with rotational symmetry
+// Parameters: lambda = julia_c.x, alpha = julia_c.y, beta = power, gamma = fractal_fold, omega = fractal_min_radius, degree = fractal_scale
+fn icon_attractor(coord: vec2<f32>) -> f32 {
+    let lambda = uniforms.julia_c.x;
+    let alpha = uniforms.julia_c.y;
+    let beta = uniforms.power;
+    let gamma = uniforms.fractal_fold;
+    let omega = uniforms.fractal_min_radius;
+    let degree = i32(uniforms.fractal_scale);
+
+    var x = 0.1;
+    var y = 0.1;
+    var hit_count = 0.0;
+    let pixel_size = 4.0 / uniforms.zoom;
+
+    // Skip initial transient
+    for (var i = 0u; i < 100u; i = i + 1u) {
+        // Compute z^(degree-2) where z = x + iy
+        var zn_real = 1.0;
+        var zn_imag = 0.0;
+        for (var j = 0; j < degree - 2; j = j + 1) {
+            let temp = zn_real * x - zn_imag * y;
+            zn_imag = zn_real * y + zn_imag * x;
+            zn_real = temp;
+        }
+
+        let zzbar = x * x + y * y;
+        let p = lambda + alpha * zzbar + beta * (x * zn_real - y * zn_imag);
+        let x_new = p * x + gamma * zn_real - omega * y;
+        let y_new = p * y - gamma * zn_imag + omega * x;
+        x = x_new;
+        y = y_new;
+    }
+
+    for (var i = 0u; i < uniforms.max_iterations; i = i + 1u) {
+        var zn_real = 1.0;
+        var zn_imag = 0.0;
+        for (var j = 0; j < degree - 2; j = j + 1) {
+            let temp = zn_real * x - zn_imag * y;
+            zn_imag = zn_real * y + zn_imag * x;
+            zn_real = temp;
+        }
+
+        let zzbar = x * x + y * y;
+        let p = lambda + alpha * zzbar + beta * (x * zn_real - y * zn_imag);
+        let x_new = p * x + gamma * zn_real - omega * y;
+        let y_new = p * y - gamma * zn_imag + omega * x;
+        x = x_new;
+        y = y_new;
+
+        if (abs(x) > 100.0 || abs(y) > 100.0) { break; }
+
+        let dist = distance(vec2<f32>(x, y), coord);
+        if (dist < pixel_size) {
+            hit_count += 1.0 - dist / pixel_size;
+        }
+    }
+
+    if (hit_count < 0.5) { return 0.0; }
+    return clamp(hit_count / 10.0, 0.0, 1.0);
+}
+
+// ============================================================================
 // 3D Distance Functions
 // ============================================================================
 
@@ -1437,6 +1809,133 @@ fn sierpinski_gasket_de(pos: vec3<f32>) -> f32 {
     return (length(p) - 1.0) / scale;
 }
 
+// ============================================================================
+// 3D Strange Attractor Distance Functions
+// ============================================================================
+
+// Pickover attractor: Creates a 3D orbit that we can ray march
+// x' = sin(a*y) - z*cos(b*x), y' = z*sin(c*x) - cos(d*y), z' = sin(x)
+fn pickover_attractor_de(pos: vec3<f32>) -> f32 {
+    let scale = uniforms.fractal_scale;
+    let a = uniforms.julia_c.x;
+    let b = uniforms.julia_c.y;
+    let c = uniforms.power;
+    let d = uniforms.fractal_fold;
+
+    // Build attractor point cloud and find minimum distance
+    var min_dist = 1000.0;
+    var x = 0.1;
+    var y = 0.1;
+    var z = 0.1;
+
+    // Skip transient
+    for (var i = 0u; i < 500u; i = i + 1u) {
+        let x_new = sin(a * y) - z * cos(b * x);
+        let y_new = z * sin(c * x) - cos(d * y);
+        let z_new = sin(x);
+        x = x_new;
+        y = y_new;
+        z = z_new;
+    }
+
+    // Sample points and find closest
+    for (var i = 0u; i < 1000u; i = i + 1u) {
+        let x_new = sin(a * y) - z * cos(b * x);
+        let y_new = z * sin(c * x) - cos(d * y);
+        let z_new = sin(x);
+        x = x_new;
+        y = y_new;
+        z = z_new;
+
+        let attractor_pos = vec3<f32>(x, y, z) * scale;
+        let dist = length(pos - attractor_pos) - 0.02 * scale; // Small sphere at each point
+        min_dist = min(min_dist, dist);
+    }
+
+    return min_dist;
+}
+
+// Lorenz attractor: dx/dt = σ(y-x), dy/dt = x(ρ-z)-y, dz/dt = xy - βz
+fn lorenz_attractor_de(pos: vec3<f32>) -> f32 {
+    let scale = uniforms.fractal_scale;
+    let sigma = uniforms.julia_c.x;   // Default: 10
+    let rho = uniforms.julia_c.y;     // Default: 28
+    let beta = uniforms.power;        // Default: 8/3 ≈ 2.666
+
+    var min_dist = 1000.0;
+    var x = 0.1;
+    var y = 0.0;
+    var z = 0.0;
+    let dt = 0.005;
+
+    // Skip transient
+    for (var i = 0u; i < 1000u; i = i + 1u) {
+        let dx = sigma * (y - x);
+        let dy = x * (rho - z) - y;
+        let dz = x * y - beta * z;
+        x = x + dx * dt;
+        y = y + dy * dt;
+        z = z + dz * dt;
+    }
+
+    // Sample points and find closest
+    for (var i = 0u; i < 2000u; i = i + 1u) {
+        let dx = sigma * (y - x);
+        let dy = x * (rho - z) - y;
+        let dz = x * y - beta * z;
+        x = x + dx * dt;
+        y = y + dy * dt;
+        z = z + dz * dt;
+
+        // Lorenz center is around (0, 0, 27) with wings spanning ~30 units
+        let attractor_pos = vec3<f32>(x, y, z - 25.0) * scale;
+        let dist = length(pos - attractor_pos) - 0.3 * scale;
+        min_dist = min(min_dist, dist);
+    }
+
+    return min_dist;
+}
+
+// Rossler attractor: dx/dt = -y - z, dy/dt = x + a*y, dz/dt = b + z*(x - c)
+fn rossler_attractor_de(pos: vec3<f32>) -> f32 {
+    let scale = uniforms.fractal_scale;
+    let a = uniforms.julia_c.x;   // Default: 0.2
+    let b = uniforms.julia_c.y;   // Default: 0.2
+    let c = uniforms.power;       // Default: 5.7
+
+    var min_dist = 1000.0;
+    var x = 0.1;
+    var y = 0.0;
+    var z = 0.0;
+    let dt = 0.01;
+
+    // Skip transient
+    for (var i = 0u; i < 500u; i = i + 1u) {
+        let dx = -y - z;
+        let dy = x + a * y;
+        let dz = b + z * (x - c);
+        x = x + dx * dt;
+        y = y + dy * dt;
+        z = z + dz * dt;
+    }
+
+    // Sample points and find closest
+    for (var i = 0u; i < 1500u; i = i + 1u) {
+        let dx = -y - z;
+        let dy = x + a * y;
+        let dz = b + z * (x - c);
+        x = x + dx * dt;
+        y = y + dy * dt;
+        z = z + dz * dt;
+
+        let attractor_pos = vec3<f32>(x, y, z) * scale;
+        let dist = length(pos - attractor_pos) - 0.15 * scale;
+        min_dist = min(min_dist, dist);
+    }
+
+    return min_dist;
+}
+
 // Quaternion multiplication helper
 fn quat_mul(a: vec4<f32>, b: vec4<f32>) -> vec4<f32> {
     return vec4<f32>(
@@ -1496,6 +1995,13 @@ fn scene_de_with_material(pos: vec3<f32>) -> SceneResult {
         fractal_dist = quaternion_cubic_de(pos);
     } else if (uniforms.fractal_type == 25u) {
         fractal_dist = sierpinski_gasket_de(pos);
+    // 3D Strange Attractors (types 35-37)
+    } else if (uniforms.fractal_type == 35u) {
+        fractal_dist = pickover_attractor_de(pos);
+    } else if (uniforms.fractal_type == 36u) {
+        fractal_dist = lorenz_attractor_de(pos);
+    } else if (uniforms.fractal_type == 37u) {
+        fractal_dist = rossler_attractor_de(pos);
     }
 
     var floor_dist = 1000.0;
@@ -2336,6 +2842,27 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
                 t = nova_fractal(coord);
             } else if (uniforms.fractal_type == 11u) {
                 t = magnet_fractal(coord);
+            } else if (uniforms.fractal_type == 12u) {
+                t = collatz_fractal(coord);
+            // Strange Attractors (types 26-34, indices after 3D fractals)
+            } else if (uniforms.fractal_type == 26u) {
+                t = hopalong_attractor(coord);
+            } else if (uniforms.fractal_type == 27u) {
+                t = henon_attractor(coord);
+            } else if (uniforms.fractal_type == 28u) {
+                t = martin_attractor(coord);
+            } else if (uniforms.fractal_type == 29u) {
+                t = gingerbreadman_attractor(coord);
+            } else if (uniforms.fractal_type == 30u) {
+                t = latoocarfian_attractor(coord);
+            } else if (uniforms.fractal_type == 31u) {
+                t = chip_attractor(coord);
+            } else if (uniforms.fractal_type == 32u) {
+                t = quadruptwo_attractor(coord);
+            } else if (uniforms.fractal_type == 33u) {
+                t = threeply_attractor(coord);
+            } else if (uniforms.fractal_type == 34u) {
+                t = icon_attractor(coord);
             } else {
                 t = collatz_fractal(coord);
             }

@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum FractalType {
-    // 2D Fractals
+    // 2D Fractals - Escape Time
     Mandelbrot2D,
     Julia2D,
     Sierpinski2D,
@@ -31,6 +31,22 @@ pub enum FractalType {
     HybridMandelbulbJulia3D,
     QuaternionCubic3D,
     SierpinskiGasket3D,
+
+    // 2D Fractals - Strange Attractors (from xfractint)
+    Hopalong2D,
+    Henon2D,
+    Martin2D,
+    Gingerbreadman2D,
+    Latoocarfian2D,
+    Chip2D,
+    Quadruptwo2D,
+    Threeply2D,
+    Icon2D,
+
+    // 3D Fractals - Strange Attractors
+    Pickover3D,
+    Lorenz3D,
+    Rossler3D,
 }
 
 impl FractalType {
@@ -63,6 +79,20 @@ impl FractalType {
             FractalType::HybridMandelbulbJulia3D => "hybrid_bulb_julia",
             FractalType::QuaternionCubic3D => "quaternion_cubic",
             FractalType::SierpinskiGasket3D => "sierpinski_gasket",
+            // Strange Attractors 2D
+            FractalType::Hopalong2D => "hopalong",
+            FractalType::Henon2D => "henon",
+            FractalType::Martin2D => "martin",
+            FractalType::Gingerbreadman2D => "gingerbreadman",
+            FractalType::Latoocarfian2D => "latoocarfian",
+            FractalType::Chip2D => "chip",
+            FractalType::Quadruptwo2D => "quadruptwo",
+            FractalType::Threeply2D => "threeply",
+            FractalType::Icon2D => "icon",
+            // Strange Attractors 3D
+            FractalType::Pickover3D => "pickover",
+            FractalType::Lorenz3D => "lorenz",
+            FractalType::Rossler3D => "rossler",
         }
     }
 }

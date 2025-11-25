@@ -208,7 +208,16 @@ fn test_all_fractal_types_switchable() {
             | FractalType::Lyapunov2D
             | FractalType::Nova2D
             | FractalType::Magnet2D
-            | FractalType::Collatz2D => {
+            | FractalType::Collatz2D
+            | FractalType::Hopalong2D
+            | FractalType::Henon2D
+            | FractalType::Martin2D
+            | FractalType::Gingerbreadman2D
+            | FractalType::Latoocarfian2D
+            | FractalType::Chip2D
+            | FractalType::Quadruptwo2D
+            | FractalType::Threeply2D
+            | FractalType::Icon2D => {
                 assert_eq!(params.render_mode, RenderMode::TwoD);
             }
             FractalType::Mandelbulb3D
@@ -223,7 +232,10 @@ fn test_all_fractal_types_switchable() {
             | FractalType::Kleinian3D
             | FractalType::HybridMandelbulbJulia3D
             | FractalType::QuaternionCubic3D
-            | FractalType::SierpinskiGasket3D => {
+            | FractalType::SierpinskiGasket3D
+            | FractalType::Pickover3D
+            | FractalType::Lorenz3D
+            | FractalType::Rossler3D => {
                 assert_eq!(params.render_mode, RenderMode::ThreeD);
             }
         }
