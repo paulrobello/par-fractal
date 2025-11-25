@@ -87,8 +87,6 @@ pub struct AccumulationTexture {
     pub view: wgpu::TextureView,
     /// Bind group for compute shader access (read-write)
     pub compute_bind_group: wgpu::BindGroup,
-    /// Bind group for fragment shader access (read-only sampling)
-    pub sample_bind_group: wgpu::BindGroup,
     /// Texture dimensions
     pub width: u32,
     pub height: u32,
@@ -102,16 +100,12 @@ impl AccumulationTexture {
     /// * `width` - Texture width in pixels
     /// * `height` - Texture height in pixels
     /// * `compute_bind_group_layout` - Layout for compute shader binding
-    /// * `sample_bind_group_layout` - Layout for fragment shader sampling
-    /// * `sampler` - Sampler for texture reads
     /// * `label` - Debug label for the texture
     pub fn new(
         device: &wgpu::Device,
         width: u32,
         height: u32,
         compute_bind_group_layout: &wgpu::BindGroupLayout,
-        sample_bind_group_layout: &wgpu::BindGroupLayout,
-        sampler: &wgpu::Sampler,
         label: &str,
     ) -> Self {
         let texture = device.create_texture(&wgpu::TextureDescriptor {
@@ -146,27 +140,10 @@ impl AccumulationTexture {
             }],
         });
 
-        // Sample bind group (read-only texture + sampler)
-        let sample_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some(&format!("{} Sample Bind Group", label)),
-            layout: sample_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Sampler(sampler),
-                },
-            ],
-        });
-
         Self {
             texture,
             view,
             compute_bind_group,
-            sample_bind_group,
             width,
             height,
         }
@@ -231,8 +208,6 @@ impl AccumulationTexture {
         width: u32,
         height: u32,
         compute_bind_group_layout: &wgpu::BindGroupLayout,
-        sample_bind_group_layout: &wgpu::BindGroupLayout,
-        sampler: &wgpu::Sampler,
     ) {
         if width == self.width && height == self.height {
             return;
@@ -243,8 +218,6 @@ impl AccumulationTexture {
             width,
             height,
             compute_bind_group_layout,
-            sample_bind_group_layout,
-            sampler,
             "Accumulation Texture",
         );
     }

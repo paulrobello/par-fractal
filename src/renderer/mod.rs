@@ -72,6 +72,4 @@ pub struct Renderer {
     pub accumulation_texture: Option<AccumulationTexture>,
     pub accumulation_display_pipeline: wgpu::RenderPipeline, // Uses fs_accumulation_display
     pub accumulation_display_bind_group: Option<wgpu::BindGroup>,
-    /// Layout for sampling the accumulation texture
-    pub accumulation_sample_layout: Option<wgpu::BindGroupLayout>,
 }
