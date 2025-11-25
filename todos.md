@@ -1,13 +1,13 @@
 # Par-Fractal TODOs
 
-## In Progress
+## Completed
 
-### Strange Attractor Texture-Based Accumulation (Infrastructure Complete)
+### Strange Attractor Texture-Based Accumulation
 **Priority**: Medium
 **Complexity**: High
-**Status**: Infrastructure implemented, render loop integration pending
+**Status**: ✅ Implemented
 
-The modular compute shader system and UI controls have been implemented. The remaining work is to wire the compute passes into the main render loop.
+The compute shader-based accumulation system is fully integrated and functional.
 
 **Implemented components**:
 - `src/renderer/compute.rs` - Modular compute infrastructure:
@@ -21,30 +21,30 @@ The modular compute shader system and UI controls have been implemented. The rem
   - Per-thread orbit iteration with divergence handling
   - World-to-screen coordinate transformation
   - Pixel hit count accumulation
-- `src/shaders/attractor_display.wgsl` - Display shader:
-  - Log scaling for density visualization
-  - Palette-based coloring
-  - Gamma correction
+- `src/shaders/attractor_display.wgsl` - Standalone display shader (not used in final implementation)
+- `src/shaders/postprocess.wgsl` - Added `fs_accumulation_display` function:
+  - Log scaling for high dynamic range density visualization
+  - Heat-map coloring (blue -> cyan -> green -> yellow -> red)
+  - Gamma correction for better contrast
+- `src/renderer/initialization.rs` - Added `accumulation_display_pipeline` and `init_accumulation_compute()`
+- `src/app/render.rs` - Integrated compute dispatch into render loop
 - UI controls in `src/ui/mod.rs`:
-  - Enable/disable accumulation mode
-  - Iterations per frame slider (10k-1M)
-  - Log scale adjustment
+  - Enable/disable accumulation mode checkbox
+  - Iterations per frame slider (10k-1M, logarithmic)
+  - Log scale adjustment slider
   - Total iterations counter
   - Clear accumulation button
-- FractalParams fields for accumulation settings
+- FractalParams fields for accumulation settings (persisted in settings.yaml)
 
-**Remaining work**:
-1. Add compute pipeline and accumulation texture to Renderer struct
-2. Wire compute dispatch into render loop (before scene render pass)
-3. Use accumulation texture as scene source when mode is enabled
-4. Handle texture resize and clear operations
-5. Test and optimize performance
+**How to use**:
+1. Select a 2D strange attractor (Hopalong, Hénon, Martin, etc.)
+2. Scroll to "Accumulation Mode (Experimental)" in 2D Parameters
+3. Enable the checkbox
+4. Adjust iterations per frame for speed/quality tradeoff
+5. Watch the attractor build up over time
+6. Use "Clear Accumulation" to reset
 
-**Files affected**:
-- `src/renderer/mod.rs` - Add compute fields to Renderer
-- `src/renderer/initialization.rs` - Initialize compute pipeline
-- `src/app/render.rs` - Add compute dispatch pass
-- `src/app/update.rs` - Handle accumulation clear requests
+**Note**: Requires GPU support for Rgba32Float read-write storage textures, which may not be available on all hardware.
 
 ---
 
