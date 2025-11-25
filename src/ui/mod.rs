@@ -415,6 +415,37 @@ impl UI {
                         });
 
                         ui.separator();
+                        ui.label("2D Strange Attractors:");
+                        ui.horizontal(|ui| {
+                            ui.selectable_value(&mut params.fractal_type, FractalType::Hopalong2D, "Hopalong")
+                                .on_hover_text("Hopalong attractor - intricate web patterns");
+                            ui.selectable_value(&mut params.fractal_type, FractalType::Henon2D, "Hénon")
+                                .on_hover_text("Hénon attractor - classic chaotic system");
+                        });
+                        ui.horizontal(|ui| {
+                            ui.selectable_value(&mut params.fractal_type, FractalType::Martin2D, "Martin")
+                                .on_hover_text("Martin attractor - spiral/flower patterns");
+                            ui.selectable_value(&mut params.fractal_type, FractalType::Gingerbreadman2D, "Gingerbread")
+                                .on_hover_text("Gingerbreadman - simple formula, complex output");
+                        });
+                        ui.horizontal(|ui| {
+                            ui.selectable_value(&mut params.fractal_type, FractalType::Latoocarfian2D, "Latoocarfian")
+                                .on_hover_text("Latoocarfian - intricate trigonometric patterns");
+                            ui.selectable_value(&mut params.fractal_type, FractalType::Icon2D, "Icon")
+                                .on_hover_text("Icon - rotational symmetry patterns");
+                        });
+                        ui.horizontal(|ui| {
+                            ui.selectable_value(&mut params.fractal_type, FractalType::Chip2D, "Chip")
+                                .on_hover_text("Chip - log/cos/atan hopalong variant");
+                            ui.selectable_value(&mut params.fractal_type, FractalType::Quadruptwo2D, "Quadruptwo")
+                                .on_hover_text("Quadruptwo - log/sin/atan hopalong variant");
+                        });
+                        ui.horizontal(|ui| {
+                            ui.selectable_value(&mut params.fractal_type, FractalType::Threeply2D, "Threeply")
+                                .on_hover_text("Threeply - trigonometric hopalong variant");
+                        });
+
+                        ui.separator();
                         ui.label("3D Fractals:");
                         ui.horizontal(|ui| {
                             ui.selectable_value(&mut params.fractal_type, FractalType::Mandelbulb3D, "Mandelbulb")
@@ -455,6 +486,19 @@ impl UI {
                         ui.horizontal(|ui| {
                             ui.selectable_value(&mut params.fractal_type, FractalType::QuaternionCubic3D, "Quaternion Cubic")
                                 .on_hover_text("Cubic quaternion Julia set (z³+c)");
+                        });
+
+                        ui.separator();
+                        ui.label("3D Strange Attractors:");
+                        ui.horizontal(|ui| {
+                            ui.selectable_value(&mut params.fractal_type, FractalType::Lorenz3D, "Lorenz")
+                                .on_hover_text("Lorenz attractor - butterfly chaos");
+                            ui.selectable_value(&mut params.fractal_type, FractalType::Rossler3D, "Rossler")
+                                .on_hover_text("Rossler attractor - spiral chaos");
+                        });
+                        ui.horizontal(|ui| {
+                            ui.selectable_value(&mut params.fractal_type, FractalType::Pickover3D, "Pickover")
+                                .on_hover_text("Pickover attractor - 3D orbit pattern");
                         });
 
                         if old_type != params.fractal_type {
