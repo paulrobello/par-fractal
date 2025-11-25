@@ -298,12 +298,25 @@ fn fs_copy(input: VertexOutput) -> @location(0) vec4<f32> {
 // Accumulation Display - Visualize accumulated hit counts with log scaling
 // ============================================================================
 
+// Note: This shader uses t_scene which is texture_2d<f32>, but the accumulation
+// texture is r32uint. We need a separate binding for uint textures.
+// For now, we'll use textureLoad with integer coords calculated from tex_coords.
+
+@group(0) @binding(2)
+var t_accum: texture_2d<u32>;
+
 @fragment
 fn fs_accumulation_display(input: VertexOutput) -> @location(0) vec4<f32> {
-    let accumulated = textureSample(t_scene, s_scene, input.tex_coords);
+    // Calculate texture coordinates as integers
+    let tex_size = textureDimensions(t_accum);
+    let coord = vec2<i32>(
+        i32(input.tex_coords.x * f32(tex_size.x)),
+        i32(input.tex_coords.y * f32(tex_size.y))
+    );
 
-    // Get hit count from R channel
-    let hit_count = accumulated.r;
+    // Load hit count (R32Uint format - single u32 value)
+    let accumulated = textureLoad(t_accum, coord, 0);
+    let hit_count = f32(accumulated.r);
 
     // If no hits, return black
     if (hit_count < 0.5) {

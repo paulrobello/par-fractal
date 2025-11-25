@@ -36,7 +36,7 @@ struct Uniforms {
 }
 
 @group(0) @binding(0)
-var accumulation_texture: texture_storage_2d<rgba32float, read_write>;
+var accumulation_texture: texture_storage_2d<r32uint, read_write>;
 
 @group(1) @binding(0)
 var<uniform> uniforms: Uniforms;
@@ -252,16 +252,11 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         if (is_in_bounds(screen)) {
             let coord = vec2<u32>(u32(screen.x), u32(screen.y));
 
-            // Read current value
+            // Read current value (R32Uint - single u32 channel)
             let current = textureLoad(accumulation_texture, coord);
 
-            // Increment hit count (R channel)
-            let new_value = vec4<f32>(
-                current.r + 1.0,
-                current.g,
-                current.b,
-                current.a
-            );
+            // Increment hit count
+            let new_value = vec4<u32>(current.r + 1u, 0u, 0u, 0u);
 
             // Write back
             textureStore(accumulation_texture, coord, new_value);

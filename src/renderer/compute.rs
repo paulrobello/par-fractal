@@ -124,8 +124,9 @@ impl AccumulationTexture {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            // Use Rgba32Float for high-precision accumulation
-            format: wgpu::TextureFormat::Rgba32Float,
+            // Use R32Uint for atomic accumulation - widely supported for read-write storage
+            // We only need hit count in R channel, other channels unused
+            format: wgpu::TextureFormat::R32Uint,
             // STORAGE_BINDING for compute write, TEXTURE_BINDING for fragment read
             usage: wgpu::TextureUsages::STORAGE_BINDING
                 | wgpu::TextureUsages::TEXTURE_BINDING
@@ -176,7 +177,7 @@ impl AccumulationTexture {
     /// This queues a buffer copy to zero out the texture.
     pub fn clear(&self, device: &wgpu::Device, queue: &wgpu::Queue) {
         // Create a zeroed buffer to copy from
-        let buffer_size = (self.width * self.height * 16) as u64; // 4 floats * 4 bytes
+        let buffer_size = (self.width * self.height * 4) as u64; // 1 u32 * 4 bytes (R32Uint)
         let zeros = vec![0u8; buffer_size as usize];
 
         let staging_buffer = device.create_buffer(&wgpu::BufferDescriptor {
@@ -201,7 +202,7 @@ impl AccumulationTexture {
                 buffer: &staging_buffer,
                 layout: wgpu::TexelCopyBufferLayout {
                     offset: 0,
-                    bytes_per_row: Some(self.width * 16), // 4 floats * 4 bytes
+                    bytes_per_row: Some(self.width * 4), // 1 u32 * 4 bytes (R32Uint)
                     rows_per_image: Some(self.height),
                 },
             },
@@ -258,7 +259,7 @@ pub fn create_compute_storage_layout(device: &wgpu::Device) -> wgpu::BindGroupLa
             visibility: wgpu::ShaderStages::COMPUTE,
             ty: wgpu::BindingType::StorageTexture {
                 access: wgpu::StorageTextureAccess::ReadWrite,
-                format: wgpu::TextureFormat::Rgba32Float,
+                format: wgpu::TextureFormat::R32Uint, // Widely supported for read-write
                 view_dimension: wgpu::TextureViewDimension::D2,
             },
             count: None,
