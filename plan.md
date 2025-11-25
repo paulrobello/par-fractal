@@ -222,3 +222,38 @@ A compute shader-based accumulation system for 2D strange attractors was impleme
 - `src/renderer/update.rs:169-187` - Resize handling
 - `src/fractal/mod.rs:591-628` - Default parameters for each attractor
 - `src/ui/mod.rs:1284-1357` - Attractor parameter UI controls
+
+---
+
+## Additional Updates (2025-11-25 Session 2)
+
+### 8-Color Palette System - COMPLETE
+- Expanded color palettes from 5 to 8 colors
+- Updated all 21 built-in palettes and 27 xfractint-imported palettes
+- Updated `ColorPalette` struct, `CustomPalette` struct, `Uniforms`, WGSL shaders
+- Updated UI custom palette editor with 8 color pickers
+- Preview squares reduced to 20x20 to fit 8 colors
+
+### Toast Notifications - COMPLETE
+- Added toast notifications when changing palettes (UI buttons, P key, command palette)
+- Moved toast position from center to top-center of screen
+- Fixed toast stacking issue when rapidly cycling palettes (simple toasts now replace previous)
+
+### Removed TgladFormula3D - COMPLETE
+- Removed TgladFormula3D fractal type entirely
+- Renumbered remaining 3D fractal type IDs (18-24)
+- Updated F-key shortcuts: F6=Octahedral, F7=Icosahedral, F8=Apollonian, F9=Kleinian, F10=Hybrid
+
+---
+
+## Known Issues
+
+### IFS Fractal Clipping Artifacts
+**Status:** UNRESOLVED
+
+The following 3D fractals have visual clipping issues:
+- Octahedral IFS (F6)
+- Icosahedral IFS (F7)
+- Apollonian Gasket (F8)
+
+Parts of these fractals clip in and out depending on camera distance. See `handoff.md` for investigation steps.
