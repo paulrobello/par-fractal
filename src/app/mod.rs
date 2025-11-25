@@ -6,6 +6,8 @@ mod update;
 
 #[cfg(feature = "native")]
 mod capture;
+#[cfg(target_arch = "wasm32")]
+mod capture_web;
 #[cfg(feature = "native")]
 mod persistence;
 

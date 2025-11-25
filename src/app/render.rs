@@ -239,7 +239,29 @@ impl App {
                 #[cfg(not(target_arch = "wasm32"))]
                 self.capture_screenshot(&output.texture);
                 #[cfg(target_arch = "wasm32")]
-                log::warn!("Screenshot capture not yet fully implemented on web");
+                {
+                    let fractal_name = self
+                        .fractal_params
+                        .fractal_type
+                        .filename_safe_name()
+                        .to_string();
+                    let width = self.renderer.config.width;
+                    let height = self.renderer.config.height;
+                    // Create a closure that captures what we need for the toast
+                    let show_toast: Box<dyn Fn(String) + Send + 'static> =
+                        Box::new(move |msg: String| {
+                            log::info!("{}", msg);
+                        });
+                    super::capture_web::capture_screenshot_web(
+                        &self.renderer.device,
+                        &self.renderer.queue,
+                        &output.texture,
+                        width,
+                        height,
+                        fractal_name,
+                        show_toast,
+                    );
+                }
                 self.save_screenshot = false;
             }
 
