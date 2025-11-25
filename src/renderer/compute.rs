@@ -156,10 +156,8 @@ impl AccumulationTexture {
         // bytes_per_row must be aligned to COPY_BYTES_PER_ROW_ALIGNMENT (256 bytes)
         const COPY_BYTES_PER_ROW_ALIGNMENT: u32 = 256;
         let unpadded_bytes_per_row = self.width * 4; // 1 u32 * 4 bytes (R32Uint)
-        let padded_bytes_per_row =
-            ((unpadded_bytes_per_row + COPY_BYTES_PER_ROW_ALIGNMENT - 1)
-                / COPY_BYTES_PER_ROW_ALIGNMENT)
-                * COPY_BYTES_PER_ROW_ALIGNMENT;
+        let padded_bytes_per_row = unpadded_bytes_per_row.div_ceil(COPY_BYTES_PER_ROW_ALIGNMENT)
+            * COPY_BYTES_PER_ROW_ALIGNMENT;
 
         let buffer_size = (padded_bytes_per_row * self.height) as u64;
         let zeros = vec![0u8; buffer_size as usize];

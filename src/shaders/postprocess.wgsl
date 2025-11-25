@@ -321,36 +321,40 @@ fn fs_accumulation_display(input: VertexOutput) -> @location(0) vec4<f32> {
     }
 
     // Apply log scaling for better contrast across large dynamic range
-    // log(1 + x) / log(1 + max) gives values in [0, 1]
-    // Assume max around 10000 for reasonable scaling
-    let log_scale = 1.0;
-    let max_value = 10000.0;
+    // Adaptive max based on hit count for better dynamic range
+    let log_scale = 0.5;
+    let max_value = 5000.0;
     let log_value = log(1.0 + hit_count * log_scale) / log(1.0 + max_value * log_scale);
 
     // Apply gamma correction (make mid-tones brighter)
-    let gamma = 0.5;
-    let adjusted = pow(log_value, gamma);
+    let gamma = 0.6;
+    let adjusted = pow(clamp(log_value, 0.0, 1.0), gamma);
 
-    // Simple grayscale to color gradient (blue -> cyan -> green -> yellow -> red)
+    // Classic "fire" palette - similar to classic fractal viewers
+    // Goes from black -> dark red -> red -> orange -> yellow -> white
     var color: vec3<f32>;
-    let t = clamp(adjusted, 0.0, 1.0);
+    let t = adjusted;
 
-    if (t < 0.25) {
-        // Blue to cyan
-        let s = t * 4.0;
-        color = mix(vec3<f32>(0.0, 0.0, 0.5), vec3<f32>(0.0, 0.5, 1.0), s);
-    } else if (t < 0.5) {
-        // Cyan to green
-        let s = (t - 0.25) * 4.0;
-        color = mix(vec3<f32>(0.0, 0.5, 1.0), vec3<f32>(0.0, 1.0, 0.3), s);
-    } else if (t < 0.75) {
-        // Green to yellow
-        let s = (t - 0.5) * 4.0;
-        color = mix(vec3<f32>(0.0, 1.0, 0.3), vec3<f32>(1.0, 1.0, 0.0), s);
+    if (t < 0.2) {
+        // Black to dark purple/blue
+        let s = t * 5.0;
+        color = mix(vec3<f32>(0.0, 0.0, 0.0), vec3<f32>(0.1, 0.0, 0.3), s);
+    } else if (t < 0.4) {
+        // Dark purple to magenta
+        let s = (t - 0.2) * 5.0;
+        color = mix(vec3<f32>(0.1, 0.0, 0.3), vec3<f32>(0.6, 0.0, 0.4), s);
+    } else if (t < 0.6) {
+        // Magenta to orange
+        let s = (t - 0.4) * 5.0;
+        color = mix(vec3<f32>(0.6, 0.0, 0.4), vec3<f32>(1.0, 0.4, 0.0), s);
+    } else if (t < 0.8) {
+        // Orange to yellow
+        let s = (t - 0.6) * 5.0;
+        color = mix(vec3<f32>(1.0, 0.4, 0.0), vec3<f32>(1.0, 0.9, 0.2), s);
     } else {
-        // Yellow to red/white
-        let s = (t - 0.75) * 4.0;
-        color = mix(vec3<f32>(1.0, 1.0, 0.0), vec3<f32>(1.0, 0.5, 0.5), s);
+        // Yellow to white
+        let s = (t - 0.8) * 5.0;
+        color = mix(vec3<f32>(1.0, 0.9, 0.2), vec3<f32>(1.0, 1.0, 1.0), s);
     }
 
     return vec4<f32>(color, 1.0);

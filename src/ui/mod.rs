@@ -422,33 +422,35 @@ impl UI {
 
                         ui.separator();
                         ui.label("2D Strange Attractors:");
+                        // Helper macro-like closure to create attractor buttons that auto-enable accumulation
+                        let mut attractor_button = |ui: &mut egui::Ui, fractal: FractalType, label: &str, hover: &str| {
+                            let selected = params.fractal_type == fractal;
+                            if ui.selectable_label(selected, label).on_hover_text(hover).clicked() {
+                                params.fractal_type = fractal;
+                                params.attractor_accumulation_enabled = true;
+                                params.attractor_pending_clear = true;
+                                params.attractor_total_iterations = 0;
+                                changed = true;
+                            }
+                        };
                         ui.horizontal(|ui| {
-                            ui.selectable_value(&mut params.fractal_type, FractalType::Hopalong2D, "Hopalong")
-                                .on_hover_text("Hopalong attractor - intricate web patterns");
-                            ui.selectable_value(&mut params.fractal_type, FractalType::Henon2D, "Hénon")
-                                .on_hover_text("Hénon attractor - classic chaotic system");
+                            attractor_button(ui, FractalType::Hopalong2D, "Hopalong", "Hopalong attractor - intricate web patterns");
+                            attractor_button(ui, FractalType::Henon2D, "Hénon", "Hénon attractor - classic chaotic system");
                         });
                         ui.horizontal(|ui| {
-                            ui.selectable_value(&mut params.fractal_type, FractalType::Martin2D, "Martin")
-                                .on_hover_text("Martin attractor - spiral/flower patterns");
-                            ui.selectable_value(&mut params.fractal_type, FractalType::Gingerbreadman2D, "Gingerbread")
-                                .on_hover_text("Gingerbreadman - simple formula, complex output");
+                            attractor_button(ui, FractalType::Martin2D, "Martin", "Martin attractor - spiral/flower patterns");
+                            attractor_button(ui, FractalType::Gingerbreadman2D, "Gingerbread", "Gingerbreadman - simple formula, complex output");
                         });
                         ui.horizontal(|ui| {
-                            ui.selectable_value(&mut params.fractal_type, FractalType::Latoocarfian2D, "Latoocarfian")
-                                .on_hover_text("Latoocarfian - intricate trigonometric patterns");
-                            ui.selectable_value(&mut params.fractal_type, FractalType::Icon2D, "Icon")
-                                .on_hover_text("Icon - rotational symmetry patterns");
+                            attractor_button(ui, FractalType::Latoocarfian2D, "Latoocarfian", "Latoocarfian - intricate trigonometric patterns");
+                            attractor_button(ui, FractalType::Icon2D, "Icon", "Icon - rotational symmetry patterns");
                         });
                         ui.horizontal(|ui| {
-                            ui.selectable_value(&mut params.fractal_type, FractalType::Chip2D, "Chip")
-                                .on_hover_text("Chip - log/cos/atan hopalong variant");
-                            ui.selectable_value(&mut params.fractal_type, FractalType::Quadruptwo2D, "Quadruptwo")
-                                .on_hover_text("Quadruptwo - log/sin/atan hopalong variant");
+                            attractor_button(ui, FractalType::Chip2D, "Chip", "Chip - log/cos/atan hopalong variant");
+                            attractor_button(ui, FractalType::Quadruptwo2D, "Quadruptwo", "Quadruptwo - log/sin/atan hopalong variant");
                         });
                         ui.horizontal(|ui| {
-                            ui.selectable_value(&mut params.fractal_type, FractalType::Threeply2D, "Threeply")
-                                .on_hover_text("Threeply - trigonometric hopalong variant");
+                            attractor_button(ui, FractalType::Threeply2D, "Threeply", "Threeply - trigonometric hopalong variant");
                         });
 
                         ui.separator();
