@@ -356,7 +356,6 @@ impl FractalParams {
             | FractalType::SierpinskiPyramid3D
             | FractalType::JuliaSet3D
             | FractalType::Mandelbox3D
-            | FractalType::TgladFormula3D
             | FractalType::OctahedralIFS3D
             | FractalType::IcosahedralIFS3D
             | FractalType::ApollonianGasket3D
@@ -525,7 +524,6 @@ impl FractalParams {
             | FractalType::SierpinskiPyramid3D
             | FractalType::JuliaSet3D
             | FractalType::Mandelbox3D
-            | FractalType::TgladFormula3D
             | FractalType::OctahedralIFS3D
             | FractalType::IcosahedralIFS3D
             | FractalType::ApollonianGasket3D
@@ -559,10 +557,6 @@ impl FractalParams {
                 self.fractal_min_radius = 0.5;
                 self.roughness = 0.21;
                 self.metallic = 0.32;
-            }
-            FractalType::TgladFormula3D => {
-                self.fractal_scale = 0.5; // Make very small to prevent camera clipping (shader uses 1/scale with 2.5x initial pos scale)
-                self.fractal_fold = 1.35;
             }
             // IFS fractals don't reset parameters - preserves user customization
             FractalType::OctahedralIFS3D | FractalType::IcosahedralIFS3D => {
@@ -689,7 +683,6 @@ impl FractalParams {
             FractalType::MengerSponge3D,
             FractalType::JuliaSet3D,
             FractalType::Mandelbox3D,
-            FractalType::TgladFormula3D,
             FractalType::OctahedralIFS3D,
             FractalType::IcosahedralIFS3D,
             FractalType::ApollonianGasket3D,
@@ -725,7 +718,7 @@ impl FractalParams {
 
                 if matches!(
                     self.fractal_type,
-                    FractalType::Mandelbox3D | FractalType::TgladFormula3D
+                    FractalType::Mandelbox3D
                 ) {
                     self.fractal_fold = rng.random_range(0.5..2.5);
                     self.fractal_min_radius = rng.random_range(0.2..1.5);

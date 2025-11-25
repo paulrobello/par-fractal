@@ -465,34 +465,34 @@ impl CommandPalette {
                 Some("F5"),
             ),
             (
-                FractalType::TgladFormula3D,
-                "Tglad Formula (3D)",
-                vec!["tglad"],
-                Some("F6"),
-            ),
-            (
                 FractalType::OctahedralIFS3D,
                 "Octahedral IFS (3D)",
                 vec!["octahedral", "oct"],
-                Some("F7"),
+                Some("F6"),
             ),
             (
                 FractalType::IcosahedralIFS3D,
                 "Icosahedral IFS (3D)",
                 vec!["icosahedral", "ico"],
-                Some("F8"),
+                Some("F7"),
             ),
             (
                 FractalType::ApollonianGasket3D,
                 "Apollonian Gasket (3D)",
                 vec!["apollonian", "gasket"],
+                Some("F8"),
+            ),
+            (
+                FractalType::Kleinian3D,
+                "Kleinian (3D)",
+                vec!["kleinian"],
                 Some("F9"),
             ),
             (
                 FractalType::HybridMandelbulbJulia3D,
                 "Hybrid Mandelbulb-Julia (3D)",
                 vec!["hybrid"],
-                Some("F11"),
+                Some("F10"),
             ),
             (
                 FractalType::QuaternionCubic3D,

@@ -470,24 +470,20 @@ impl UI {
                                 .on_hover_text("Cubic folding fractal with sharp edges [F5]");
                         });
                         ui.horizontal(|ui| {
-                            ui.selectable_value(&mut params.fractal_type, FractalType::TgladFormula3D, "Tglad")
-                                .on_hover_text("Complex 3D iteration formula [F6]");
                             ui.selectable_value(&mut params.fractal_type, FractalType::OctahedralIFS3D, "Octahedron IFS")
-                                .on_hover_text("Kaleidoscopic IFS with 8-fold symmetry [F7]");
-                        });
-                        ui.horizontal(|ui| {
+                                .on_hover_text("Kaleidoscopic IFS with 8-fold symmetry [F6]");
                             ui.selectable_value(&mut params.fractal_type, FractalType::IcosahedralIFS3D, "Icosahedron IFS")
-                                .on_hover_text("Kaleidoscopic IFS with 20-fold symmetry [F8]");
+                                .on_hover_text("Kaleidoscopic IFS with 20-fold symmetry [F7]");
+                        });
+                        ui.horizontal(|ui| {
                             ui.selectable_value(&mut params.fractal_type, FractalType::ApollonianGasket3D, "Apollonian Gasket")
-                                .on_hover_text("Beautiful sphere-packing fractal [F9]");
-                        });
-                        ui.horizontal(|ui| {
+                                .on_hover_text("Beautiful sphere-packing fractal [F8]");
                             ui.selectable_value(&mut params.fractal_type, FractalType::Kleinian3D, "Kleinian")
-                                .on_hover_text("Kleinian group limit set fractal [F10]");
-                            ui.selectable_value(&mut params.fractal_type, FractalType::HybridMandelbulbJulia3D, "Hybrid Bulb-Julia")
-                                .on_hover_text("Mandelbulb and Julia set hybrid [F11]");
+                                .on_hover_text("Kleinian group fractal [F9]");
                         });
                         ui.horizontal(|ui| {
+                            ui.selectable_value(&mut params.fractal_type, FractalType::HybridMandelbulbJulia3D, "Hybrid Bulb-Julia")
+                                .on_hover_text("Mandelbulb and Julia set hybrid [F10]");
                             ui.selectable_value(&mut params.fractal_type, FractalType::QuaternionCubic3D, "Quaternion Cubic")
                                 .on_hover_text("Cubic quaternion Julia set (z³+c)");
                         });
@@ -1429,7 +1425,6 @@ impl UI {
                                 // Advanced fractal shape controls
                                 if matches!(params.fractal_type,
                                     FractalType::Mandelbox3D |
-                                    FractalType::TgladFormula3D |
                                     FractalType::OctahedralIFS3D |
                                     FractalType::IcosahedralIFS3D |
                                     FractalType::ApollonianGasket3D) {

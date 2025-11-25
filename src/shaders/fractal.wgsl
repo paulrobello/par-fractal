@@ -1485,54 +1485,6 @@ fn mandelbox_de(pos: vec3<f32>) -> f32 {
     return (length(p) / abs(dr)) * 0.3025;
 }
 
-fn tglad_formula_de(pos: vec3<f32>) -> f32 {
-    // Scale down by 62.5% (2.5x position scale, 25% smaller than before)
-    var p = pos * 2.5;
-    var dr = 1.0;
-    // Use adjustable scale parameter with inverse for intuitive behavior
-    let scale = 1.0 / uniforms.fractal_scale;  // Adjustable scale (default 2.0 -> 0.5)
-
-    for (var i = 0u; i < uniforms.max_steps; i = i + 1u) {
-        // Tglad's folding
-        p = abs(p);
-
-        // Swap operations for symmetry
-        if (p.x - p.y < 0.0) {
-            let temp = p.x;
-            p.x = p.y;
-            p.y = temp;
-        }
-        if (p.x - p.z < 0.0) {
-            let temp = p.x;
-            p.x = p.z;
-            p.z = temp;
-        }
-        if (p.y - p.z < 0.0) {
-            let temp = p.y;
-            p.y = p.z;
-            p.z = temp;
-        }
-
-        // Box folding (adjustable)
-        let fold = uniforms.fractal_fold;  // Adjustable fold (default 1.0)
-        p.x = fold - abs(p.x - fold);
-
-        // Scale and translate
-        p = p * scale - vec3<f32>(1.0, 1.0, 1.0) * (scale - 1.0);
-        dr = dr * scale;
-
-        // Bailout check
-        if (length(p) > 20.0) {
-            break;
-        }
-    }
-
-    // Distance using length instead of box to avoid negative values
-    let d = (length(p) - 2.0) / abs(dr);
-    // Scale result down by 50%
-    return d * 0.5;
-}
-
 // Octahedral IFS - 8-fold kaleidoscopic symmetry
 fn octahedral_ifs_de(pos: vec3<f32>) -> f32 {
     let scale_inv = 1.0 / uniforms.fractal_scale;
@@ -2004,20 +1956,18 @@ fn scene_de_with_material(pos: vec3<f32>) -> SceneResult {
     } else if (uniforms.fractal_type == 17u) {
         fractal_dist = mandelbox_de(pos);
     } else if (uniforms.fractal_type == 18u) {
-        fractal_dist = tglad_formula_de(pos);
-    } else if (uniforms.fractal_type == 19u) {
         fractal_dist = octahedral_ifs_de(pos);
-    } else if (uniforms.fractal_type == 20u) {
+    } else if (uniforms.fractal_type == 19u) {
         fractal_dist = icosahedral_ifs_de(pos);
-    } else if (uniforms.fractal_type == 21u) {
+    } else if (uniforms.fractal_type == 20u) {
         fractal_dist = apollonian_gasket_de(pos);
-    } else if (uniforms.fractal_type == 22u) {
+    } else if (uniforms.fractal_type == 21u) {
         fractal_dist = kleinian_de(pos);
-    } else if (uniforms.fractal_type == 23u) {
+    } else if (uniforms.fractal_type == 22u) {
         fractal_dist = hybrid_mandelbulb_julia_de(pos);
-    } else if (uniforms.fractal_type == 24u) {
+    } else if (uniforms.fractal_type == 23u) {
         fractal_dist = quaternion_cubic_de(pos);
-    } else if (uniforms.fractal_type == 25u) {
+    } else if (uniforms.fractal_type == 24u) {
         fractal_dist = sierpinski_gasket_de(pos);
     // 3D Strange Attractors (types 35-37)
     } else if (uniforms.fractal_type == 35u) {

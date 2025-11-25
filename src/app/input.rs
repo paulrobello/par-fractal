@@ -141,34 +141,28 @@ impl App {
                 }
                 KeyCode::F6 => {
                     self.fractal_params
-                        .switch_fractal(FractalType::TgladFormula3D);
+                        .switch_fractal(FractalType::OctahedralIFS3D);
                     self.reset_view();
                     return true;
                 }
                 KeyCode::F7 => {
                     self.fractal_params
-                        .switch_fractal(FractalType::OctahedralIFS3D);
+                        .switch_fractal(FractalType::IcosahedralIFS3D);
                     self.reset_view();
                     return true;
                 }
                 KeyCode::F8 => {
                     self.fractal_params
-                        .switch_fractal(FractalType::IcosahedralIFS3D);
-                    self.reset_view();
-                    return true;
-                }
-                KeyCode::F9 => {
-                    self.fractal_params
                         .switch_fractal(FractalType::ApollonianGasket3D);
                     self.reset_view();
                     return true;
                 }
-                KeyCode::F10 => {
+                KeyCode::F9 => {
                     self.fractal_params.switch_fractal(FractalType::Kleinian3D);
                     self.reset_view();
                     return true;
                 }
-                KeyCode::F11 => {
+                KeyCode::F10 => {
                     self.fractal_params
                         .switch_fractal(FractalType::HybridMandelbulbJulia3D);
                     self.reset_view();
