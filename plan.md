@@ -165,3 +165,47 @@ trunk serve
 3. Add custom domain `par-fractal.pardev.net` in GitHub Pages settings
 4. Ensure DNS CNAME record exists: `par-fractal.pardev.net` → `paulrobello.github.io`
 5. Run `make web-deploy` or push to trigger deployment
+
+---
+
+## Strange Attractor Compute Shader Accumulation (2025-11-25)
+
+### Status: PARTIALLY COMPLETE - Two Issues Remain
+
+A compute shader-based accumulation system for 2D strange attractors was implemented to enable millions of iterations at 60 FPS. The core functionality works but has two outstanding issues.
+
+### What Works
+- Compute shader iterates attractor orbits and accumulates hit counts to R32Uint texture
+- Auto-enables accumulation when selecting a 2D strange attractor
+- Clear accumulation button works (with proper 256-byte row alignment)
+- Iterations per frame slider works
+- Total iterations counter displays correctly
+- Display shader renders accumulated data with log scaling visualization
+
+### Outstanding Issues
+
+**Issue 1: Log Scale Slider Has No Visible Effect**
+- Uniform buffer is created and written each frame
+- Shader reads `accum_uniforms.log_scale` but changes aren't visible
+- May be formula issue or uniform binding problem
+- See `handoff.md` for debug approach
+
+**Issue 2: Accumulator Uses Fixed Palette**
+- Display shader has hardcoded "fire" palette (black→purple→magenta→orange→yellow→white)
+- Does not use user-selected palette from main uniforms
+- Need to pass palette colors to accumulation display shader
+- See `handoff.md` for implementation options
+
+### Key Files
+- `src/renderer/compute.rs` - Compute infrastructure
+- `src/shaders/attractor_compute.wgsl` - GPU orbit iteration
+- `src/shaders/postprocess.wgsl:297-368` - Display shader with hardcoded palette
+- `src/app/render.rs:23-124` - Render loop integration
+- `src/renderer/initialization.rs:628-715` - Pipeline setup
+
+### Recent Commits
+- `852dedf` - Connect log scale slider (attempted fix)
+- `b3f73c7` - Auto-enable accumulation, improve palette
+- `4bf6d20` - Fix bytes_per_row alignment
+- `74ea53d` - Simplify bind groups
+- `5b94b7c` - Use R32Uint for GPU compatibility
