@@ -431,20 +431,21 @@ impl App {
                     TouchPhase::Started => {
                         // Clear stale touches if we have too many (Ended events might have been lost)
                         if self.active_touches.len() >= 2 {
-                            log::debug!("Touch: Clearing {} stale touches", self.active_touches.len());
+                            log::info!("🔧 Touch: Clearing {} stale touches", self.active_touches.len());
                             self.active_touches.clear();
                             self.initial_pinch_distance = None;
                         }
 
                         self.active_touches.insert(touch.id, current_pos);
-                        log::debug!("Touch Started: id={}, active={}, mouse_pressed={}", touch.id, self.active_touches.len(), self.mouse_pressed);
+                        log::info!("🔧 Touch Started: id={}, active={}, mouse_pressed={}, last_mouse_pos={:?}",
+                            touch.id, self.active_touches.len(), self.mouse_pressed, self.last_mouse_pos.is_some());
 
                         // If this is the first touch, enable panning
                         if self.active_touches.len() == 1 {
                             self.mouse_pressed = true;
                             self.cursor_pos = current_pos;
                             self.last_mouse_pos = Some(current_pos);
-                            log::debug!("Touch: Enabled panning for first touch");
+                            log::info!("🔧 Touch: Enabled panning for first touch at ({:.1}, {:.1})", current_pos.0, current_pos.1);
                         }
                         // If we now have 2 touches, start pinch gesture
                         else if self.active_touches.len() == 2 {
@@ -510,7 +511,7 @@ impl App {
 
                             // Ensure panning is enabled for single touch
                             if !self.mouse_pressed {
-                                log::debug!("Touch Move: Re-enabling mouse_pressed");
+                                log::info!("🔧 Touch Move: Re-enabling mouse_pressed (was off!)");
                                 self.mouse_pressed = true;
                                 self.last_mouse_pos = Some(current_pos);
                             }
@@ -521,7 +522,8 @@ impl App {
                                 let delta_y = (current_pos.1 - last_pos.1) as f64
                                     / self.renderer.size.height as f64;
 
-                                log::debug!("Touch Pan: delta=({:.3}, {:.3}), mouse_pressed={}", delta_x, delta_y, self.mouse_pressed);
+                                log::info!("🔧 Touch Pan: delta=({:.3}, {:.3}), mouse_pressed={}, zoom={:.2}",
+                                    delta_x, delta_y, self.mouse_pressed, self.fractal_params.zoom_2d);
 
                                 let aspect = self.renderer.size.width as f64
                                     / self.renderer.size.height as f64;
@@ -530,7 +532,7 @@ impl App {
                                 self.fractal_params.center_2d[1] +=
                                     delta_y * 2.0 / self.fractal_params.zoom_2d as f64;
                             } else {
-                                log::debug!("Touch Pan: last_mouse_pos is None!");
+                                log::info!("🔧 Touch Pan: last_mouse_pos is None! mouse_pressed={}", self.mouse_pressed);
                             }
                             self.last_mouse_pos = Some(current_pos);
                             true
