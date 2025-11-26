@@ -227,7 +227,7 @@ pub struct UI {
 impl UI {
     pub fn new() -> Self {
         Self {
-            show_ui: true,
+            show_ui: cfg!(not(target_arch = "wasm32")), // Hidden by default on web for mobile testing
             show_fps: false,
             show_camera_info: false,
             show_performance_overlay: false,
