@@ -426,6 +426,8 @@ impl App {
             WindowEvent::Touch(touch) => {
                 // Handle touch events for mobile 2D panning and pinch-to-zoom
                 let current_pos = (touch.location.x as f32, touch.location.y as f32);
+                log::info!("🔧 WindowEvent::Touch phase={:?}, id={}, pos=({:.1}, {:.1})",
+                    touch.phase, touch.id, current_pos.0, current_pos.1);
 
                 match touch.phase {
                     TouchPhase::Started => {
@@ -462,9 +464,11 @@ impl App {
                     }
                     TouchPhase::Moved => {
                         self.active_touches.insert(touch.id, current_pos);
+                        log::info!("🔧 TouchPhase::Moved - active_touches={}, checking mode...", self.active_touches.len());
 
                         // Handle pinch-to-zoom (2 fingers)
                         if self.active_touches.len() == 2 {
+                            log::info!("🔧 Entering 2-finger pinch mode");
                             let touches: Vec<&(f32, f32)> = self.active_touches.values().collect();
                             let dx = touches[0].0 - touches[1].0;
                             let dy = touches[0].1 - touches[1].1;
@@ -507,6 +511,7 @@ impl App {
                         }
                         // Handle single-finger pan (simplified - like 3D camera)
                         else if self.active_touches.len() == 1 {
+                            log::info!("🔧 Entering 1-finger pan mode");
                             self.cursor_pos = current_pos;
 
                             // Ensure panning is enabled for single touch
@@ -537,6 +542,7 @@ impl App {
                             self.last_mouse_pos = Some(current_pos);
                             true
                         } else {
+                            log::info!("🔧 Touch Moved: active_touches={} (not 1 or 2, ignoring)", self.active_touches.len());
                             false
                         }
                     }
