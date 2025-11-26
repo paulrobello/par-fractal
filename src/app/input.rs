@@ -427,39 +427,21 @@ impl App {
                 // Handle touch events for mobile 2D panning and pinch-to-zoom
                 let current_pos = (touch.location.x as f32, touch.location.y as f32);
 
-                log::info!(
-                    "2D Touch: phase={:?}, id={}, pos=({:.1}, {:.1}), active_touches={}",
-                    touch.phase,
-                    touch.id,
-                    current_pos.0,
-                    current_pos.1,
-                    self.active_touches.len()
-                );
-
                 match touch.phase {
                     TouchPhase::Started => {
                         // Clear stale touches if we have too many (Ended events might have been lost)
                         if self.active_touches.len() >= 2 {
-                            log::info!(
-                                "  -> WARNING: Clearing {} stale touches",
-                                self.active_touches.len()
-                            );
                             self.active_touches.clear();
                             self.initial_pinch_distance = None;
                         }
 
                         self.active_touches.insert(touch.id, current_pos);
-                        log::info!(
-                            "  -> Started: active_touches now = {}",
-                            self.active_touches.len()
-                        );
 
                         // If this is the first touch, enable panning
                         if self.active_touches.len() == 1 {
                             self.mouse_pressed = true;
                             self.cursor_pos = current_pos;
                             self.last_mouse_pos = Some(current_pos);
-                            log::info!("  -> Enabled panning");
                         }
                         // If we now have 2 touches, start pinch gesture
                         else if self.active_touches.len() == 2 {
@@ -476,11 +458,9 @@ impl App {
                     }
                     TouchPhase::Moved => {
                         self.active_touches.insert(touch.id, current_pos);
-                        log::info!("  -> Moved: active_touches = {}", self.active_touches.len());
 
                         // Handle pinch-to-zoom (2 fingers)
                         if self.active_touches.len() == 2 {
-                            log::info!("  -> Processing pinch zoom");
                             let touches: Vec<&(f32, f32)> = self.active_touches.values().collect();
                             let dx = touches[0].0 - touches[1].0;
                             let dy = touches[0].1 - touches[1].1;
@@ -489,8 +469,8 @@ impl App {
                             if let Some(initial_distance) = self.initial_pinch_distance {
                                 // Calculate zoom factor based on distance change
                                 let zoom_delta = current_distance / initial_distance;
-                                // Apply zoom with smoothing
-                                let zoom_factor = 1.0 + (zoom_delta - 1.0) * 0.05;
+                                // Apply zoom with smoothing (50% sensitivity for responsive zoom)
+                                let zoom_factor = 1.0 + (zoom_delta - 1.0) * 0.5;
                                 self.fractal_params.zoom_2d *= zoom_factor;
 
                                 // Update initial distance for next frame
@@ -505,26 +485,15 @@ impl App {
                         }
                         // Handle single-finger pan (simplified - like 3D camera)
                         else if self.active_touches.len() == 1 {
-                            log::info!("  -> Processing single-finger pan");
                             self.cursor_pos = current_pos;
 
                             // Ensure panning is enabled for single touch
                             if !self.mouse_pressed {
                                 self.mouse_pressed = true;
                                 self.last_mouse_pos = Some(current_pos);
-                                log::info!("  -> Enabled mouse_pressed (was off)");
                             }
 
                             if let Some(last_pos) = self.last_mouse_pos {
-                                log::info!(
-                                    "  -> Pan delta: ({:.1}, {:.1})",
-                                    current_pos.0 - last_pos.0,
-                                    current_pos.1 - last_pos.1
-                                );
-
-                                let old_center = self.fractal_params.center_2d;
-                                let old_zoom = self.fractal_params.zoom_2d;
-
                                 let delta_x = (current_pos.0 - last_pos.0) as f64
                                     / self.renderer.size.width as f64;
                                 let delta_y = (current_pos.1 - last_pos.1) as f64
@@ -536,15 +505,6 @@ impl App {
                                     delta_x * 2.0 / self.fractal_params.zoom_2d as f64 * aspect;
                                 self.fractal_params.center_2d[1] +=
                                     delta_y * 2.0 / self.fractal_params.zoom_2d as f64;
-
-                                log::info!(
-                                    "  -> Center: [{:.6}, {:.6}] -> [{:.6}, {:.6}]",
-                                    old_center[0],
-                                    old_center[1],
-                                    self.fractal_params.center_2d[0],
-                                    self.fractal_params.center_2d[1]
-                                );
-                                log::info!("  -> Zoom: {:.2} (unchanged)", old_zoom);
                             }
                             self.last_mouse_pos = Some(current_pos);
                             true

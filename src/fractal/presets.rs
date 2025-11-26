@@ -822,36 +822,155 @@ impl PresetGallery {
         }
     }
 
-    // Web stubs
+    // Web implementations using localStorage
     #[cfg(target_arch = "wasm32")]
-    pub fn save_preset(
-        _preset: &Preset,
-        _filename: &str,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        Err("Preset saving not yet supported on web".into())
+    pub fn save_preset(preset: &Preset, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
+        use web_sys::window;
+
+        let window = window().ok_or("No window object")?;
+        let storage = window
+            .local_storage()
+            .map_err(|_| "Failed to access localStorage")?
+            .ok_or("localStorage not available")?;
+
+        let key = format!("par-fractal-preset-{}", filename);
+        let json = serde_json::to_string(preset)?;
+        storage
+            .set_item(&key, &json)
+            .map_err(|_| "Failed to save preset to localStorage")?;
+
+        log::info!("Preset '{}' saved to localStorage", preset.name);
+        Ok(())
     }
 
     #[cfg(target_arch = "wasm32")]
-    pub fn load_preset(_filename: &str) -> Result<Preset, Box<dyn std::error::Error>> {
-        Err("User preset loading not yet supported on web".into())
+    pub fn load_preset(filename: &str) -> Result<Preset, Box<dyn std::error::Error>> {
+        use web_sys::window;
+
+        let window = window().ok_or("No window object")?;
+        let storage = window
+            .local_storage()
+            .map_err(|_| "Failed to access localStorage")?
+            .ok_or("localStorage not available")?;
+
+        let key = format!("par-fractal-preset-{}", filename);
+        let json = storage
+            .get_item(&key)
+            .map_err(|_| "Failed to read from localStorage")?
+            .ok_or_else(|| format!("Preset '{}' not found", filename))?;
+
+        let preset: Preset = serde_json::from_str(&json)?;
+        log::info!("Preset '{}' loaded from localStorage", preset.name);
+        Ok(preset)
     }
 
     #[cfg(target_arch = "wasm32")]
     pub fn list_user_presets() -> Result<Vec<String>, Box<dyn std::error::Error>> {
-        Ok(Vec::new())
+        use web_sys::window;
+
+        let window = window().ok_or("No window object")?;
+        let storage = window
+            .local_storage()
+            .map_err(|_| "Failed to access localStorage")?
+            .ok_or("localStorage not available")?;
+
+        let mut presets = Vec::new();
+        let prefix = "par-fractal-preset-";
+        let length = storage
+            .length()
+            .map_err(|_| "Failed to get storage length")?;
+
+        for i in 0..length {
+            if let Ok(Some(key)) = storage.key(i) {
+                if key.starts_with(prefix) {
+                    let name = key.trim_start_matches(prefix).to_string();
+                    presets.push(name);
+                }
+            }
+        }
+
+        Ok(presets)
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn delete_preset(filename: &str) -> Result<(), Box<dyn std::error::Error>> {
+        use web_sys::window;
+
+        let window = window().ok_or("No window object")?;
+        let storage = window
+            .local_storage()
+            .map_err(|_| "Failed to access localStorage")?
+            .ok_or("localStorage not available")?;
+
+        let key = format!("par-fractal-preset-{}", filename);
+        storage
+            .remove_item(&key)
+            .map_err(|_| "Failed to delete preset from localStorage")?;
+
+        log::info!("Preset '{}' deleted from localStorage", filename);
+        Ok(())
     }
 
     #[cfg(target_arch = "wasm32")]
     pub fn export_to_json(
-        _settings: &Settings,
-        _camera_position: [f32; 3],
-        _camera_target: [f32; 3],
+        settings: &Settings,
+        camera_position: [f32; 3],
+        camera_target: [f32; 3],
     ) -> Result<(), Box<dyn std::error::Error>> {
-        Err("Export not yet supported on web".into())
+        use wasm_bindgen::JsCast;
+        use web_sys::{window, Blob, BlobPropertyBag, HtmlAnchorElement, Url};
+
+        // Create a preset with current settings
+        let preset = Preset {
+            name: "Exported Settings".to_string(),
+            description: "Exported fractal configuration".to_string(),
+            category: PresetCategory::All,
+            settings: Settings {
+                camera_position,
+                camera_target,
+                ..settings.clone()
+            },
+        };
+
+        let json = serde_json::to_string_pretty(&preset)?;
+
+        // Create blob and download
+        let window = window().ok_or("No window object")?;
+        let document = window.document().ok_or("No document")?;
+
+        let array = js_sys::Array::new();
+        array.push(&wasm_bindgen::JsValue::from_str(&json));
+
+        let mut blob_props = BlobPropertyBag::new();
+        blob_props.set_type("application/json");
+        let blob = Blob::new_with_str_sequence_and_options(&array, &blob_props)
+            .map_err(|_| "Failed to create blob")?;
+
+        let url =
+            Url::create_object_url_with_blob(&blob).map_err(|_| "Failed to create object URL")?;
+
+        // Create temporary anchor and trigger download
+        let anchor = document
+            .create_element("a")
+            .map_err(|_| "Failed to create anchor")?
+            .dyn_into::<HtmlAnchorElement>()
+            .map_err(|_| "Failed to cast to HtmlAnchorElement")?;
+
+        anchor.set_href(&url);
+        anchor.set_download("fractal_settings.json");
+        anchor.click();
+
+        // Clean up
+        Url::revoke_object_url(&url).map_err(|_| "Failed to revoke object URL")?;
+
+        log::info!("Settings exported to JSON");
+        Ok(())
     }
 
     #[cfg(target_arch = "wasm32")]
     pub fn import_from_json() -> Result<Preset, Box<dyn std::error::Error>> {
-        Err("Import not yet supported on web".into())
+        // This is a synchronous function but file reading is async on web
+        // We'll need to handle this through the UI with a callback
+        Err("Import should be handled through UI file input".into())
     }
 }
