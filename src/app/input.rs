@@ -415,9 +415,10 @@ impl App {
             }
             WindowEvent::Touch(touch) => {
                 // Handle touch events for mobile 2D panning and pinch-to-zoom
+                let current_pos = (touch.location.x as f32, touch.location.y as f32);
+
                 match touch.phase {
                     TouchPhase::Started => {
-                        let current_pos = (touch.location.x as f32, touch.location.y as f32);
                         self.active_touches.insert(touch.id, current_pos);
 
                         // If this is the first touch, enable panning
@@ -440,8 +441,6 @@ impl App {
                         true
                     }
                     TouchPhase::Moved => {
-                        // Update touch position
-                        let current_pos = (touch.location.x as f32, touch.location.y as f32);
                         self.active_touches.insert(touch.id, current_pos);
 
                         // Handle pinch-to-zoom (2 fingers)
@@ -468,12 +467,15 @@ impl App {
                             }
                             true
                         }
-                        // Handle single-finger pan
-                        else if self.active_touches.len() == 1
-                            && self.mouse_pressed
-                            && !self.shift_pressed
-                        {
+                        // Handle single-finger pan (simplified - like 3D camera)
+                        else if self.active_touches.len() == 1 {
                             self.cursor_pos = current_pos;
+
+                            // Ensure panning is enabled for single touch
+                            if !self.mouse_pressed {
+                                self.mouse_pressed = true;
+                                self.last_mouse_pos = Some(current_pos);
+                            }
 
                             if let Some(last_pos) = self.last_mouse_pos {
                                 let delta_x = (current_pos.0 - last_pos.0) as f64
@@ -495,7 +497,6 @@ impl App {
                         }
                     }
                     TouchPhase::Ended | TouchPhase::Cancelled => {
-                        // Remove this touch from active touches
                         self.active_touches.remove(&touch.id);
 
                         // If we're down to 1 or 0 touches, reset pinch state
