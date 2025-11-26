@@ -12,21 +12,24 @@ impl App {
             return true;
         }
 
-        // Check if egui wants pointer input RIGHT NOW (not from previous frame)
-        // This prevents camera movement during window resizing from any edge
-        let ctx = self.egui_state.egui_ctx();
+        // For touch events, we rely solely on egui's consumed flag (checked above)
+        // Don't check egui_wants_pointer for touches because:
+        // 1. egui-winit may not update pointer position from Touch events on web
+        // 2. is_pointer_over_area() would return stale/incorrect data
+        // 3. If egui consumed the touch, we already returned early
+        // 4. If not consumed, the touch is for fractal interaction
+        let is_touch = matches!(event, WindowEvent::Touch(_));
 
-        // For touch events, only block if pointer is actually over UI area
-        // On mobile, egui.wants_pointer_input() can return true even when not touching UI
-        let egui_wants_pointer = if matches!(event, WindowEvent::Touch(_)) {
-            // For touch, only check if actually touching a UI element
-            ctx.is_pointer_over_area() || ctx.is_using_pointer() || ctx.dragged_id().is_some()
-        } else {
-            // For mouse, use full check including wants_pointer_input
+        // For mouse events, check if egui wants pointer input
+        // This prevents camera movement during UI interactions like window resizing
+        let egui_blocks_mouse = if !is_touch {
+            let ctx = self.egui_state.egui_ctx();
             ctx.wants_pointer_input()
                 || ctx.is_pointer_over_area()
                 || ctx.is_using_pointer()
                 || ctx.dragged_id().is_some()
+        } else {
+            false // Touch events not blocked by egui (already checked consumed flag)
         };
 
         // Track shift key for continuous zoom
@@ -376,10 +379,11 @@ impl App {
             }
         }
 
-        // Handle mode-specific input only if egui doesn't want pointer input
-        // This prevents camera/view manipulation when interacting with UI (e.g., resizing window)
+        // Handle mode-specific input only if egui doesn't block it
+        // For touch: always handle (egui consumed flag already checked)
+        // For mouse: only if egui doesn't want pointer input
         // Also skip camera input during auto-orbit to prevent state accumulation
-        if !egui_wants_pointer {
+        if !egui_blocks_mouse {
             match self.fractal_params.render_mode {
                 RenderMode::TwoD => self.handle_2d_input(event),
                 RenderMode::ThreeD => {
