@@ -464,20 +464,16 @@ impl App {
                                 let dy = current_pos.1 - first_touch_pos.1;
                                 let distance = (dx * dx + dy * dy).sqrt();
 
-                                // Dual heuristic phantom touch detection:
-                                // 1. Reject if nearly instant (<20ms) - physically impossible for human
-                                // 2. Reject if very fast (<50ms) AND very far (>500px) - catches phantoms (640px)
-                                // Allows: simultaneous natural pinches (<500px), delayed pinches (any distance)
-                                let is_instant = elapsed_ms < 20;
-                                let is_far_fast = elapsed_ms < 50 && distance > 500.0;
-
-                                if is_instant || is_far_fast {
+                                // Distance-only phantom touch detection:
+                                // Reject if touches are absurdly far apart (>500px)
+                                // Phantom touches from UI interactions are ~640px apart
+                                // Natural pinch gestures (even wide ones) are <500px
+                                // This allows simultaneous pinches at any timing
+                                if distance > 500.0 {
                                     log::info!(
-                                        "🔧 Touch: PHANTOM DETECTED! Rejecting second touch ({}ms, {:.0}px apart) [instant={}, far_fast={}]",
+                                        "🔧 Touch: PHANTOM DETECTED! Rejecting second touch ({}ms, {:.0}px apart)",
                                         elapsed_ms,
-                                        distance,
-                                        is_instant,
-                                        is_far_fast
+                                        distance
                                     );
                                     self.active_touches.clear();
                                     self.initial_pinch_distance = None;
@@ -487,11 +483,9 @@ impl App {
                                     return true; // Don't process this phantom touch further
                                 } else {
                                     log::info!(
-                                        "🔧 Touch: Valid second touch for pinch ({}ms, {:.0}px apart) [instant={}, far_fast={}]",
+                                        "🔧 Touch: Valid second touch for pinch ({}ms, {:.0}px apart)",
                                         elapsed_ms,
-                                        distance,
-                                        is_instant,
-                                        is_far_fast
+                                        distance
                                     );
                                 }
                             }
