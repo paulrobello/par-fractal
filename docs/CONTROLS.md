@@ -56,7 +56,7 @@ Par Fractal provides intuitive controls for exploring both 2D and 3D fractals. C
 | **9** | Lyapunov | Lyapunov fractal |
 | **0** | Nova | Nova fractal |
 
-**Note:** Magnet2D, Collatz2D, and Sierpinski Triangle2D are accessible via UI and command palette only.
+**Note:** Additional 2D fractals accessible via UI and command palette only: Magnet2D, Collatz2D, Sierpinski Triangle2D, and Strange Attractors (Hopalong, Martin, Gingerbreadman, Chip, Quadruptwo, Threeply).
 
 ### Fractal Type Switching - 3D Fractals
 
@@ -67,14 +67,13 @@ Par Fractal provides intuitive controls for exploring both 2D and 3D fractals. C
 | **F3** | Sierpinski Pyramid | 3D Sierpinski pyramid |
 | **F4** | Julia Set 3D | 3D Julia set |
 | **F5** | Mandelbox | Box-folding fractal |
-| **F6** | Tglad Formula | Tglad's formula fractal |
-| **F7** | Octahedral IFS | Octahedral iterated function system |
-| **F8** | Icosahedral IFS | Icosahedral iterated function system |
-| **F9** | Apollonian Gasket | Apollonian circle packing |
-| **F10** | Kleinian | Kleinian limit set |
-| **F11** | Hybrid Mandelbulb-Julia | Hybrid 3D fractal |
+| **F6** | Octahedral IFS | Octahedral iterated function system |
+| **F7** | Icosahedral IFS | Icosahedral iterated function system |
+| **F8** | Apollonian Gasket | Apollonian circle packing |
+| **F9** | Kleinian | Kleinian limit set |
+| **F10** | Hybrid Mandelbulb-Julia | Hybrid 3D fractal |
 
-**Note:** QuaternionCubic3D and Sierpinski Gasket3D are accessible via UI and command palette only.
+**Note:** Additional 3D fractals accessible via UI and command palette only: QuaternionCubic3D, Sierpinski Gasket3D, and Strange Attractors (Pickover, Lorenz, Rossler).
 
 ### View Controls
 
@@ -397,10 +396,9 @@ Esc            Close Command Palette/Dialogs
 3D Fractals (Function Keys):
 F1             Mandelbulb      F2             Menger Sponge
 F3             Sierpinski 3D   F4             Julia Set 3D
-F5             Mandelbox       F6             Tglad Formula
-F7             Octahedral IFS  F8             Icosahedral IFS
-F9             Apollonian      F10            Kleinian
-F11            Hybrid Mandelbulb-Julia
+F5             Mandelbox       F6             Octahedral IFS
+F7             Icosahedral IFS F8             Apollonian
+F9             Kleinian        F10            Hybrid Mandelbulb-Julia
 ```
 
 ### 2D Navigation
@@ -449,18 +447,18 @@ Shift+D        LOD Debug Visualization
 ```mermaid
 graph LR
     Drag[Click + Drag] --> Pan[Pan View]
-    ScrollUp[Scroll Up] --> ZoomIn[Zoom In]
-    ScrollDown[Scroll Down] --> ZoomOut[Zoom Out]
-    DblClick[Double Click] --> CenterZoom[Center + Zoom]
+    ScrollUp[Scroll Up] --> ZoomIn[Zoom In at Cursor]
+    ScrollDown[Scroll Down] --> ZoomOut[Zoom Out at Cursor]
+    ShiftDrag[Shift + Drag] --> ContZoom[Continuous Zoom]
 
     style Drag fill:#1b5e20,stroke:#4caf50,stroke-width:2px,color:#ffffff
     style ScrollUp fill:#0d47a1,stroke:#2196f3,stroke-width:2px,color:#ffffff
     style ScrollDown fill:#0d47a1,stroke:#2196f3,stroke-width:2px,color:#ffffff
-    style DblClick fill:#4a148c,stroke:#9c27b0,stroke-width:2px,color:#ffffff
+    style ShiftDrag fill:#4a148c,stroke:#9c27b0,stroke-width:2px,color:#ffffff
     style Pan fill:#e65100,stroke:#ff9800,stroke-width:2px,color:#ffffff
     style ZoomIn fill:#e65100,stroke:#ff9800,stroke-width:2px,color:#ffffff
     style ZoomOut fill:#e65100,stroke:#ff9800,stroke-width:2px,color:#ffffff
-    style CenterZoom fill:#e65100,stroke:#ff9800,stroke-width:2px,color:#ffffff
+    style ContZoom fill:#e65100,stroke:#ff9800,stroke-width:2px,color:#ffffff
 ```
 
 ### 3D Mode Mouse
@@ -468,16 +466,12 @@ graph LR
 ```mermaid
 graph LR
     Drag[Click + Drag] --> Look[Rotate Camera]
-    ScrollUp[Scroll Up] --> SpeedUp[Faster Movement]
-    ScrollDown[Scroll Down] --> SpeedDown[Slower Movement]
 
     style Drag fill:#1b5e20,stroke:#4caf50,stroke-width:2px,color:#ffffff
-    style ScrollUp fill:#0d47a1,stroke:#2196f3,stroke-width:2px,color:#ffffff
-    style ScrollDown fill:#0d47a1,stroke:#2196f3,stroke-width:2px,color:#ffffff
     style Look fill:#e65100,stroke:#ff9800,stroke-width:2px,color:#ffffff
-    style SpeedUp fill:#e65100,stroke:#ff9800,stroke-width:2px,color:#ffffff
-    style SpeedDown fill:#e65100,stroke:#ff9800,stroke-width:2px,color:#ffffff
 ```
+
+**Note:** In 3D mode, the mouse wheel does not control camera speed. Camera speed is adjusted via the UI slider in the Camera section.
 
 ## Customization
 

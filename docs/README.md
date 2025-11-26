@@ -100,6 +100,7 @@ cargo run --release
 - Phoenix - Unique iteration formula
 - Celtic - Knot-like patterns
 - Newton - Root-finding visualization
+- Strange Attractors - Hopalong, Martin, Gingerbreadman, and more
 - And more...
 
 **Topics:**
@@ -123,6 +124,7 @@ cargo run --release
 - Julia Set 3D - Quaternion mathematics
 - Mandelbox - Folding operations
 - Apollonian Gasket - Sphere packing
+- Strange Attractors - Lorenz, Rossler, Pickover systems
 - And more...
 
 **Topics:**
@@ -218,11 +220,11 @@ User Input → UI → FractalParams → Uniforms → GPU → Rendered Frame
 
 ### Color Palettes
 
-**Built-in Palettes (21 total):**
+**Built-in Palettes (39 total):**
 
-Par Fractal includes 21 professionally-designed color palettes optimized for fractal visualization:
+Par Fractal includes 39 professionally-designed color palettes optimized for fractal visualization:
 
-**Classic Palettes:**
+**Classic Palettes (6):**
 - **Fire** - Black → Purple → Red → Orange → Yellow (High contrast, classic look)
 - **Ocean** - Deep Blue → Light Blue → Cyan (Cool, ethereal atmosphere)
 - **Rainbow** - Full spectrum (Maximum color variation)
@@ -230,11 +232,18 @@ Par Fractal includes 21 professionally-designed color palettes optimized for fra
 - **Sunset** - Purple → Pink → Orange → Yellow (Warm, vibrant scenes)
 - **Grayscale** - Black → White (Classic, minimalist)
 
-**Scientific Visualization:**
+**Scientific Visualization (4):**
 - Viridis, Plasma, Inferno, Magma
 
-**Additional Themes:**
+**Artistic Themes (9):**
 - Copper, Cool, Hot, Neon, Purple Dream, Earth, Ice, Lava, Galaxy, Mint, Cherry
+
+**Xfractint Palettes (20):**
+- Alternating Grey, Blues, Chromatic, Default, Default White
+- Fire Storm, Froth 3, Froth 3-16, Froth 6, Froth 6-16
+- Gamma 1, Gamma 2, 3D Glasses 1, 3D Glasses 2, Good EGA
+- Green, Grey, Grid, Headache, Headache 2
+- Landscape, Lyapunov, XF Neon, PaintJet, Royal, Topo, Volcano
 
 **Custom Palettes:**
 - Create in UI panel
@@ -243,20 +252,31 @@ Par Fractal includes 21 professionally-designed color palettes optimized for fra
 
 ### Fractal Type Reference
 
-**2D Fractals (13 types):**
+**2D Fractals (19 types):**
+
+*Escape-Time Fractals (13):*
 - Mandelbrot2D, Julia2D, Sierpinski2D, SierpinskiTriangle2D
 - BurningShip2D, Tricorn2D, Phoenix2D
 - Celtic2D, Newton2D, Lyapunov2D
 - Nova2D, Magnet2D, Collatz2D
 
-**3D Fractals (13 types):**
+*Strange Attractors (6):*
+- Hopalong2D, Martin2D, Gingerbreadman2D
+- Chip2D, Quadruptwo2D, Threeply2D
+
+**3D Fractals (15 types):**
+
+*Ray-Marched Fractals (12):*
 - Mandelbulb3D, MengerSponge3D, SierpinskiPyramid3D, SierpinskiGasket3D
-- JuliaSet3D, Mandelbox3D, TgladFormula3D
+- JuliaSet3D, Mandelbox3D
 - OctahedralIFS3D, IcosahedralIFS3D
 - ApollonianGasket3D, Kleinian3D
 - HybridMandelbulbJulia3D, QuaternionCubic3D
 
-**Total:** 26 fractal types
+*Strange Attractors (3):*
+- Pickover3D, Lorenz3D, Rossler3D
+
+**Total:** 34 fractal types
 
 ### Command-Line Interface
 
@@ -373,9 +393,9 @@ par-fractal --preset "Ocean Julia" --screenshot-delay 5 --exit-delay 6
 
 ### Version Information
 
-**Documentation Version:** 1.0.0
-**Project Version:** 0.2.0
-**Last Updated:** 2025-11-24
+**Documentation Version:** 1.1.0
+**Project Version:** 0.3.0
+**Last Updated:** 2025-11-25
 
 ### Contributing to Documentation
 

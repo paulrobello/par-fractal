@@ -12,13 +12,15 @@ Complete guide to all 3D fractals in Par Fractal, including ray marching techniq
 - [Sierpinski Gasket](#sierpinski-gasket)
 - [Julia Set 3D](#julia-set-3d)
 - [Mandelbox](#mandelbox)
-- [Tglad Formula](#tglad-formula)
 - [Octahedral IFS](#octahedral-ifs)
 - [Icosahedral IFS](#icosahedral-ifs)
 - [Apollonian Gasket](#apollonian-gasket)
 - [Kleinian Groups](#kleinian-groups)
 - [Hybrid Mandelbulb-Julia](#hybrid-mandelbulb-julia)
 - [Quaternion Cubic](#quaternion-cubic)
+- [Pickover Attractor](#pickover-attractor)
+- [Lorenz Attractor](#lorenz-attractor)
+- [Rossler Attractor](#rossler-attractor)
 - [Shading Models](#shading-models)
 - [Visual Effects](#visual-effects)
 - [Lighting](#lighting)
@@ -556,40 +558,6 @@ The Mandelbox is a 3D fractal defined by folding and scaling operations in space
 - Enable AO for depth perception
 - Use soft shadows to enhance 3D appearance
 
-## Tglad Formula
-
-### Description
-
-A 3D fractal using iterative folding and scaling operations to create intricate geometric structures.
-
-**Mathematical Approach:**
-- Absolute value folding (octahedral symmetry)
-- Coordinate swapping for additional symmetry
-- Box folding with adjustable parameter
-- Iterative scaling and translation
-
-**Key Features:**
-- Smooth organic surfaces with geometric elements
-- Octahedral base symmetry
-- Unusual geometric patterns from combined folding operations
-- Highly detailed structure at all scales
-
-### How to Explore
-
-**UI Parameters:**
-- **Fractal Scale** (0.1-5.0): Overall size control
-  - Higher values = larger fractal
-  - Default: 2.0
-- **Fractal Fold** (0.5-2.0): Box folding intensity
-  - Higher values = tighter folding, more complex structure
-  - Default: 1.0
-
-**Recommended Settings:**
-- Scale: 1.5-2.5 for best detail
-- Fold: 0.8-1.5 for interesting structures
-- Enable AO to reveal surface complexity
-- Use 200+ ray steps for quality
-
 ## Octahedral IFS
 
 ### Description
@@ -904,6 +872,241 @@ Using quaternion multiplication rules
 - [-0.3, 0.8] - Complex, detailed
 - [-0.1, 0.4] - Open, wispy
 - [0.0, 0.5] - Symmetric patterns
+
+## Pickover Attractor
+
+### Description
+
+The Pickover attractor is a 3D strange attractor discovered by Clifford Pickover. It creates chaotic, flowing patterns through a system of trigonometric equations. Unlike the other fractals which use iterative function systems or escape-time algorithms, strange attractors are rendered by tracing the trajectory of a dynamical system through phase space.
+
+**Mathematical Definition:**
+```
+x_{n+1} = sin(a·y_n) - z_n·cos(b·x_n)
+y_{n+1} = z_n·sin(c·x_n) - cos(d·y_n)
+z_{n+1} = sin(x_n)
+```
+
+Where a, b, c, d are parameters that control the attractor's shape.
+
+**Rendering Technique:**
+- Iterate the dynamical system 500 times to skip transient behavior
+- Sample 1000 points along the trajectory
+- Create small spheres at each point to form a point cloud
+- Use distance estimation to the nearest point
+
+**Key Features:**
+- Chaotic, organic flowing structures
+- Parameter-sensitive: small changes create dramatically different patterns
+- Non-repeating trajectories fill a bounded region
+- Beautiful interweaving curves
+- Point cloud rendering creates ethereal appearance
+
+### How to Explore
+
+**UI Parameters:**
+- **Julia C [a, b]**: First two attractor parameters
+  - Controls overall flow pattern
+  - Try: a=2.24, b=0.43 for classic form
+  - Default: [-0.7, 0.27]
+- **Power (c)**: Third parameter
+  - Controls vertical complexity
+  - Range: 0.5-3.0
+  - Default: 8.0
+- **Fractal Fold (d)**: Fourth parameter
+  - Controls folding intensity
+  - Range: 0.5-2.0
+  - Default: 1.0
+- **Fractal Scale**: Overall size control
+  - Higher values = larger attractor
+  - Default: 1.0
+
+**Recommended Settings:**
+- **Classic Pickover**: a=2.24, b=0.43, c=1.77, d=-0.65
+- **Flowing Ribbons**: a=2.5, b=0.5, c=1.5, d=0.8
+- **Tight Knot**: a=2.0, b=-2.0, c=0.5, d=0.5
+
+**Exploration Tips:**
+- Start with classic parameters and vary one at a time
+- Small parameter changes can create completely different forms
+- Look for symmetries and periodic orbits
+- Enable AO to see depth in overlapping curves
+- Point cloud rendering benefits from higher ray step counts (256+)
+- Try different camera angles to see 3D structure
+- PBR shading with low metallic (0.0-0.3) works well
+
+**Visual Settings:**
+- **Enable AO** with medium strength (0.5-0.8)
+- **Soft Shadows** help separate overlapping trajectories
+- **Higher Ray Steps** (256-512) for smoother point cloud
+- **Lower metallic** (0.0-0.3) for ribbon-like appearance
+
+## Lorenz Attractor
+
+### Description
+
+The Lorenz attractor is one of the most famous chaotic systems, discovered by Edward Lorenz in 1963 while studying atmospheric convection. It demonstrates how deterministic systems can exhibit chaotic behavior - the famous "butterfly effect." The attractor has a distinctive double-spiral or "butterfly" shape.
+
+**Mathematical Definition:**
+```
+dx/dt = σ(y - x)
+dy/dt = x(ρ - z) - y
+dz/dt = xy - βz
+```
+
+**Classic Parameters:**
+- σ (sigma) = 10.0  : Prandtl number
+- ρ (rho) = 28.0    : Rayleigh number
+- β (beta) = 8/3 ≈ 2.667 : Geometric factor
+
+**Physical Meaning:**
+Originally derived from simplified equations for atmospheric convection:
+- x: Rate of convective overturning
+- y: Horizontal temperature variation
+- z: Vertical temperature variation
+
+**Rendering Technique:**
+- Integrate differential equations using Euler method (dt = 0.005)
+- Skip 1000 transient iterations to reach the attractor
+- Sample 2000 points along the trajectory
+- Create small spheres (radius 0.3) at each point
+- Offset center down by 25 units for better viewing
+
+**Key Features:**
+- Iconic "butterfly" or double-wing shape
+- Chaotic yet bounded trajectory
+- Sensitive dependence on initial conditions
+- Never repeats but stays within bounded region
+- Two lobes with characteristic spiral structure
+
+### How to Explore
+
+**UI Parameters:**
+- **Julia C [σ, ρ]**: Sigma and Rho parameters
+  - σ (x-component): Prandtl number, controls damping
+  - ρ (y-component): Rayleigh number, controls instability
+  - Classic: σ=10.0, ρ=28.0
+  - Default: [10.0, 28.0]
+- **Power (β)**: Beta parameter
+  - Geometric scaling factor
+  - Classic: 8/3 ≈ 2.667
+  - Default: 8.0 (close to classic)
+- **Fractal Scale**: Overall size control
+  - Default: 1.0
+
+**Recommended Settings:**
+- **Classic Lorenz**: σ=10.0, ρ=28.0, β=2.667
+- **Pre-Chaotic**: σ=10.0, ρ=13.0, β=2.667 (stable limit cycle)
+- **Modified Chaos**: σ=10.0, ρ=99.96, β=2.667 (different structure)
+
+**Exploration Tips:**
+- Start with classic parameters (σ=10, ρ=28, β=8/3)
+- The double-wing structure is best viewed from an angle
+- Orbit around to see how the wings interweave
+- ρ < 24.74: System becomes stable (no chaos)
+- ρ > 24.74: Chaotic attractor emerges
+- Try varying ρ from 20 to 35 to see transition to chaos
+- Camera starting position benefits from being offset to see both wings
+
+**Visual Settings:**
+- **Enable AO** with high strength (0.8-1.2) to separate loops
+- **Soft Shadows** reveal depth in overlapping spirals
+- **High Ray Steps** (512+) for smooth curves
+- **Low metallic** (0.1-0.3) for smooth, flowing appearance
+- **Camera Speed**: 5.0-8.0 to navigate the large structure
+
+**Understanding the Behavior:**
+- Trajectory spirals around one wing
+- Unpredictably switches to the other wing
+- Never exactly repeats its path
+- Stays confined to the butterfly shape
+- Number of loops before switching varies chaotically
+
+## Rossler Attractor
+
+### Description
+
+The Rössler attractor is another famous chaotic system, discovered by Otto Rössler in 1976. Unlike the Lorenz attractor which arose from physics, Rössler designed these equations specifically to produce the simplest possible chaotic system. It creates a single-lobed spiral that folds back on itself.
+
+**Mathematical Definition:**
+```
+dx/dt = -y - z
+dy/dt = x + a·y
+dz/dt = b + z(x - c)
+```
+
+**Classic Parameters:**
+- a = 0.2   : Controls folding
+- b = 0.2   : Base height
+- c = 5.7   : Critical parameter (chaos threshold)
+
+**Rendering Technique:**
+- Integrate differential equations using Euler method (dt = 0.01)
+- Skip 500 transient iterations to reach the attractor
+- Sample 1500 points along the trajectory
+- Create small spheres (radius 0.15) at each point
+
+**Key Features:**
+- Single-lobed spiral structure
+- Simpler than Lorenz but still chaotic
+- Distinctive folding and stretching pattern
+- Easier to understand topologically
+- Band-like appearance when viewed edge-on
+
+### How to Explore
+
+**UI Parameters:**
+- **Julia C [a, b]**: Parameters a and b
+  - a (x-component): Controls spiral folding (0.1-0.3 typical)
+  - b (y-component): Base height offset (0.1-0.4 typical)
+  - Default: [0.2, 0.2]
+- **Power (c)**: Parameter c
+  - Critical parameter controlling chaos
+  - c < 4: Simple periodic orbit
+  - c > 4: Transition to chaos
+  - Classic: c = 5.7
+  - Default: 5.7
+- **Fractal Scale**: Overall size control
+  - Default: 1.0
+
+**Recommended Settings:**
+- **Classic Rössler**: a=0.2, b=0.2, c=5.7 (chaotic)
+- **Periodic Orbit**: a=0.2, b=0.2, c=3.0 (stable loop)
+- **Onset of Chaos**: a=0.2, b=0.2, c=4.5 (transition point)
+- **Extended Chaos**: a=0.1, b=0.1, c=14.0 (more complex)
+
+**Exploration Tips:**
+- Start with classic parameters (a=0.2, b=0.2, c=5.7)
+- View from above to see spiral structure
+- View edge-on to see the band folding
+- Parameter c is most interesting to vary:
+  - c < 2: Converges to fixed point
+  - c ≈ 3-4: Periodic orbits
+  - c > 4.2: Chaotic behavior emerges
+  - c ≈ 5.7: Classic chaotic attractor
+  - c > 6: Increasingly complex chaos
+- Small changes in 'a' dramatically affect folding
+- Parameter 'b' controls vertical offset
+
+**Visual Settings:**
+- **Enable AO** with medium strength (0.5-0.8)
+- **Soft Shadows** emphasize the folding structure
+- **Higher Ray Steps** (256-512) for smooth bands
+- **Low metallic** (0.1-0.3) for ribbon appearance
+- **Camera**: Position to see spiral from angle, not directly top-down
+
+**Understanding the Behavior:**
+- Trajectory spirals outward in the xy-plane
+- Folds back along z-axis creating band structure
+- Returns near starting point but shifted
+- Creates a single twisted loop
+- Folding creates the chaotic mixing
+
+**Comparison with Lorenz:**
+- Simpler structure (one lobe vs two)
+- Easier to understand mathematically
+- Still exhibits full chaotic behavior
+- More "ribbon-like" appearance
+- Designed rather than discovered
 
 ## Shading Models
 

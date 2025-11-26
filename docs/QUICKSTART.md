@@ -162,18 +162,19 @@ graph TD
 | **4** | Burning Ship | **9** | Lyapunov |
 | **5** | Tricorn | **0** | Nova |
 
-**3D Fractals (Function keys F1-F11):**
+**3D Fractals (Function keys F1-F10):**
 
 | Key | Fractal | Key | Fractal |
 |-----|---------|-----|---------|
-| **F1** | Mandelbulb | **F7** | Octahedral IFS |
-| **F2** | Menger Sponge | **F8** | Icosahedral IFS |
-| **F3** | Sierpinski Pyramid | **F9** | Apollonian Gasket |
-| **F4** | Julia Set 3D | **F10** | Kleinian |
-| **F5** | Mandelbox | **F11** | Hybrid Mandelbulb-Julia |
-| **F6** | Tglad Formula | | |
+| **F1** | Mandelbulb | **F6** | Octahedral IFS |
+| **F2** | Menger Sponge | **F7** | Icosahedral IFS |
+| **F3** | Sierpinski Pyramid | **F8** | Apollonian Gasket |
+| **F4** | Julia Set 3D | **F9** | Kleinian |
+| **F5** | Mandelbox | **F10** | Hybrid Mandelbulb-Julia |
 
-**Note:** Magnet 2D, Collatz 2D, Quaternion Cubic 3D, and Sierpinski Gasket 3D are accessible via UI or command palette only.
+**Note:** The following fractals are accessible via UI or command palette only:
+- **2D:** Magnet, Collatz, Sierpinski Triangle, Hopalong, Martin, Gingerbreadman, Chip, Quadruptwo, Threeply
+- **3D:** Quaternion Cubic, Sierpinski Gasket, Pickover, Lorenz, Rossler
 
 ### Color Palette Cycling
 
@@ -273,9 +274,11 @@ Mouse Wheel → Adjust camera speed
    - Keyboard: `-` to decrease by 32 (2D) or 10 (3D), `+/=` to increase
 
 2. **Color Palette** - Choose visual style
-   - 21 built-in palettes: Fire, Ocean, Rainbow, Forest, Sunset, Grayscale, and more
-   - Scientific visualization: Viridis, Plasma, Inferno, Magma, Copper, Cool, Hot
-   - Artistic palettes: Neon, Purple Dream, Earth, Ice, Lava, Galaxy, Mint, Cherry
+   - 48 built-in palettes including:
+     - Classic: Fire, Ocean, Rainbow, Forest, Sunset, Grayscale
+     - Scientific: Viridis, Plasma, Inferno, Magma, Copper, Cool, Hot
+     - Artistic: Neon, Purple Dream, Earth, Ice, Lava, Galaxy, Mint, Cherry
+     - Xfractint: 27 classic fractal palettes (Altern, Blues, Chroma, Default, Fire Storm, Froth, Gamma, Glasses, etc.)
    - Custom palette support via YAML or .pal file import
    - Keyboard: `P` to cycle forward through palettes
 
@@ -457,7 +460,7 @@ Save favorite views:
 
 **Try These:**
 1. **Command Palette** (`/` or `Ctrl/Cmd+K`)
-   - Quick access to all 26 fractal types
+   - Quick access to all 34 fractal types (19 2D + 15 3D)
    - Toggle effects (AO, shadows, DoF, fog, bloom, FXAA)
    - Switch color modes and LOD profiles
    - Fuzzy search matching for fast command filtering

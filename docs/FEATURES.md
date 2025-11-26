@@ -12,14 +12,15 @@ Complete feature documentation for Par Fractal's rendering capabilities, effects
 
 ## Fractal Types
 
-### 2D Fractals (14 types)
+### 2D Fractals (19 types)
 
-Par Fractal supports 14 different 2D escape-time fractals:
+Par Fractal supports 19 different 2D fractals organized into two categories:
 
+**Escape-Time Fractals (13 types):**
 - **Mandelbrot2D** - The classic fractal with infinite detail at all zoom levels
 - **Julia2D** - Symmetric variations with customizable complex constant parameters
-- **Sierpinski2D** - Triangle-based recursive pattern
-- **SierpinskiTriangle2D** - Alternative Sierpinski triangle visualization
+- **Sierpinski2D** - Carpet-based recursive pattern
+- **SierpinskiTriangle2D** - Triangle-based recursive pattern
 - **BurningShip2D** - Dramatic ship-like patterns with sharp edges
 - **Tricorn2D** - Conjugate Mandelbrot with unique symmetry
 - **Phoenix2D** - Multi-parameter fractal with flowing patterns
@@ -30,23 +31,36 @@ Par Fractal supports 14 different 2D escape-time fractals:
 - **Magnet2D** - Magnetic field-inspired patterns
 - **Collatz2D** - Collatz conjecture visualization
 
-### 3D Fractals (13 types)
+**Strange Attractors (6 types):**
+- **Hopalong2D** - Barry Martin's hopalong attractor with chaotic point clouds
+- **Martin2D** - Barry Martin's original strange attractor
+- **Gingerbreadman2D** - Chaotic 2D map with cookie-like patterns
+- **Chip2D** - Chip attractor variant
+- **Quadruptwo2D** - Quadruptwo strange attractor
+- **Threeply2D** - Threeply strange attractor
 
-Par Fractal supports 13 different 3D ray-marched fractals:
+### 3D Fractals (15 types)
 
+Par Fractal supports 15 different 3D fractals organized into two categories:
+
+**Ray-Marched Fractals (12 types):**
 - **Mandelbulb3D** - 3D extension of Mandelbrot set with configurable power (typically 8)
 - **MengerSponge3D** - Recursive cube structure with self-similarity
 - **SierpinskiPyramid3D** - 3D tetrahedral recursive pattern
+- **SierpinskiGasket3D** - 3D Sierpinski gasket recursive structure
 - **JuliaSet3D** - 3D Julia set with adjustable parameters
 - **Mandelbox3D** - Box-folding fractal with scale and fold parameters
-- **TgladFormula3D** - Advanced IFS fractal with complex folding
 - **OctahedralIFS3D** - Octahedral symmetry iterated function system
 - **IcosahedralIFS3D** - Icosahedral symmetry iterated function system
 - **ApollonianGasket3D** - Circle-packing fractal in 3D
 - **Kleinian3D** - Kleinian group limit set visualization
 - **HybridMandelbulbJulia3D** - Combination of Mandelbulb and Julia patterns
 - **QuaternionCubic3D** - Quaternion-based cubic iteration
-- **SierpinskiGasket3D** - 3D Sierpinski gasket recursive structure
+
+**Strange Attractors (3 types):**
+- **Pickover3D** - Clifford Pickover's chaotic attractor
+- **Lorenz3D** - Classic Lorenz butterfly attractor with chaotic dynamics
+- **Rossler3D** - Rossler system attractor with continuous dynamics
 
 ## Rendering Capabilities
 
@@ -275,9 +289,9 @@ Par Fractal supports 13 different 3D ray-marched fractals:
 
 ### Color Palette System
 
-**Built-in Palettes (21 total):**
+**Built-in Palettes (48 total):**
 
-*Classic Palettes:*
+*Classic Palettes (6):*
 - **Fire** - Black to purple to red to orange to yellow
 - **Ocean** - Deep blue to cyan gradients
 - **Rainbow** - Full spectrum color cycle
@@ -285,13 +299,13 @@ Par Fractal supports 13 different 3D ray-marched fractals:
 - **Sunset** - Purple to pink to orange to yellow
 - **Grayscale** - Black to white monochrome
 
-*Scientific Visualization (Perceptually Uniform):*
+*Scientific Visualization - Perceptually Uniform (4):*
 - **Viridis** - Purple to teal to green to yellow
 - **Plasma** - Blue to purple to magenta to orange to yellow
 - **Inferno** - Black to purple to red to orange to yellow
 - **Magma** - Black to purple to pink-red to orange to pale yellow
 
-*Specialty Palettes:*
+*Specialty Palettes (11):*
 - **Copper** - Black to brown to copper metallic
 - **Cool** - Cyan to blue to purple to magenta
 - **Hot** - Black to red to orange to yellow to white
@@ -304,16 +318,47 @@ Par Fractal supports 13 different 3D ray-marched fractals:
 - **Mint** - Fresh green and mint tones
 - **Cherry** - Red, pink, and cherry variations
 
+*Xfractint Palettes (27):*
+- **Alternating Grey** - High contrast grayscale alternation
+- **Blues** - Deep to bright blue gradient
+- **Chromatic** - Multi-hued chromatic spectrum
+- **Default** - Classic xfractint default palette
+- **Default White** - White-based default variant
+- **Fire Storm** - Intense fire colors with storm blues
+- **Froth 3** - RGB primary color froth pattern
+- **Froth 3-16** - Extended RGB froth pattern
+- **Froth 6** - Six-color froth pattern
+- **Froth 6-16** - Extended six-color froth
+- **Gamma 1** - Gamma-corrected grayscale gradient
+- **Gamma 2** - Alternative gamma gradient
+- **3D Glasses 1** - Red-cyan anaglyph palette
+- **3D Glasses 2** - Red-magenta anaglyph palette
+- **Good EGA** - Enhanced EGA color palette
+- **Green** - Monochrome green gradient
+- **Grey** - Smooth grayscale gradient
+- **Grid** - Blue-magenta grid visualization
+- **Headache 2** - High contrast red-blue
+- **Headache** - Eye-catching red-green-blue
+- **Landscape** - Natural terrain colors
+- **Lyapunov** - Orange-brown gradient
+- **XF Neon** - Xfractint neon colors
+- **PaintJet** - HP PaintJet printer palette
+- **Royal** - Purple and gold royal colors
+- **Topo** - Topographic map colors
+- **Volcano** - Volcanic red-yellow gradient
+
 **Custom Palettes:**
-- Create 5-color gradient palettes
+- Create 8-color gradient palettes
 - Save and load custom palettes
 - Import from YAML files
+- Import from .pal files (JASC-PAL format or simple RGB text)
 - Export for sharing
 - Interactive color picker
+- Custom palette gallery management
 
 **Palette Features:**
-- Real-time preview
-- Smooth 5-point interpolation
+- Real-time preview with toast notifications
+- Smooth 8-point interpolation
 - Palette offset control
 - Cycle through palettes with **P** key
 - Palette animation (auto-cycling)

@@ -285,10 +285,10 @@ pub struct App {
 **Submodules:**
 
 **`fractal/types.rs`** - Fractal Type Definitions
-- `FractalType` enum (26 fractal types: 13 2D + 13 3D)
+- `FractalType` enum (34 fractal types: 19 2D escape-time + 6 2D strange attractors + 12 3D ray-marched + 3 3D strange attractors)
 - `RenderMode` enum (TwoD, ThreeD)
 - `ShadingModel` enum (BlinnPhong, PBR)
-- `ColorMode` enum (16 visualization modes)
+- `ColorMode` enum (16 visualization modes: Palette, RaySteps, Normals, OrbitTrapXYZ, OrbitTrapRadial, WorldPosition, LocalPosition, AmbientOcclusion, PerChannel, DistanceField, Depth, Convergence, LightingOnly, ShadowMap, CameraDistanceLOD, DistanceGrayscale)
 - `ChannelSource` enum (8 sources: Iterations, Distance, PositionX/Y/Z, Normal, AO, Constant)
 - `FogMode` enum (Linear, Exponential, Quadratic)
 
@@ -325,18 +325,25 @@ pub struct App {
 
 **Supported Fractals:**
 
-**2D Fractals (13 types):**
+**2D Escape-Time Fractals (13 types):**
 - Mandelbrot2D, Julia2D, Sierpinski2D, SierpinskiTriangle2D
 - BurningShip2D, Tricorn2D, Phoenix2D
 - Celtic2D, Newton2D, Lyapunov2D
 - Nova2D, Magnet2D, Collatz2D
 
-**3D Fractals (13 types):**
+**2D Strange Attractors (6 types):**
+- Hopalong2D, Martin2D, Gingerbreadman2D
+- Chip2D, Quadruptwo2D, Threeply2D
+
+**3D Ray-Marched Fractals (12 types):**
 - Mandelbulb3D, MengerSponge3D, SierpinskiPyramid3D, SierpinskiGasket3D
-- JuliaSet3D, Mandelbox3D, TgladFormula3D
+- JuliaSet3D, Mandelbox3D
 - OctahedralIFS3D, IcosahedralIFS3D
 - ApollonianGasket3D, Kleinian3D
 - HybridMandelbulbJulia3D, QuaternionCubic3D
+
+**3D Strange Attractors (3 types):**
+- Pickover3D, Lorenz3D, Rossler3D
 
 ### Renderer
 
@@ -363,6 +370,7 @@ pub struct App {
 
 **`renderer/uniforms.rs`** - Uniform Buffer Management
 - `Uniforms` struct (832 bytes, matching WGSL exactly)
+- Fractal type mapping from enum to GPU indices (includes gaps: 25 reserved, 32-34 reserved)
 - `BloomUniforms`, `BlurUniforms`, `PostProcessUniforms`
 - Conversion from `FractalParams` to GPU format via `update()` method
 - Compile-time size assertions to ensure Rust/WGSL synchronization
@@ -378,6 +386,12 @@ pub struct App {
   5. Composite pass (scene + bloom)
   6. FXAA or copy to surface
 - Surface presentation
+
+**`renderer/compute.rs`** - Compute Shader Infrastructure (Not Yet Integrated)
+- Accumulation texture system for iterative effects
+- Designed for strange attractor density accumulation
+- Compute pipeline creation utilities
+- Currently infrastructure-only; integration with render loop is pending
 
 **Pipeline Configuration:**
 - **Main Pipeline:** Full-screen quad → Fractal shader
@@ -569,10 +583,10 @@ The `Uniforms` struct in `renderer/uniforms.rs` must exactly match the `Uniforms
 **Key Fields:**
 - Camera matrices (view-projection, inverse view-projection for 3D ray generation)
 - Camera position (3D mode)
-- Fractal type (0-25 for 26 fractal types) and render mode (0=2D, 1=3D)
+- Fractal type (0-12 for 2D escape-time, 13-24 for 3D ray-marched, 26-31 for 2D attractors, 35-37 for 3D attractors) and render mode (0=2D, 1=3D)
 - 2D parameters (center, zoom, iterations with auto-scaling, high-precision center for deep zoom)
 - 3D parameters (power, ray steps, min distance, fractal-specific scale/fold/radius parameters)
-- Color palette (5 colors × RGBA with palette_offset for animation)
+- Color palette (8 colors × RGBA with palette_offset for animation)
 - Color modes (16 visualization modes) and channel sources (8 per-channel sources for RGB)
 - Visual effects (AO with intensity/step, soft shadows with samples/softness, fog with mode/density/color, DoF with focal length/aperture/samples)
 - Material properties (roughness, metallic, albedo) for PBR shading
@@ -901,8 +915,11 @@ When enabled, LOD zones are visualized in 3D space as colored distance rings aro
 3. **Update fractal type mapping** in `renderer/uniforms.rs`
    ```rust
    self.fractal_type = match params.fractal_type {
-       // ... existing mappings (0-25) ...
-       crate::fractal::FractalType::MyNewFractal2D => 26,  // Next available index
+       // 2D escape-time: 0-12
+       // 3D ray-marched: 13-24
+       // 2D attractors: 26-31 (25 reserved)
+       // 3D attractors: 35-37 (32-34 reserved)
+       crate::fractal::FractalType::MyNewFractal2D => 38,  // Next available index
    };
    ```
 

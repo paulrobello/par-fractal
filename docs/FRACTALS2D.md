@@ -46,7 +46,7 @@ Complete guide to all 13 2D fractals available in Par Fractal, including mathema
 - Real-time GPU computation
 - High-precision zoom mode (emulated double-float precision on GPU)
 - Smooth continuous coloring (eliminates banding)
-- 21 built-in color palettes plus custom palette support
+- 39 built-in color palettes plus custom palette support
 - Multiple coloring modes (palette, orbit traps, position-based, etc.)
 - Interactive parameter adjustment with instant preview
 - Screenshot and video capture support
@@ -98,8 +98,18 @@ High-precision mode is more computationally intensive than standard mode, but th
 |-----|--------|
 | **1** | Switch to Mandelbrot |
 | **2** | Switch to Julia |
+| **3** | Switch to Sierpinski Carpet |
+| **4** | Switch to Burning Ship |
+| **5** | Switch to Tricorn |
+| **6** | Switch to Phoenix |
+| **7** | Switch to Celtic |
+| **8** | Switch to Newton |
+| **9** | Switch to Lyapunov |
+| **0** | Switch to Nova |
 | **R** | Reset to default view |
 | **H** | Toggle UI panel |
+| **F** | Toggle FPS display |
+| **V** | Toggle performance overlay |
 | **P** | Cycle color palettes |
 | **F12** | Take screenshot |
 
@@ -741,11 +751,13 @@ Barycentric subdivision rule:
 **Palette Mode (Default):**
 - Maps iteration count to color palette
 - Smooth interpolation between colors
-- 5-color gradients
+- 8-color gradients for rich color transitions
 
 **Available Palettes:**
 
-*Classic Palettes:*
+Par Fractal includes 39 built-in color palettes organized into several categories:
+
+*Classic Palettes (6):*
 - Fire - Black → Purple → Red → Orange → Yellow
 - Ocean - Deep Blue → Dark Blue → Blue → Light Blue → Cyan
 - Rainbow - Red → Yellow → Green → Blue → Purple
@@ -753,19 +765,19 @@ Barycentric subdivision rule:
 - Sunset - Purple → Pink → Orange → Light Orange → Yellow
 - Grayscale - Black → Dark Gray → Gray → Light Gray → White
 
-*Scientific Visualization:*
+*Scientific Visualization (4):*
 - Viridis - Dark Purple → Purple → Teal → Green → Yellow
 - Plasma - Deep Blue → Purple → Magenta → Orange → Yellow
 - Inferno - Black → Dark Purple → Red → Orange → Yellow
 - Magma - Black → Purple → Pink-Red → Orange → Pale Yellow
 
-*Temperature Palettes:*
+*Temperature Palettes (4):*
 - Copper - Black → Dark Brown → Brown → Copper → Light Copper
 - Cool - Cyan → Light Blue → Blue-Purple → Purple → Magenta
 - Hot - Black → Dark Red → Orange → Yellow → White
 - Lava - Almost Black → Dark Red → Red → Orange → Yellow-Orange
 
-*Artistic Palettes:*
+*Artistic Palettes (7):*
 - Neon - Magenta → Cyan → Green → Yellow → Pink
 - Purple Dream - Dark Purple → Purple → Violet → Lavender → Pale Purple
 - Earth - Dark Brown → Brown → Tan → Olive → Beige-Green
@@ -773,6 +785,26 @@ Barycentric subdivision rule:
 - Galaxy - Deep Space Blue → Purple → Violet → Pink-Purple → Pink
 - Mint - Dark Teal → Teal → Mint → Light Mint → Pale Mint
 - Cherry - Dark Red → Cherry Red → Red-Pink → Pink → Pale Pink
+
+*XFractint Classic Palettes (18):*
+- XF Altern - Alternating color bands
+- XF Blues - Blue gradient variations
+- XF Chroma - Chromatic color progression
+- XF Default - Classic XFractint default palette
+- XF DefaultW - White-based default variant
+- XF Firestrm - Fire storm effect
+- XF Goodega - EGA-style retro colors
+- XF Green - Green gradient variations
+- XF Grey - Grayscale variations
+- XF Grid - Grid-like color pattern
+- XF Headache - High-contrast psychedelic colors
+- XF Landscap - Landscape-inspired earth tones
+- XF Lyapunov - Optimized for Lyapunov fractals
+- XF Neon - Bright neon colors
+- XF Paintjet - Paintjet printer color set
+- XF Royal - Royal purple and blue tones
+- XF Topo - Topographic map colors
+- XF Volcano - Volcanic lava colors
 
 ### Smooth Coloring
 
@@ -791,7 +823,7 @@ Par Fractal supports creating and importing custom color palettes.
 **Creating Custom Palettes:**
 1. Open UI panel (H key)
 2. Go to "Palette" section
-3. Adjust 5 color stops using color pickers
+3. Adjust 8 color stops using color pickers
 4. See results in real-time
 5. Save palette to `~/.config/par-fractal/palettes/` (Linux/macOS) or `%APPDATA%\par-fractal\palettes\` (Windows)
 
@@ -802,7 +834,7 @@ Supports multiple palette file formats:
 - **Simple text format** - One RGB color per line (0-255 integers or 0.0-1.0 floats)
 - **YAML format** - Par Fractal's native format
 
-The importer automatically samples 5 evenly-spaced colors from palettes with more than 5 colors.
+The importer automatically samples 8 evenly-spaced colors from palettes with more than 8 colors.
 
 **Loading Saved Palettes:**
 1. Place palette file in config directory
