@@ -438,6 +438,16 @@ impl App {
 
                 match touch.phase {
                     TouchPhase::Started => {
+                        // Clear stale touches if we have too many (Ended events might have been lost)
+                        if self.active_touches.len() >= 2 {
+                            log::info!(
+                                "  -> WARNING: Clearing {} stale touches",
+                                self.active_touches.len()
+                            );
+                            self.active_touches.clear();
+                            self.initial_pinch_distance = None;
+                        }
+
                         self.active_touches.insert(touch.id, current_pos);
                         log::info!(
                             "  -> Started: active_touches now = {}",
