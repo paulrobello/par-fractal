@@ -3129,7 +3129,7 @@ impl UI {
 
                     ui.collapsing("Features", |ui| {
                         ui.label("• 19 2D fractals (13 escape-time + 6 attractors)");
-                        ui.label("• 15 3D fractals (12 ray-marched + 3 attractors)");
+                        ui.label("• 12 3D fractals (ray-marched)");
                         ui.label("• 46 static + 12 procedural color palettes");
                         ui.label("• PBR shading, AO, soft shadows, DoF");
                         ui.label("• Screenshot & video recording");
