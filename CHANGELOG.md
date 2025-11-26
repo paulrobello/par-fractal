@@ -31,7 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Pinch-in/out gestures smoothly zoom 2D fractals in/out
   - Zoom center calculated between two fingers for intuitive zooming
   - Automatic transition between pan (1 finger) and zoom (2 fingers) modes
-  - Smooth zoom factor calculation with 5% sensitivity for precise control
+  - Smooth zoom factor calculation with 50% sensitivity for responsive control
+  - Fixed touch state management - gestures now work reliably after UI interactions
+  - Settings panel defaults to hidden on web builds for immediate gesture testing
+  - Removed phantom touch detection - no longer needed with hidden settings panel
+  - Natural simultaneous and delayed pinch gestures fully supported (no artificial timing constraints)
 
 ## [0.4.0] - 2025-11-25
 
