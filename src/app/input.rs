@@ -614,10 +614,12 @@ impl App {
                             self.initial_pinch_distance = None;
                         }
 
-                        // If all touches ended, reset mouse state
+                        // If all touches ended, reset mouse state and timing
                         if self.active_touches.is_empty() {
                             self.mouse_pressed = false;
                             self.last_mouse_pos = None;
+                            self.last_touch_time = None; // Reset timing for next touch sequence
+                            log::info!("🔧 Touch: All touches ended, state reset");
                         }
                         // If we're down to 1 touch, re-enable panning
                         else if self.active_touches.len() == 1 {
