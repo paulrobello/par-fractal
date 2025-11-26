@@ -1,8 +1,10 @@
 # Par Fractal Web/WASM Build Plan
 
-## Status: COMPLETE
+## Status: COMPLETE ✅
+## Mobile Touch Support: IN PROGRESS 🚧
 
-All phases have been implemented. The web build compiles successfully and all tests pass.
+**Core web build:** All phases complete. Web build compiles and deploys successfully.
+**Mobile improvements (v0.5.0):** Viewport, resize, pan working. Pinch zoom working but needs 10x speed increase.
 
 ## Overview
 
@@ -131,9 +133,47 @@ trunk serve
 
 ---
 
-## Current Issues (2025-11-24)
+## Recent Progress Updates
 
-### Strange Attractor Rendering Bug - FIXED
+### Mobile Touch Support (2025-11-26) - IN PROGRESS
+
+**Status**: Core functionality working, one performance issue remains.
+
+**Completed:**
+- ✅ iOS Safari viewport fills entire screen (viewport-fit=cover, position:fixed)
+- ✅ Browser window resize and orientation change handling
+- ✅ Touch event routing (bypassed egui pointer blocking for touches)
+- ✅ Single-finger pan working in 2D mode
+- ✅ Single-finger camera rotation working in 3D mode
+- ✅ Two-finger pinch-to-zoom implemented and functional
+- ✅ Fixed touch/mouse event collision (prevented double-processing)
+- ✅ Fixed stale touch accumulation bug (clear phantom touches)
+
+**Remaining Work:**
+- ⚠️ **CRITICAL:** Pinch zoom sensitivity too low (5%) - needs 10x increase to 50%+
+- 🔧 Remove debug logging after zoom speed confirmed working
+- 📝 Update CHANGELOG.md with final v0.5.0 notes
+
+**Files Modified:**
+- `index.html` - Viewport meta tags, iOS-specific CSS
+- `src/web_main.rs` - Device pixel ratio, resize event listeners
+- `src/app/mod.rs` - Added touch tracking fields (active_touches HashMap)
+- `src/app/input.rs` - Complete touch event handling (pan + pinch)
+- `src/camera.rs` - Touch support for 3D camera
+- `CHANGELOG.md` - v0.5.0 mobile improvements documented
+
+**Key Technical Solutions:**
+1. Bypass egui pointer checks for touch events (egui-winit doesn't update pointer position from touches on web)
+2. Guard mouse handlers when touches active (prevent double-processing)
+3. Clear stale touches on new gesture (mitigate lost TouchPhase::Ended events)
+
+**See:** `handoff.md` for detailed technical implementation notes and next steps.
+
+---
+
+## Past Issues (Resolved)
+
+### Strange Attractor Rendering Bug (2025-11-24) - FIXED
 
 **Status**: Fixed. All 9 2D attractor functions updated to use distance-based coloring.
 
