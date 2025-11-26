@@ -15,11 +15,19 @@ impl App {
         // Check if egui wants pointer input RIGHT NOW (not from previous frame)
         // This prevents camera movement during window resizing from any edge
         let ctx = self.egui_state.egui_ctx();
-        // Check multiple conditions to catch all UI interactions including window resizing
-        let egui_wants_pointer = ctx.wants_pointer_input()
-            || ctx.is_pointer_over_area()
-            || ctx.is_using_pointer()
-            || ctx.dragged_id().is_some();
+
+        // For touch events, only block if pointer is actually over UI area
+        // On mobile, egui.wants_pointer_input() can return true even when not touching UI
+        let egui_wants_pointer = if matches!(event, WindowEvent::Touch(_)) {
+            // For touch, only check if actually touching a UI element
+            ctx.is_pointer_over_area() || ctx.is_using_pointer() || ctx.dragged_id().is_some()
+        } else {
+            // For mouse, use full check including wants_pointer_input
+            ctx.wants_pointer_input()
+                || ctx.is_pointer_over_area()
+                || ctx.is_using_pointer()
+                || ctx.dragged_id().is_some()
+        };
 
         // Track shift key for continuous zoom
         if let WindowEvent::KeyboardInput {
