@@ -776,10 +776,12 @@ impl PresetGallery {
     #[cfg(not(target_arch = "wasm32"))]
     pub fn export_preset_to_json(preset: &Preset) -> Result<(), Box<dyn std::error::Error>> {
         // Sanitize filename
-        let filename = preset.name.replace(|c: char| !c.is_alphanumeric() && c != '_' && c != '-', "_");
+        let filename = preset
+            .name
+            .replace(|c: char| !c.is_alphanumeric() && c != '_' && c != '-', "_");
         let file_dialog = rfd::FileDialog::new()
             .add_filter("JSON", &["json"])
-            .set_file_name(&format!("{}.json", filename));
+            .set_file_name(format!("{}.json", filename));
 
         if let Some(path) = file_dialog.save_file() {
             let json = serde_json::to_string_pretty(preset)?;
@@ -960,7 +962,9 @@ impl PresetGallery {
             .map_err(|_| "Failed to cast to HtmlAnchorElement")?;
 
         // Sanitize filename
-        let filename = preset.name.replace(|c: char| !c.is_alphanumeric() && c != '_' && c != '-', "_");
+        let filename = preset
+            .name
+            .replace(|c: char| !c.is_alphanumeric() && c != '_' && c != '-', "_");
         anchor.set_href(&url);
         anchor.set_download(&format!("{}.json", filename));
         anchor.click();

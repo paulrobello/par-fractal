@@ -426,8 +426,13 @@ impl App {
             WindowEvent::Touch(touch) => {
                 // Handle touch events for mobile 2D panning and pinch-to-zoom
                 let current_pos = (touch.location.x as f32, touch.location.y as f32);
-                log::info!("🔧 WindowEvent::Touch phase={:?}, id={}, pos=({:.1}, {:.1})",
-                    touch.phase, touch.id, current_pos.0, current_pos.1);
+                log::info!(
+                    "🔧 WindowEvent::Touch phase={:?}, id={}, pos=({:.1}, {:.1})",
+                    touch.phase,
+                    touch.id,
+                    current_pos.0,
+                    current_pos.1
+                );
 
                 match touch.phase {
                     TouchPhase::Started => {
@@ -439,7 +444,10 @@ impl App {
                             log::info!("🔧 Touch: First touch, starting fresh");
                             self.last_touch_time = Some(now);
                         } else if self.active_touches.len() >= 2 {
-                            log::info!("🔧 Touch: Clearing {} stale touches", self.active_touches.len());
+                            log::info!(
+                                "🔧 Touch: Clearing {} stale touches",
+                                self.active_touches.len()
+                            );
                             self.active_touches.clear();
                             self.initial_pinch_distance = None;
                             self.mouse_pressed = false;
@@ -456,8 +464,10 @@ impl App {
                                 let dy = current_pos.1 - first_touch_pos.1;
                                 let distance = (dx * dx + dy * dy).sqrt();
 
-                                // Phantom touch heuristic: if arrives within 100ms AND is far away (>300px), reject it
-                                if elapsed_ms < 100 && distance > 300.0 {
+                                // Phantom touch heuristic: if arrives within 50ms AND is far away (>400px), reject it
+                                // Adjusted from 100ms/300px to allow natural pinch gestures (100-300ms, <400px)
+                                // while still blocking phantom touches (very fast ~10ms, very far ~640px)
+                                if elapsed_ms < 50 && distance > 400.0 {
                                     log::info!("🔧 Touch: PHANTOM DETECTED! Rejecting second touch ({}ms, {:.0}px apart)", elapsed_ms, distance);
                                     self.active_touches.clear();
                                     self.initial_pinch_distance = None;
@@ -480,7 +490,11 @@ impl App {
                             self.mouse_pressed = true;
                             self.cursor_pos = current_pos;
                             self.last_mouse_pos = Some(current_pos);
-                            log::info!("🔧 Touch: Enabled panning for first touch at ({:.1}, {:.1})", current_pos.0, current_pos.1);
+                            log::info!(
+                                "🔧 Touch: Enabled panning for first touch at ({:.1}, {:.1})",
+                                current_pos.0,
+                                current_pos.1
+                            );
                         }
                         // If we now have 2 touches, start pinch gesture
                         else if self.active_touches.len() == 2 {
@@ -492,13 +506,19 @@ impl App {
                             let dy = touches[0].1 - touches[1].1;
                             let distance = (dx * dx + dy * dy).sqrt();
                             self.initial_pinch_distance = Some(distance);
-                            log::info!("🔧 Touch: Starting pinch gesture, initial distance={:.1}", distance);
+                            log::info!(
+                                "🔧 Touch: Starting pinch gesture, initial distance={:.1}",
+                                distance
+                            );
                         }
                         true
                     }
                     TouchPhase::Moved => {
                         self.active_touches.insert(touch.id, current_pos);
-                        log::info!("🔧 TouchPhase::Moved - active_touches={}, checking mode...", self.active_touches.len());
+                        log::info!(
+                            "🔧 TouchPhase::Moved - active_touches={}, checking mode...",
+                            self.active_touches.len()
+                        );
 
                         // Handle pinch-to-zoom (2 fingers)
                         if self.active_touches.len() == 2 {
@@ -519,13 +539,19 @@ impl App {
                                 let center_y = (touches[0].1 + touches[1].1) / 2.0;
 
                                 // Convert pinch center from screen coords to fractal coords
-                                let screen_x = (center_x / self.renderer.size.width as f32) * 2.0 - 1.0;
-                                let screen_y = 1.0 - (center_y / self.renderer.size.height as f32) * 2.0;
-                                let aspect = self.renderer.size.width as f64 / self.renderer.size.height as f64;
+                                let screen_x =
+                                    (center_x / self.renderer.size.width as f32) * 2.0 - 1.0;
+                                let screen_y =
+                                    1.0 - (center_y / self.renderer.size.height as f32) * 2.0;
+                                let aspect = self.renderer.size.width as f64
+                                    / self.renderer.size.height as f64;
 
                                 // Calculate where the pinch center is in fractal coordinates
-                                let fractal_x = self.fractal_params.center_2d[0] + (screen_x as f64) * aspect / self.fractal_params.zoom_2d as f64;
-                                let fractal_y = self.fractal_params.center_2d[1] + (screen_y as f64) / self.fractal_params.zoom_2d as f64;
+                                let fractal_x = self.fractal_params.center_2d[0]
+                                    + (screen_x as f64) * aspect
+                                        / self.fractal_params.zoom_2d as f64;
+                                let fractal_y = self.fractal_params.center_2d[1]
+                                    + (screen_y as f64) / self.fractal_params.zoom_2d as f64;
 
                                 // Apply zoom
                                 let old_zoom = self.fractal_params.zoom_2d;
@@ -534,8 +560,12 @@ impl App {
                                 // Adjust center so the pinch point stays in the same place
                                 // new_center = old_center + (point - old_center) * (1 - old_zoom/new_zoom)
                                 let zoom_ratio = old_zoom / self.fractal_params.zoom_2d;
-                                self.fractal_params.center_2d[0] += (fractal_x - self.fractal_params.center_2d[0]) * (1.0 - zoom_ratio as f64);
-                                self.fractal_params.center_2d[1] += (fractal_y - self.fractal_params.center_2d[1]) * (1.0 - zoom_ratio as f64);
+                                self.fractal_params.center_2d[0] += (fractal_x
+                                    - self.fractal_params.center_2d[0])
+                                    * (1.0 - zoom_ratio as f64);
+                                self.fractal_params.center_2d[1] += (fractal_y
+                                    - self.fractal_params.center_2d[1])
+                                    * (1.0 - zoom_ratio as f64);
 
                                 // Update initial distance for next frame
                                 self.initial_pinch_distance = Some(current_distance);
@@ -571,12 +601,18 @@ impl App {
                                 self.fractal_params.center_2d[1] +=
                                     delta_y * 2.0 / self.fractal_params.zoom_2d as f64;
                             } else {
-                                log::info!("🔧 Touch Pan: last_mouse_pos is None! mouse_pressed={}", self.mouse_pressed);
+                                log::info!(
+                                    "🔧 Touch Pan: last_mouse_pos is None! mouse_pressed={}",
+                                    self.mouse_pressed
+                                );
                             }
                             self.last_mouse_pos = Some(current_pos);
                             true
                         } else {
-                            log::info!("🔧 Touch Moved: active_touches={} (not 1 or 2, ignoring)", self.active_touches.len());
+                            log::info!(
+                                "🔧 Touch Moved: active_touches={} (not 1 or 2, ignoring)",
+                                self.active_touches.len()
+                            );
                             false
                         }
                     }
