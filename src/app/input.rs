@@ -401,6 +401,47 @@ impl App {
                 }
                 true
             }
+            WindowEvent::Touch(touch) => {
+                // Handle touch events for mobile 2D panning
+                match touch.phase {
+                    TouchPhase::Started => {
+                        self.mouse_pressed = true;
+                        let current_pos = (touch.location.x as f32, touch.location.y as f32);
+                        self.cursor_pos = current_pos;
+                        self.last_mouse_pos = Some(current_pos);
+                        true
+                    }
+                    TouchPhase::Moved => {
+                        if self.mouse_pressed && !self.shift_pressed {
+                            let current_pos = (touch.location.x as f32, touch.location.y as f32);
+                            self.cursor_pos = current_pos;
+
+                            if let Some(last_pos) = self.last_mouse_pos {
+                                let delta_x = (current_pos.0 - last_pos.0) as f64
+                                    / self.renderer.size.width as f64;
+                                let delta_y = (current_pos.1 - last_pos.1) as f64
+                                    / self.renderer.size.height as f64;
+
+                                let aspect = self.renderer.size.width as f64
+                                    / self.renderer.size.height as f64;
+                                self.fractal_params.center_2d[0] -=
+                                    delta_x * 2.0 / self.fractal_params.zoom_2d as f64 * aspect;
+                                self.fractal_params.center_2d[1] +=
+                                    delta_y * 2.0 / self.fractal_params.zoom_2d as f64;
+                            }
+                            self.last_mouse_pos = Some(current_pos);
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    TouchPhase::Ended | TouchPhase::Cancelled => {
+                        self.mouse_pressed = false;
+                        self.last_mouse_pos = None;
+                        true
+                    }
+                }
+            }
             WindowEvent::CursorMoved { position, .. } => {
                 let current_pos = (position.x as f32, position.y as f32);
                 self.cursor_pos = current_pos; // Always track cursor position

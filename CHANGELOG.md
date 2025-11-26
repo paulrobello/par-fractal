@@ -20,9 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added event listeners for `resize` and `orientationchange` events
   - Automatically updates canvas dimensions and notifies app of size changes
   - Properly handles device pixel ratio changes during resize
-- **Touch interaction improvements** - Touch events now work correctly for panning and zooming on mobile devices
+- **Touch panning and camera control** - Touch gestures now work correctly on mobile devices
+  - Added explicit `WindowEvent::Touch` handling for 2D panning in `handle_2d_input()`
+  - Added touch event support to 3D camera controller for rotation/looking around
+  - Touch events properly map to pan/drag behavior (TouchPhase::Started/Moved/Ended)
+  - Single-finger drag now works for both 2D fractal panning and 3D camera rotation
   - Disabled text selection and tap highlighting during touch interactions
-  - Enabled proper touch event propagation to the fractal renderer
 
 ## [0.4.0] - 2025-11-25
 

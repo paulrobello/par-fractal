@@ -149,6 +149,42 @@ impl CameraController {
                     false
                 }
             }
+            WindowEvent::Touch(touch) => {
+                // Handle touch events for mobile 3D camera control
+                match touch.phase {
+                    TouchPhase::Started => {
+                        self.mouse_pressed = true;
+                        let current_pos = (touch.location.x as f32, touch.location.y as f32);
+                        self.last_mouse_pos = Some(current_pos);
+                        true
+                    }
+                    TouchPhase::Moved => {
+                        if self.mouse_pressed {
+                            let current_pos = (touch.location.x as f32, touch.location.y as f32);
+                            if let Some(last_pos) = self.last_mouse_pos {
+                                let delta_x = current_pos.0 - last_pos.0;
+                                let delta_y = current_pos.1 - last_pos.1;
+
+                                // Negate delta_x so dragging right rotates view right
+                                self.yaw -= delta_x * self.rotate_speed;
+                                self.pitch -= delta_y * self.rotate_speed;
+                                self.pitch = self
+                                    .pitch
+                                    .clamp(-89.0f32.to_radians(), 89.0f32.to_radians());
+                            }
+                            self.last_mouse_pos = Some(current_pos);
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    TouchPhase::Ended | TouchPhase::Cancelled => {
+                        self.mouse_pressed = false;
+                        self.last_mouse_pos = None;
+                        true
+                    }
+                }
+            }
             _ => false,
         }
     }
