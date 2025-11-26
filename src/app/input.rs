@@ -407,9 +407,13 @@ impl App {
                 state,
                 ..
             } => {
-                self.mouse_pressed = *state == ElementState::Pressed;
-                if !self.mouse_pressed {
-                    self.last_mouse_pos = None;
+                // Don't handle mouse input if we have active touches
+                // (touch events set their own mouse_pressed state)
+                if self.active_touches.is_empty() {
+                    self.mouse_pressed = *state == ElementState::Pressed;
+                    if !self.mouse_pressed {
+                        self.last_mouse_pos = None;
+                    }
                 }
                 true
             }
@@ -524,7 +528,9 @@ impl App {
                 let current_pos = (position.x as f32, position.y as f32);
                 self.cursor_pos = current_pos; // Always track cursor position
 
-                if self.mouse_pressed && !self.shift_pressed {
+                // Don't handle CursorMoved if we have active touches
+                // (touch events generate their own cursor movements on web)
+                if self.active_touches.is_empty() && self.mouse_pressed && !self.shift_pressed {
                     // Pan when dragging without shift (shift+drag is continuous zoom)
                     if let Some(last_pos) = self.last_mouse_pos {
                         let delta_x =
