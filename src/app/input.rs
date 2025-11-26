@@ -454,40 +454,20 @@ impl App {
                             self.last_mouse_pos = None;
                             self.last_touch_time = Some(now);
                         } else if self.active_touches.len() == 1 {
-                            // Check if this might be a phantom touch (arrives too quickly after first touch)
+                            // Log second touch for debugging (phantom detection disabled)
+                            // Settings panel now hidden by default on web, so phantoms shouldn't occur
                             if let Some(last_time) = self.last_touch_time {
                                 let elapsed_ms = now.duration_since(last_time).as_millis();
-
-                                // Calculate distance from first touch
                                 let first_touch_pos = self.active_touches.values().next().unwrap();
                                 let dx = current_pos.0 - first_touch_pos.0;
                                 let dy = current_pos.1 - first_touch_pos.1;
                                 let distance = (dx * dx + dy * dy).sqrt();
 
-                                // Distance-only phantom touch detection:
-                                // Reject if touches are absurdly far apart (>500px)
-                                // Phantom touches from UI interactions are ~640px apart
-                                // Natural pinch gestures (even wide ones) are <500px
-                                // This allows simultaneous pinches at any timing
-                                if distance > 500.0 {
-                                    log::info!(
-                                        "🔧 Touch: PHANTOM DETECTED! Rejecting second touch ({}ms, {:.0}px apart)",
-                                        elapsed_ms,
-                                        distance
-                                    );
-                                    self.active_touches.clear();
-                                    self.initial_pinch_distance = None;
-                                    self.mouse_pressed = false;
-                                    self.last_mouse_pos = None;
-                                    self.last_touch_time = Some(now);
-                                    return true; // Don't process this phantom touch further
-                                } else {
-                                    log::info!(
-                                        "🔧 Touch: Valid second touch for pinch ({}ms, {:.0}px apart)",
-                                        elapsed_ms,
-                                        distance
-                                    );
-                                }
+                                log::info!(
+                                    "🔧 Touch: Second touch for pinch ({}ms, {:.0}px apart)",
+                                    elapsed_ms,
+                                    distance
+                                );
                             }
                         }
 
