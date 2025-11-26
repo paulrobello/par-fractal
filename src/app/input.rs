@@ -431,17 +431,20 @@ impl App {
                     TouchPhase::Started => {
                         // Clear stale touches if we have too many (Ended events might have been lost)
                         if self.active_touches.len() >= 2 {
+                            log::debug!("Touch: Clearing {} stale touches", self.active_touches.len());
                             self.active_touches.clear();
                             self.initial_pinch_distance = None;
                         }
 
                         self.active_touches.insert(touch.id, current_pos);
+                        log::debug!("Touch Started: id={}, active={}, mouse_pressed={}", touch.id, self.active_touches.len(), self.mouse_pressed);
 
                         // If this is the first touch, enable panning
                         if self.active_touches.len() == 1 {
                             self.mouse_pressed = true;
                             self.cursor_pos = current_pos;
                             self.last_mouse_pos = Some(current_pos);
+                            log::debug!("Touch: Enabled panning for first touch");
                         }
                         // If we now have 2 touches, start pinch gesture
                         else if self.active_touches.len() == 2 {
@@ -471,14 +474,32 @@ impl App {
                                 let zoom_delta = current_distance / initial_distance;
                                 // Apply zoom with smoothing (50% sensitivity for responsive zoom)
                                 let zoom_factor = 1.0 + (zoom_delta - 1.0) * 0.5;
+
+                                // Calculate center point between two fingers (pinch center)
+                                let center_x = (touches[0].0 + touches[1].0) / 2.0;
+                                let center_y = (touches[0].1 + touches[1].1) / 2.0;
+
+                                // Convert pinch center from screen coords to fractal coords
+                                let screen_x = (center_x / self.renderer.size.width as f32) * 2.0 - 1.0;
+                                let screen_y = 1.0 - (center_y / self.renderer.size.height as f32) * 2.0;
+                                let aspect = self.renderer.size.width as f64 / self.renderer.size.height as f64;
+
+                                // Calculate where the pinch center is in fractal coordinates
+                                let fractal_x = self.fractal_params.center_2d[0] + (screen_x as f64) * aspect / self.fractal_params.zoom_2d as f64;
+                                let fractal_y = self.fractal_params.center_2d[1] + (screen_y as f64) / self.fractal_params.zoom_2d as f64;
+
+                                // Apply zoom
+                                let old_zoom = self.fractal_params.zoom_2d;
                                 self.fractal_params.zoom_2d *= zoom_factor;
+
+                                // Adjust center so the pinch point stays in the same place
+                                // new_center = old_center + (point - old_center) * (1 - old_zoom/new_zoom)
+                                let zoom_ratio = old_zoom / self.fractal_params.zoom_2d;
+                                self.fractal_params.center_2d[0] += (fractal_x - self.fractal_params.center_2d[0]) * (1.0 - zoom_ratio as f64);
+                                self.fractal_params.center_2d[1] += (fractal_y - self.fractal_params.center_2d[1]) * (1.0 - zoom_ratio as f64);
 
                                 // Update initial distance for next frame
                                 self.initial_pinch_distance = Some(current_distance);
-
-                                // Calculate center point between two fingers for zoom center
-                                let center_x = (touches[0].0 + touches[1].0) / 2.0;
-                                let center_y = (touches[0].1 + touches[1].1) / 2.0;
                                 self.cursor_pos = (center_x, center_y);
                             }
                             true
@@ -489,6 +510,7 @@ impl App {
 
                             // Ensure panning is enabled for single touch
                             if !self.mouse_pressed {
+                                log::debug!("Touch Move: Re-enabling mouse_pressed");
                                 self.mouse_pressed = true;
                                 self.last_mouse_pos = Some(current_pos);
                             }
@@ -499,12 +521,16 @@ impl App {
                                 let delta_y = (current_pos.1 - last_pos.1) as f64
                                     / self.renderer.size.height as f64;
 
+                                log::debug!("Touch Pan: delta=({:.3}, {:.3}), mouse_pressed={}", delta_x, delta_y, self.mouse_pressed);
+
                                 let aspect = self.renderer.size.width as f64
                                     / self.renderer.size.height as f64;
                                 self.fractal_params.center_2d[0] -=
                                     delta_x * 2.0 / self.fractal_params.zoom_2d as f64 * aspect;
                                 self.fractal_params.center_2d[1] +=
                                     delta_y * 2.0 / self.fractal_params.zoom_2d as f64;
+                            } else {
+                                log::debug!("Touch Pan: last_mouse_pos is None!");
                             }
                             self.last_mouse_pos = Some(current_pos);
                             true
