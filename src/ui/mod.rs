@@ -671,7 +671,7 @@ impl UI {
                         } else {
                             egui::ScrollArea::vertical()
                                 .id_salt("builtin_presets_scroll")
-                                .max_height(400.0)
+                                .max_height(800.0)
                                 .show(ui, |ui| {
                                     for preset in filtered_builtin.iter() {
                                         ui.horizontal(|ui| {
@@ -679,6 +679,15 @@ impl UI {
                                                 preset_to_load = Some((*preset).clone());
                                             }
                                             ui.label(format!("- {}", preset.description));
+
+                                            // Add export button
+                                            if ui.small_button("💾").on_hover_text("Export this preset to JSON").clicked() {
+                                                if let Err(e) = PresetGallery::export_preset_to_json(preset) {
+                                                    eprintln!("Failed to export preset: {}", e);
+                                                } else {
+                                                    log::info!("Preset '{}' exported successfully", preset.name);
+                                                }
+                                            }
                                         });
                                     }
                                 });
@@ -779,9 +788,25 @@ impl UI {
                                                         }
                                                     }
                                                 }
+
+                                                // Add export button
+                                                if ui.small_button("💾").on_hover_text("Export this preset to JSON").clicked() {
+                                                    match PresetGallery::load_preset(preset_name) {
+                                                        Ok(preset) => {
+                                                            if let Err(e) = PresetGallery::export_preset_to_json(&preset) {
+                                                                eprintln!("Failed to export preset: {}", e);
+                                                            } else {
+                                                                log::info!("Preset '{}' exported successfully", preset.name);
+                                                            }
+                                                        }
+                                                        Err(e) => {
+                                                            eprintln!("Failed to load preset '{}' for export: {}", preset_name, e);
+                                                        }
+                                                    }
+                                                }
+
                                                 // Add delete button
                                                 if ui.small_button("🗑").on_hover_text("Delete preset").clicked() {
-                                                    #[cfg(not(target_arch = "wasm32"))]
                                                     if let Err(e) = PresetGallery::delete_preset(preset_name) {
                                                         eprintln!("Failed to delete preset: {}", e);
                                                     } else {

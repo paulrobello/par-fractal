@@ -772,6 +772,25 @@ impl PresetGallery {
         }
     }
 
+    /// Export a single preset to a JSON file (user chooses location)
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn export_preset_to_json(preset: &Preset) -> Result<(), Box<dyn std::error::Error>> {
+        // Sanitize filename
+        let filename = preset.name.replace(|c: char| !c.is_alphanumeric() && c != '_' && c != '-', "_");
+        let file_dialog = rfd::FileDialog::new()
+            .add_filter("JSON", &["json"])
+            .set_file_name(&format!("{}.json", filename));
+
+        if let Some(path) = file_dialog.save_file() {
+            let json = serde_json::to_string_pretty(preset)?;
+            fs::write(&path, json)?;
+            println!("Preset '{}' exported to {}", preset.name, path.display());
+            Ok(())
+        } else {
+            Err("Export cancelled by user".into())
+        }
+    }
+
     /// Export current settings to a JSON file (user chooses location)
     #[cfg(not(target_arch = "wasm32"))]
     pub fn export_to_json(
@@ -908,6 +927,48 @@ impl PresetGallery {
             .map_err(|_| "Failed to delete preset from localStorage")?;
 
         log::info!("Preset '{}' deleted from localStorage", filename);
+        Ok(())
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn export_preset_to_json(preset: &Preset) -> Result<(), Box<dyn std::error::Error>> {
+        use wasm_bindgen::JsCast;
+        use web_sys::{window, Blob, BlobPropertyBag, HtmlAnchorElement, Url};
+
+        let json = serde_json::to_string_pretty(preset)?;
+
+        // Create blob and download
+        let window = window().ok_or("No window object")?;
+        let document = window.document().ok_or("No document")?;
+
+        let array = js_sys::Array::new();
+        array.push(&wasm_bindgen::JsValue::from_str(&json));
+
+        let blob_props = BlobPropertyBag::new();
+        blob_props.set_type("application/json");
+        let blob = Blob::new_with_str_sequence_and_options(&array, &blob_props)
+            .map_err(|_| "Failed to create blob")?;
+
+        let url =
+            Url::create_object_url_with_blob(&blob).map_err(|_| "Failed to create object URL")?;
+
+        // Create temporary anchor and trigger download
+        let anchor = document
+            .create_element("a")
+            .map_err(|_| "Failed to create anchor")?
+            .dyn_into::<HtmlAnchorElement>()
+            .map_err(|_| "Failed to cast to HtmlAnchorElement")?;
+
+        // Sanitize filename
+        let filename = preset.name.replace(|c: char| !c.is_alphanumeric() && c != '_' && c != '-', "_");
+        anchor.set_href(&url);
+        anchor.set_download(&format!("{}.json", filename));
+        anchor.click();
+
+        // Clean up
+        Url::revoke_object_url(&url).map_err(|_| "Failed to revoke object URL")?;
+
+        log::info!("Preset '{}' exported to JSON", preset.name);
         Ok(())
     }
 
