@@ -78,6 +78,38 @@ See [Features](docs/FEATURES.md) for complete feature documentation.
 
 </td>
 </tr>
+<tr>
+<td>
+
+**Apollonian Gasket**
+
+![Apollonian](https://raw.githubusercontent.com/paulrobello/par-fractal/main/screenshots/apollonian.png)
+
+</td>
+<td>
+
+**Hopalong Attractor**
+
+![Hopalong](https://raw.githubusercontent.com/paulrobello/par-fractal/main/screenshots/hopalong.png)
+
+</td>
+</tr>
+<tr>
+<td>
+
+**Martin Attractor**
+
+![Martin](https://raw.githubusercontent.com/paulrobello/par-fractal/main/screenshots/martin.png)
+
+</td>
+<td>
+
+**Threeply Attractor**
+
+![Threeply](https://raw.githubusercontent.com/paulrobello/par-fractal/main/screenshots/threeply.png)
+
+</td>
+</tr>
 </table>
 
 ## Supported Fractals

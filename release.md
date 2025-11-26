@@ -24,7 +24,6 @@ I'm excited to share **Par Fractal**, a high-performance, GPU-accelerated fracta
 
 **Strange Attractors** - Added 9 new strange attractor fractals for a total of 34 fractal types:
 - **2D Attractors:** Hopalong, Martin, Gingerbreadman, Chip, Quadruptwo, Threeply
-- **3D Attractors:** Pickover, Lorenz (butterfly), Rossler
 
 **Enhanced Command Palette** - New commands for shading models, fog modes, and per-channel color source selection for advanced visualization control.
 
@@ -46,7 +45,6 @@ I'm excited to share **Par Fractal**, a high-performance, GPU-accelerated fracta
 - Advanced structures: Octahedral/Icosahedral IFS
 - Exotic types: Apollonian Gasket, Kleinian, Hybrid Mandelbulb-Julia, Quaternion Cubic
 - Sierpinski: Pyramid and Gasket
-- Strange Attractors: Pickover, Lorenz, Rossler
 
 ## Key Features
 
@@ -55,7 +53,7 @@ I'm excited to share **Par Fractal**, a high-performance, GPU-accelerated fracta
 - PBR (Physically Based Rendering) and Blinn-Phong shading for 3D fractals
 - Ambient occlusion and soft shadows
 - Depth of field effects
-- Post-processing: Bloom, FXAA anti-aliasing, color grading
+- Post-processing: Bloom, color grading
 - Fog modes: Linear, Exponential, Quadratic
 
 **Interactive Exploration:**
