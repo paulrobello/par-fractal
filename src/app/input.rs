@@ -171,7 +171,8 @@ impl App {
                 // QuaternionCubic3D: accessible via UI only (no F12 - reserved for screenshot)
                 KeyCode::KeyP => {
                     self.fractal_params.next_palette();
-                    self.ui.show_toast(format!("Palette: {}", self.fractal_params.palette.name));
+                    self.ui
+                        .show_toast(format!("Palette: {}", self.fractal_params.palette.name));
                     return true;
                 }
                 KeyCode::F12 => {

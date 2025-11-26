@@ -1070,7 +1070,7 @@ impl UI {
                                 });
 
                                 ui.horizontal(|ui| {
-                                    if ui.button("💾 Save Custom Palette")
+                                    if ui.button("💾 Save Custom")
                                         .on_hover_text("Save this palette for later use")
                                         .clicked()
                                         && !self.custom_palette_name.is_empty()
@@ -2923,17 +2923,17 @@ impl UI {
                     ui.add_space(4.0);
 
                     ui.collapsing("What's New in v0.3.0", |ui| {
-                        ui.label("• 12 new 2D strange attractor fractals");
-                        ui.label("• 27 new color palettes from xfractint");
+                        ui.label("• 6 new 2D strange attractors (Hopalong, Martin, etc.)");
+                        ui.label("• 3 new 3D strange attractors (Lorenz, Pickover, Rossler)");
+                        ui.label("• Command palette: shading, fog, channel source commands");
                         ui.label("• Hit-based rendering for attractors");
-                        ui.label("• Increased iteration limits (100k for attractors)");
-                        ui.label("• Hotkey tooltips on all buttons");
-                        ui.label("• About panel with version info");
+                        ui.label("• Toast notifications for palette changes");
+                        ui.label("• Removed TgladFormula3D (consolidated into IFS)");
                     });
 
                     ui.collapsing("Features", |ui| {
-                        ui.label("• 13 classic 2D fractals + 12 strange attractors");
-                        ui.label("• 13 ray-marched 3D fractals");
+                        ui.label("• 19 2D fractals (13 escape-time + 6 attractors)");
+                        ui.label("• 15 3D fractals (12 ray-marched + 3 attractors)");
                         ui.label("• 33+ color palettes with animation");
                         ui.label("• PBR shading, AO, soft shadows, DoF");
                         ui.label("• Screenshot & video recording");

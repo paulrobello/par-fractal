@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2025-11-25
+
+### Added
+
+#### New Fractal Types - Strange Attractors
+- **2D Strange Attractors (6 new):**
+  - Hopalong - Barry Martin's hopalong attractor
+  - Martin - Barry Martin's original attractor
+  - Gingerbreadman - Chaotic 2D map
+  - Chip - Chip attractor variant
+  - Quadruptwo - Quadruptwo strange attractor
+  - Threeply - Threeply strange attractor
+
+- **3D Strange Attractors (3 new):**
+  - Pickover - Clifford Pickover's chaotic attractor
+  - Lorenz - Classic Lorenz butterfly attractor
+  - Rossler - Rossler system attractor
+
+#### Command Palette Enhancements
+- Added all new strange attractor fractals to command palette
+- Added shading model commands (Blinn-Phong, PBR)
+- Added fog mode commands (Linear, Exponential, Quadratic)
+- Added per-channel color source commands for PerChannel color mode:
+  - Red/Green/Blue channel sources: Iterations, Distance, Position X/Y/Z, Normal, AO, Constant
+- Toast notifications for palette changes to prevent notification stacking
+
+### Changed
+- Total fractal count increased from 26 to 34 (19 2D + 15 3D)
+
+### Removed
+- TgladFormula3D fractal type (consolidated into other IFS fractals)
+
+### Fixed
+- Fixed toast notification stacking when rapidly changing palettes
+- Reduced custom palette preview squares from 30x30 to 20x20 for better UI fit
+
 ## [0.2.0] - 2025-11-24
 
 ### Added
@@ -68,5 +104,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Settings persistence (YAML)
 - Cross-platform support: Windows (DX12/Vulkan), macOS (Metal), Linux (Vulkan)
 
+[0.3.0]: https://github.com/paulrobello/par-fractal/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/paulrobello/par-fractal/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/paulrobello/par-fractal/releases/tag/v0.1.0

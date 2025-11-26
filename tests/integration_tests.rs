@@ -222,7 +222,6 @@ fn test_all_fractal_types_switchable() {
             | FractalType::SierpinskiPyramid3D
             | FractalType::JuliaSet3D
             | FractalType::Mandelbox3D
-            | FractalType::TgladFormula3D
             | FractalType::OctahedralIFS3D
             | FractalType::IcosahedralIFS3D
             | FractalType::ApollonianGasket3D

@@ -1,7 +1,7 @@
 // Command Palette System
 // Provides a quick command interface for accessing all application features
 
-use crate::fractal::{ColorMode, FractalType, ShadingModel};
+use crate::fractal::{ChannelSource, ColorMode, FogMode, FractalType, ShadingModel};
 use crate::lod::LODProfile;
 use serde::{Deserialize, Serialize};
 
@@ -64,6 +64,8 @@ pub enum CommandAction {
     SetPalette(usize),
     SetShadowMode(u32), // 0=off, 1=hard, 2=soft
     SetShadingModel(ShadingModel),
+    SetFogMode(FogMode),
+    SetChannelSource { channel: u8, source: ChannelSource }, // channel: 0=R, 1=G, 2=B
     SetLODProfile(LODProfile),
     ToggleLOD,
     ToggleLODDebug,
@@ -506,6 +508,62 @@ impl CommandPalette {
                 vec!["sierpinski gasket", "gasket3d"],
                 None,
             ),
+            // 2D Strange Attractors
+            (
+                FractalType::Hopalong2D,
+                "Hopalong Attractor (2D)",
+                vec!["hopalong", "hop"],
+                None,
+            ),
+            (
+                FractalType::Martin2D,
+                "Martin Attractor (2D)",
+                vec!["martin"],
+                None,
+            ),
+            (
+                FractalType::Gingerbreadman2D,
+                "Gingerbreadman (2D)",
+                vec!["gingerbreadman", "gingerbread", "gbm"],
+                None,
+            ),
+            (
+                FractalType::Chip2D,
+                "Chip Attractor (2D)",
+                vec!["chip"],
+                None,
+            ),
+            (
+                FractalType::Quadruptwo2D,
+                "Quadruptwo (2D)",
+                vec!["quadruptwo", "quad2"],
+                None,
+            ),
+            (
+                FractalType::Threeply2D,
+                "Threeply (2D)",
+                vec!["threeply", "3ply"],
+                None,
+            ),
+            // 3D Strange Attractors
+            (
+                FractalType::Pickover3D,
+                "Pickover Attractor (3D)",
+                vec!["pickover", "pick"],
+                None,
+            ),
+            (
+                FractalType::Lorenz3D,
+                "Lorenz Attractor (3D)",
+                vec!["lorenz"],
+                None,
+            ),
+            (
+                FractalType::Rossler3D,
+                "Rossler Attractor (3D)",
+                vec!["rossler", "rössler"],
+                None,
+            ),
         ];
 
         for (ftype, name, aliases, shortcut) in fractal_types {
@@ -723,6 +781,132 @@ impl CommandPalette {
                     format!("Switch to {} mode", name),
                 )
                 .with_aliases(aliases),
+            );
+        }
+
+        // === Shading Model Commands ===
+        commands.push(
+            Command::new(
+                "Blinn-Phong Shading",
+                CommandCategory::Effect,
+                CommandAction::SetShadingModel(ShadingModel::BlinnPhong),
+                "Use classic Blinn-Phong lighting model",
+            )
+            .with_aliases(vec!["blinn phong", "phong", "blinn"]),
+        );
+
+        commands.push(
+            Command::new(
+                "PBR Shading",
+                CommandCategory::Effect,
+                CommandAction::SetShadingModel(ShadingModel::PBR),
+                "Use Physically Based Rendering",
+            )
+            .with_aliases(vec!["pbr", "physically based", "physical"]),
+        );
+
+        // === Fog Mode Commands ===
+        commands.push(
+            Command::new(
+                "Linear Fog",
+                CommandCategory::Effect,
+                CommandAction::SetFogMode(FogMode::Linear),
+                "Set fog to linear falloff",
+            )
+            .with_aliases(vec!["fog linear", "linear fog"]),
+        );
+
+        commands.push(
+            Command::new(
+                "Exponential Fog",
+                CommandCategory::Effect,
+                CommandAction::SetFogMode(FogMode::Exponential),
+                "Set fog to exponential falloff",
+            )
+            .with_aliases(vec!["fog exp", "exponential fog", "exp fog"]),
+        );
+
+        commands.push(
+            Command::new(
+                "Quadratic Fog",
+                CommandCategory::Effect,
+                CommandAction::SetFogMode(FogMode::Quadratic),
+                "Set fog to quadratic (exp squared) falloff",
+            )
+            .with_aliases(vec!["fog quad", "quadratic fog", "fog squared"]),
+        );
+
+        // === Channel Source Commands (for Per-Channel color mode) ===
+        let channel_sources = vec![
+            (
+                ChannelSource::Iterations,
+                "Iterations",
+                vec!["iter", "iteration"],
+            ),
+            (ChannelSource::Distance, "Distance", vec!["dist"]),
+            (ChannelSource::PositionX, "Position X", vec!["posx", "x"]),
+            (ChannelSource::PositionY, "Position Y", vec!["posy", "y"]),
+            (ChannelSource::PositionZ, "Position Z", vec!["posz", "z"]),
+            (ChannelSource::Normal, "Normal", vec!["norm"]),
+            (ChannelSource::AO, "Ambient Occlusion", vec!["ao"]),
+            (
+                ChannelSource::Constant,
+                "Constant (Zero)",
+                vec!["const", "zero"],
+            ),
+        ];
+
+        for (source, name, aliases) in channel_sources.clone() {
+            commands.push(
+                Command::new(
+                    format!("Red Channel: {}", name),
+                    CommandCategory::Color,
+                    CommandAction::SetChannelSource { channel: 0, source },
+                    format!("Set red channel source to {}", name),
+                )
+                .with_aliases(
+                    aliases
+                        .iter()
+                        .map(|a| format!("r {}", a))
+                        .chain(aliases.iter().map(|a| format!("red {}", a)))
+                        .collect(),
+                ),
+            );
+        }
+
+        for (source, name, aliases) in channel_sources.clone() {
+            commands.push(
+                Command::new(
+                    format!("Green Channel: {}", name),
+                    CommandCategory::Color,
+                    CommandAction::SetChannelSource { channel: 1, source },
+                    format!("Set green channel source to {}", name),
+                )
+                .with_aliases(
+                    aliases
+                        .iter()
+                        .map(|a| format!("g {}", a))
+                        .chain(aliases.iter().map(|a| format!("green {}", a)))
+                        .collect(),
+                ),
+            );
+        }
+
+        for (source, name, aliases) in channel_sources {
+            commands.push(
+                Command::new(
+                    format!("Blue Channel: {}", name),
+                    CommandCategory::Color,
+                    CommandAction::SetChannelSource { channel: 2, source },
+                    format!("Set blue channel source to {}", name),
+                )
+                .with_aliases(
+                    aliases
+                        .iter()
+                        .map(|a| format!("b {}", a))
+                        .chain(aliases.iter().map(|a| format!("blue {}", a)))
+                        .collect(),
+                ),
             );
         }
 

@@ -1533,41 +1533,56 @@ fn icosahedral_ifs_de(pos: vec3<f32>) -> f32 {
     var dr = 1.0;
 
     // Golden ratio for icosahedral symmetry
-    let phi = 1.618033988749895;
+    let phi = (1.0 + sqrt(5.0)) / 2.0;
+
+    // Pre-compute normalized icosahedral fold normals
+    // These define the 15 mirror planes of icosahedral symmetry
+    let n1 = normalize(vec3<f32>(1.0, phi, 0.0));
+    let n2 = normalize(vec3<f32>(0.0, 1.0, phi));
+    let n3 = normalize(vec3<f32>(phi, 0.0, 1.0));
+    // Additional planes for full icosahedral symmetry
+    let n4 = normalize(vec3<f32>(-1.0, phi, 0.0));
+    let n5 = normalize(vec3<f32>(0.0, -1.0, phi));
 
     for (var i = 0u; i < uniforms.max_steps; i = i + 1u) {
         // Icosahedral folding - creates 20-fold symmetry
+        // Fold across icosahedral mirror planes (before abs!)
+        var d = dot(p, n1);
+        if (d < 0.0) { p = p - 2.0 * d * n1; }
+
+        d = dot(p, n2);
+        if (d < 0.0) { p = p - 2.0 * d * n2; }
+
+        d = dot(p, n3);
+        if (d < 0.0) { p = p - 2.0 * d * n3; }
+
+        d = dot(p, n4);
+        if (d < 0.0) { p = p - 2.0 * d * n4; }
+
+        d = dot(p, n5);
+        if (d < 0.0) { p = p - 2.0 * d * n5; }
+
+        // Apply abs for remaining octant folding
         p = abs(p);
 
-        // Fold along icosahedron planes
-        var dot_pn = dot(p, normalize(vec3<f32>(1.0, phi, 0.0)));
-        if (dot_pn < 0.0) {
-            p = p - 2.0 * dot_pn * normalize(vec3<f32>(1.0, phi, 0.0));
-        }
-
-        dot_pn = dot(p, normalize(vec3<f32>(0.0, 1.0, phi)));
-        if (dot_pn < 0.0) {
-            p = p - 2.0 * dot_pn * normalize(vec3<f32>(0.0, 1.0, phi));
-        }
-
-        dot_pn = dot(p, normalize(vec3<f32>(phi, 0.0, 1.0)));
-        if (dot_pn < 0.0) {
-            p = p - 2.0 * dot_pn * normalize(vec3<f32>(phi, 0.0, 1.0));
-        }
-
-        // Additional symmetry folding
-        if (p.x - p.y < 0.0) {
+        // Sort coordinates to ensure consistent fundamental domain
+        if (p.x < p.y) {
             let temp = p.x;
             p.x = p.y;
             p.y = temp;
         }
-        if (p.x - p.z < 0.0) {
-            let temp = p.x;
-            p.x = p.z;
+        if (p.y < p.z) {
+            let temp = p.y;
+            p.y = p.z;
             p.z = temp;
         }
+        if (p.x < p.y) {
+            let temp = p.x;
+            p.x = p.y;
+            p.y = temp;
+        }
 
-        // Apply scaling
+        // Apply scaling and translation
         p = p * scale - vec3<f32>(1.0) * (scale - 1.0);
         dr = dr * scale;
 

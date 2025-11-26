@@ -32,7 +32,7 @@ See the [Quick Start Guide](docs/QUICKSTART.md) for detailed instructions.
 ## Features
 
 - **GPU-Accelerated** - Efficient WebGPU rendering for 2D and 3D fractals
-- **26 Fractal Types** - 13 2D and 13 3D fractals including Mandelbrot, Julia, Mandelbulb, Menger Sponge, and more
+- **34 Fractal Types** - 19 2D and 15 3D fractals including Mandelbrot, Julia, Mandelbulb, Menger Sponge, strange attractors, and more
 - **Advanced Rendering** - PBR shading, ambient occlusion, soft shadows, depth of field
 - **Real-time Interaction** - Smooth pan/zoom, camera controls, parameter adjustment
 - **High-Quality Output** - PNG screenshots, video recording, custom resolutions
@@ -82,17 +82,21 @@ See [Features](docs/FEATURES.md) for complete feature documentation.
 
 ## Supported Fractals
 
-### 2D Fractals (13)
-Mandelbrot, Julia, Sierpinski Carpet, Sierpinski Triangle, Burning Ship, Tricorn, Phoenix, Celtic, Newton, Lyapunov, Nova, Magnet, Collatz
+### 2D Fractals (19)
+**Escape-Time:** Mandelbrot, Julia, Sierpinski Carpet, Sierpinski Triangle, Burning Ship, Tricorn, Phoenix, Celtic, Newton, Lyapunov, Nova, Magnet, Collatz
 
-### 3D Fractals (13)
-Mandelbulb, Menger Sponge, Sierpinski Pyramid, Julia Set 3D, Mandelbox, Tglad Formula, Octahedral IFS, Icosahedral IFS, Apollonian Gasket, Kleinian, Hybrid Mandelbulb-Julia, Quaternion Cubic, Sierpinski Gasket
+**Strange Attractors:** Hopalong, Martin, Gingerbreadman, Chip, Quadruptwo, Threeply
+
+### 3D Fractals (15)
+**Ray-Marched:** Mandelbulb, Menger Sponge, Sierpinski Pyramid, Julia Set 3D, Mandelbox, Octahedral IFS, Icosahedral IFS, Apollonian Gasket, Kleinian, Hybrid Mandelbulb-Julia, Quaternion Cubic, Sierpinski Gasket
+
+**Strange Attractors:** Pickover, Lorenz, Rossler
 
 ## Command Palette
 
 Press **Ctrl/Cmd+P** to open the command palette for quick access to all features:
 
-- **Fractal Selection** - Switch between all 26 fractal types
+- **Fractal Selection** - Switch between all 34 fractal types
 - **Effects** - Toggle AO, shadows, DoF, fog, bloom, FXAA
 - **Color Modes** - Palette, normals, orbit traps, debug visualization
 - **LOD Profiles** - Balanced, Quality First, Performance First

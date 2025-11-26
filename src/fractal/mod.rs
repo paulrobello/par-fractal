@@ -558,9 +558,8 @@ impl FractalParams {
                 self.roughness = 0.21;
                 self.metallic = 0.32;
             }
-            // IFS fractals don't reset parameters - preserves user customization
             FractalType::OctahedralIFS3D | FractalType::IcosahedralIFS3D => {
-                // No parameter resets - use current values or FractalParams defaults
+                self.fractal_fold = 1.7;
             }
             FractalType::ApollonianGasket3D => {
                 self.fractal_fold = 1.05;
@@ -716,10 +715,7 @@ impl FractalParams {
                 self.max_steps = rng.random_range(100..350);
                 self.fractal_scale = rng.random_range(0.8..3.0);
 
-                if matches!(
-                    self.fractal_type,
-                    FractalType::Mandelbox3D
-                ) {
+                if matches!(self.fractal_type, FractalType::Mandelbox3D) {
                     self.fractal_fold = rng.random_range(0.5..2.5);
                     self.fractal_min_radius = rng.random_range(0.2..1.5);
                 }
