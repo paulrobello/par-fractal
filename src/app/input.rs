@@ -170,9 +170,29 @@ impl App {
                 }
                 // QuaternionCubic3D: accessible via UI only (no F12 - reserved for screenshot)
                 KeyCode::KeyP => {
-                    self.fractal_params.next_palette();
-                    self.ui
-                        .show_toast(format!("Palette: {}", self.fractal_params.palette.name));
+                    if self.shift_pressed {
+                        // Shift+P: Cycle procedural palette
+                        use crate::fractal::ProceduralPalette;
+                        let all_options: Vec<ProceduralPalette> =
+                            std::iter::once(ProceduralPalette::None)
+                                .chain(ProceduralPalette::ALL.iter().copied())
+                                .collect();
+                        let current_idx = all_options
+                            .iter()
+                            .position(|p| *p == self.fractal_params.procedural_palette)
+                            .unwrap_or(0);
+                        let next_idx = (current_idx + 1) % all_options.len();
+                        self.fractal_params.procedural_palette = all_options[next_idx];
+                        self.ui.show_toast(format!(
+                            "Procedural: {}",
+                            self.fractal_params.procedural_palette.name()
+                        ));
+                    } else {
+                        // P: Cycle static palette
+                        self.fractal_params.next_palette();
+                        self.ui
+                            .show_toast(format!("Palette: {}", self.fractal_params.palette.name));
+                    }
                     return true;
                 }
                 KeyCode::F12 => {

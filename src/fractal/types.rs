@@ -168,3 +168,95 @@ pub enum FogMode {
     Exponential, // Exponential fog falloff
     Quadratic,   // Quadratic (exponential squared) fog falloff
 }
+
+/// Procedural palette types that generate colors mathematically
+/// These use cosine-based formulas for smooth, continuous color gradients
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum ProceduralPalette {
+    /// No procedural palette - use static color palette
+    #[default]
+    None,
+    /// Fire Storm - RGB phase-shifted cosines (classic Fractint firestrm)
+    /// r = (cos(a) + 1) / 2
+    /// g = (cos(a + 2π/3) + 1) / 2
+    /// b = (cos(a + 4π/3) + 1) / 2
+    Firestrm,
+    /// Rainbow - full spectrum HSV-like gradient
+    Rainbow,
+    /// Electric Blue - cyan to blue to purple
+    Electric,
+    /// Sunset - warm oranges to purples
+    Sunset,
+    /// Forest - greens and earth tones
+    Forest,
+    /// Ocean - deep blues to cyan
+    Ocean,
+    /// Grayscale - simple black to white
+    Grayscale,
+    /// Hot - black to red to yellow to white
+    Hot,
+    /// Cool - cyan to magenta gradient
+    Cool,
+    /// Plasma - purple to orange (scientific visualization)
+    Plasma,
+    /// Viridis - perceptually uniform (scientific visualization)
+    Viridis,
+    /// Custom - user-defined cosine palette parameters
+    Custom,
+}
+
+impl ProceduralPalette {
+    /// All procedural palette variants (excluding None)
+    pub const ALL: &'static [ProceduralPalette] = &[
+        ProceduralPalette::Firestrm,
+        ProceduralPalette::Rainbow,
+        ProceduralPalette::Electric,
+        ProceduralPalette::Sunset,
+        ProceduralPalette::Forest,
+        ProceduralPalette::Ocean,
+        ProceduralPalette::Grayscale,
+        ProceduralPalette::Hot,
+        ProceduralPalette::Cool,
+        ProceduralPalette::Plasma,
+        ProceduralPalette::Viridis,
+        ProceduralPalette::Custom,
+    ];
+
+    /// Returns the display name for this palette
+    pub fn name(&self) -> &'static str {
+        match self {
+            ProceduralPalette::None => "None (Static)",
+            ProceduralPalette::Firestrm => "Fire Storm",
+            ProceduralPalette::Rainbow => "Rainbow",
+            ProceduralPalette::Electric => "Electric",
+            ProceduralPalette::Sunset => "Sunset",
+            ProceduralPalette::Forest => "Forest",
+            ProceduralPalette::Ocean => "Ocean",
+            ProceduralPalette::Grayscale => "Grayscale",
+            ProceduralPalette::Hot => "Hot",
+            ProceduralPalette::Cool => "Cool",
+            ProceduralPalette::Plasma => "Plasma",
+            ProceduralPalette::Viridis => "Viridis",
+            ProceduralPalette::Custom => "Custom",
+        }
+    }
+
+    /// Returns the shader index for this procedural palette type
+    pub fn shader_index(&self) -> u32 {
+        match self {
+            ProceduralPalette::None => 0,
+            ProceduralPalette::Firestrm => 1,
+            ProceduralPalette::Rainbow => 2,
+            ProceduralPalette::Electric => 3,
+            ProceduralPalette::Sunset => 4,
+            ProceduralPalette::Forest => 5,
+            ProceduralPalette::Ocean => 6,
+            ProceduralPalette::Grayscale => 7,
+            ProceduralPalette::Hot => 8,
+            ProceduralPalette::Cool => 9,
+            ProceduralPalette::Plasma => 10,
+            ProceduralPalette::Viridis => 11,
+            ProceduralPalette::Custom => 12,
+        }
+    }
+}

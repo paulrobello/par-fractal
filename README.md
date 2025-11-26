@@ -37,7 +37,7 @@ See the [Quick Start Guide](docs/QUICKSTART.md) for detailed instructions.
 - **Real-time Interaction** - Smooth pan/zoom, camera controls, parameter adjustment
 - **High-Quality Output** - PNG screenshots, video recording, custom resolutions
 - **Productivity Tools** - Command palette, presets, bookmarks, undo/redo
-- **Custom Palettes** - 6 built-in palettes plus custom color scheme support
+- **Custom Palettes** - 46 static palettes, 12 procedural palettes (including Fractint-style), plus custom color schemes
 - **Web Browser Support** - Run directly in browser via WebGPU/WASM
 - **Performance Tuning** - LOD system, quality profiles, GPU selection
 
@@ -180,7 +180,8 @@ make checkall       # Run all checks
 | **Ctrl/Cmd+P** | Open command palette |
 | **Ctrl/Cmd+Z** | Undo |
 | **1-4** | Quick switch fractals |
-| **P** | Cycle color palettes |
+| **P** | Cycle static palettes |
+| **Shift+P** | Cycle procedural palettes |
 
 #### 2D Mode
 | Shortcut | Action |

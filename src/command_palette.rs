@@ -82,6 +82,7 @@ pub enum CommandAction {
     Screenshot,
     CycleTheme,
     CyclePalette,
+    CycleProceduralPalette,
     IncrementIterations,
     DecrementIterations,
     IncrementPower,
@@ -1020,13 +1021,29 @@ impl CommandPalette {
         // === Control Commands ===
         commands.push(
             Command::new(
-                "Next Palette",
+                "Next Static Palette",
                 CommandCategory::Color,
                 CommandAction::CyclePalette,
-                "Cycle to next color palette",
+                "Cycle to next static color palette",
             )
             .with_aliases(vec!["next palette", "palette next", "cycle palette"])
             .with_shortcut("P"),
+        );
+
+        commands.push(
+            Command::new(
+                "Next Procedural Palette",
+                CommandCategory::Color,
+                CommandAction::CycleProceduralPalette,
+                "Cycle to next procedural palette (Fire Storm, Rainbow, etc.)",
+            )
+            .with_aliases(vec![
+                "procedural palette",
+                "cycle procedural",
+                "firestrm",
+                "rainbow palette",
+            ])
+            .with_shortcut("Shift+P"),
         );
 
         commands.push(

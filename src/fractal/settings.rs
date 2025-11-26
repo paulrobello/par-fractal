@@ -1,5 +1,7 @@
 use super::ui_state::*;
-use super::{ChannelSource, ColorMode, FogMode, FractalType, ShadingModel, UIState};
+use super::{
+    ChannelSource, ColorMode, FogMode, FractalType, ProceduralPalette, ShadingModel, UIState,
+};
 use crate::lod::LODConfig;
 use serde::{Deserialize, Serialize};
 
@@ -13,6 +15,18 @@ pub struct Settings {
     pub channel_r: ChannelSource,
     pub channel_g: ChannelSource,
     pub channel_b: ChannelSource,
+
+    // Procedural palette settings
+    #[serde(default)]
+    pub procedural_palette: ProceduralPalette,
+    #[serde(default = "default_procedural_brightness")]
+    pub procedural_brightness: [f32; 3],
+    #[serde(default = "default_procedural_contrast")]
+    pub procedural_contrast: [f32; 3],
+    #[serde(default = "default_procedural_frequency")]
+    pub procedural_frequency: [f32; 3],
+    #[serde(default = "default_procedural_phase")]
+    pub procedural_phase: [f32; 3],
 
     // UI state
     #[serde(default)]
@@ -149,6 +163,22 @@ fn default_attractor_iterations_per_frame() -> u32 {
 
 fn default_attractor_log_scale() -> f32 {
     1.0
+}
+
+fn default_procedural_brightness() -> [f32; 3] {
+    [0.5, 0.5, 0.5]
+}
+
+fn default_procedural_contrast() -> [f32; 3] {
+    [0.5, 0.5, 0.5]
+}
+
+fn default_procedural_frequency() -> [f32; 3] {
+    [1.0, 1.0, 1.0]
+}
+
+fn default_procedural_phase() -> [f32; 3] {
+    [0.0, 0.333, 0.667]
 }
 
 // Preset categories for organization

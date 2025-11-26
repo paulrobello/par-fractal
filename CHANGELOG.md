@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2025-11-25
+
+### Added
+
+#### Procedural Palettes
+- **12 mathematically-generated color palettes** using cosine-based formulas:
+  - **Fire Storm** - Classic Fractint `firestrm` palette with RGB phase-shifted cosines
+  - **Rainbow** - Full spectrum HSV hue rotation
+  - **Electric** - Cyan to blue to purple gradient
+  - **Sunset** - Warm oranges to purples
+  - **Forest** - Greens and earth tones
+  - **Ocean** - Deep blues to cyan
+  - **Grayscale** - Simple black to white
+  - **Hot** - Black to red to yellow to white
+  - **Cool** - Cyan to magenta gradient
+  - **Plasma** - Purple to orange (scientific visualization)
+  - **Viridis** - Perceptually uniform (scientific visualization)
+  - **Custom** - User-defined cosine palette with adjustable brightness, contrast, frequency, and phase parameters
+
+#### Command Palette Enhancements
+- Added "Next Procedural Palette" command (`Shift+P`) to cycle through procedural palettes
+- Renamed "Next Palette" to "Next Static Palette" for clarity
+
+#### Keyboard Shortcuts
+- `Shift+P` - Cycle procedural palette (new)
+- `P` - Cycle static palette (unchanged)
+
+### Changed
+- Procedural palettes use GPU-computed colors for smooth, continuous gradients
+- Palette animation works with both static and procedural palettes
+- UI shows procedural palette preview and custom parameter controls
+
+### Fixed
+- Fixed command palette fractal selection not properly switching fractal type (was not calling `switch_fractal()`)
+- Fixed Rainbow procedural palette being identical to Fire Storm (now uses proper HSV hue rotation)
+
 ## [0.3.0] - 2025-11-25
 
 ### Added

@@ -30,6 +30,18 @@ pub struct FractalParams {
     pub channel_g: ChannelSource,
     pub channel_b: ChannelSource,
 
+    // Procedural palette settings
+    pub procedural_palette: ProceduralPalette,
+    /// Custom procedural palette parameters (for Custom type)
+    /// Format: [brightness_r, brightness_g, brightness_b, _]
+    pub procedural_brightness: [f32; 3],
+    /// Format: [contrast_r, contrast_g, contrast_b, _]
+    pub procedural_contrast: [f32; 3],
+    /// Format: [frequency_r, frequency_g, frequency_b, _]
+    pub procedural_frequency: [f32; 3],
+    /// Format: [phase_r, phase_g, phase_b, _]
+    pub procedural_phase: [f32; 3],
+
     // 2D specific
     pub center_2d: [f64; 2],
     pub zoom_2d: f32,
@@ -154,6 +166,14 @@ impl Default for FractalParams {
             channel_g: ChannelSource::Distance,
             channel_b: ChannelSource::PositionZ,
 
+            // Procedural palette defaults
+            procedural_palette: ProceduralPalette::None,
+            // Default custom parameters create a rainbow-like gradient
+            procedural_brightness: [0.5, 0.5, 0.5],
+            procedural_contrast: [0.5, 0.5, 0.5],
+            procedural_frequency: [1.0, 1.0, 1.0],
+            procedural_phase: [0.0, 0.333, 0.667],
+
             center_2d: [0.0f64, 0.0f64],
             zoom_2d: 1.0,
             julia_c: [-0.7, 0.27015],
@@ -255,6 +275,11 @@ impl FractalParams {
             channel_r: self.channel_r,
             channel_g: self.channel_g,
             channel_b: self.channel_b,
+            procedural_palette: self.procedural_palette,
+            procedural_brightness: self.procedural_brightness,
+            procedural_contrast: self.procedural_contrast,
+            procedural_frequency: self.procedural_frequency,
+            procedural_phase: self.procedural_phase,
             ui_state: UIState::default(), // Will be overridden by App if UI state exists
             auto_open_captures: false,    // Will be overridden by App with UI state
             center_2d: self.center_2d,
@@ -380,6 +405,11 @@ impl FractalParams {
             channel_r: settings.channel_r,
             channel_g: settings.channel_g,
             channel_b: settings.channel_b,
+            procedural_palette: settings.procedural_palette,
+            procedural_brightness: settings.procedural_brightness,
+            procedural_contrast: settings.procedural_contrast,
+            procedural_frequency: settings.procedural_frequency,
+            procedural_phase: settings.procedural_phase,
             center_2d: settings.center_2d,
             zoom_2d: settings.zoom_2d,
             julia_c: settings.julia_c,

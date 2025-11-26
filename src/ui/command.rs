@@ -161,7 +161,7 @@ impl UI {
 
         match action {
             CommandAction::SetFractalType(ftype) => {
-                params.fractal_type = ftype;
+                params.switch_fractal(ftype);
                 changed = true;
                 message = Some(format!("Switched to {:?}", ftype));
             }
@@ -296,7 +296,25 @@ impl UI {
             CommandAction::CyclePalette => {
                 params.next_palette();
                 changed = true;
-                message = Some(format!("Palette: {}", params.palette.name));
+                message = Some(format!("Static Palette: {}", params.palette.name));
+            }
+            CommandAction::CycleProceduralPalette => {
+                use crate::fractal::ProceduralPalette;
+                // Cycle through procedural palettes including None
+                let all_options: Vec<ProceduralPalette> = std::iter::once(ProceduralPalette::None)
+                    .chain(ProceduralPalette::ALL.iter().copied())
+                    .collect();
+                let current_idx = all_options
+                    .iter()
+                    .position(|p| *p == params.procedural_palette)
+                    .unwrap_or(0);
+                let next_idx = (current_idx + 1) % all_options.len();
+                params.procedural_palette = all_options[next_idx];
+                changed = true;
+                message = Some(format!(
+                    "Procedural Palette: {}",
+                    params.procedural_palette.name()
+                ));
             }
             CommandAction::IncrementIterations => {
                 use crate::fractal::RenderMode;

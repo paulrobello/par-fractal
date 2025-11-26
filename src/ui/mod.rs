@@ -20,6 +20,121 @@ use glam::Vec3;
 
 use history::HistoryEntry;
 
+use crate::fractal::ProceduralPalette;
+
+/// Generate a preview color for procedural palettes (CPU-side approximation of shader code)
+fn get_procedural_preview_color(
+    palette_type: ProceduralPalette,
+    t: f32,
+    brightness: &[f32; 3],
+    contrast: &[f32; 3],
+    frequency: &[f32; 3],
+    phase: &[f32; 3],
+) -> [f32; 3] {
+    const TWO_PI: f32 = std::f32::consts::PI * 2.0;
+
+    // Generic cosine palette formula
+    let cosine_palette = |t: f32, a: [f32; 3], b: [f32; 3], c: [f32; 3], d: [f32; 3]| -> [f32; 3] {
+        [
+            (a[0] + b[0] * (TWO_PI * (c[0] * t + d[0])).cos()).clamp(0.0, 1.0),
+            (a[1] + b[1] * (TWO_PI * (c[1] * t + d[1])).cos()).clamp(0.0, 1.0),
+            (a[2] + b[2] * (TWO_PI * (c[2] * t + d[2])).cos()).clamp(0.0, 1.0),
+        ]
+    };
+
+    match palette_type {
+        ProceduralPalette::None => [0.0, 0.0, 0.0],
+        ProceduralPalette::Firestrm => {
+            let angle = t * TWO_PI;
+            [
+                (angle.cos() + 1.0) * 0.5,
+                ((angle + TWO_PI / 3.0).cos() + 1.0) * 0.5,
+                ((angle + TWO_PI * 2.0 / 3.0).cos() + 1.0) * 0.5,
+            ]
+        }
+        ProceduralPalette::Rainbow => {
+            // HSV hue rotation (red -> yellow -> green -> cyan -> blue -> magenta -> red)
+            let h = t;
+            let c = 1.0_f32; // s * v where s=1, v=1
+            let x = c * (1.0 - ((h * 6.0).fract() * 2.0 - 1.0).abs());
+            let m = 0.0_f32; // v - c where v=1, c=1
+            let h6 = h * 6.0;
+            let (r, g, b) = if h6 < 1.0 {
+                (c, x, 0.0)
+            } else if h6 < 2.0 {
+                (x, c, 0.0)
+            } else if h6 < 3.0 {
+                (0.0, c, x)
+            } else if h6 < 4.0 {
+                (0.0, x, c)
+            } else if h6 < 5.0 {
+                (x, 0.0, c)
+            } else {
+                (c, 0.0, x)
+            };
+            [r + m, g + m, b + m]
+        }
+        ProceduralPalette::Electric => cosine_palette(
+            t,
+            [0.5, 0.5, 0.5],
+            [0.5, 0.5, 0.5],
+            [1.0, 1.0, 1.0],
+            [0.5, 0.6, 0.7],
+        ),
+        ProceduralPalette::Sunset => cosine_palette(
+            t,
+            [0.5, 0.5, 0.5],
+            [0.5, 0.5, 0.5],
+            [1.0, 1.0, 1.0],
+            [0.0, 0.1, 0.2],
+        ),
+        ProceduralPalette::Forest => cosine_palette(
+            t,
+            [0.5, 0.5, 0.5],
+            [0.5, 0.5, 0.5],
+            [1.0, 1.0, 0.5],
+            [0.3, 0.2, 0.2],
+        ),
+        ProceduralPalette::Ocean => cosine_palette(
+            t,
+            [0.5, 0.5, 0.5],
+            [0.5, 0.5, 0.5],
+            [1.0, 1.0, 1.0],
+            [0.6, 0.7, 0.8],
+        ),
+        ProceduralPalette::Grayscale => [t, t, t],
+        ProceduralPalette::Hot => cosine_palette(
+            t,
+            [0.5, 0.5, 0.5],
+            [0.5, 0.5, 0.4],
+            [1.0, 1.0, 1.0],
+            [0.0, 0.15, 0.4],
+        ),
+        ProceduralPalette::Cool => cosine_palette(
+            t,
+            [0.5, 0.5, 0.5],
+            [0.5, 0.5, 0.5],
+            [1.0, 1.0, 1.0],
+            [0.8, 0.9, 0.3],
+        ),
+        ProceduralPalette::Plasma => cosine_palette(
+            t,
+            [0.5, 0.5, 0.5],
+            [0.5, 0.5, 0.5],
+            [1.0, 1.0, 1.0],
+            [0.8, 0.9, 0.1],
+        ),
+        ProceduralPalette::Viridis => cosine_palette(
+            t,
+            [0.5, 0.5, 0.5],
+            [0.4, 0.5, 0.4],
+            [0.8, 0.8, 0.5],
+            [0.7, 0.5, 0.0],
+        ),
+        ProceduralPalette::Custom => cosine_palette(t, *brightness, *contrast, *frequency, *phase),
+    }
+}
+
 // Video format - use actual type on native, stub on web
 #[cfg(not(target_arch = "wasm32"))]
 use crate::video_recorder::VideoFormat;
@@ -895,37 +1010,119 @@ impl UI {
                            params.color_mode == crate::fractal::ColorMode::OrbitTrapXYZ ||
                            params.color_mode == crate::fractal::ColorMode::OrbitTrapRadial {
                             ui.separator();
-                            ui.label("Palette Selection:")
-                                .on_hover_text("Choose from 6 built-in color palettes [P to cycle]");
-                            ui.horizontal(|ui| {
-                                if ui.button("◀ Previous").on_hover_text("Switch to previous palette").clicked() {
-                                    params.prev_palette();
-                                    self.show_toast(format!("Palette: {}", params.palette.name));
-                                    changed = true;
-                                }
-                                ui.label(params.palette.name);
-                                if ui.button("Next ▶").on_hover_text("Switch to next palette [P]").clicked() {
-                                    params.next_palette();
-                                    self.show_toast(format!("Palette: {}", params.palette.name));
-                                    changed = true;
-                                }
-                            });
+                            // Procedural Palette Selection
+                            ui.label("Procedural Palette:")
+                                .on_hover_text("Choose a mathematically-generated palette for smooth gradients");
+                            changed |= egui::ComboBox::from_id_salt("procedural_palette")
+                                .selected_text(params.procedural_palette.name())
+                                .show_ui(ui, |ui| {
+                                    let mut ch = false;
+                                    ch |= ui.selectable_value(
+                                        &mut params.procedural_palette,
+                                        crate::fractal::ProceduralPalette::None,
+                                        "None (Static)"
+                                    ).on_hover_text("Use the static color palette below").changed();
+                                    for palette in crate::fractal::ProceduralPalette::ALL {
+                                        ch |= ui.selectable_value(
+                                            &mut params.procedural_palette,
+                                            *palette,
+                                            palette.name()
+                                        ).changed();
+                                    }
+                                    ch
+                                })
+                                .inner.unwrap_or(false);
 
-                            // Show palette colors
-                            ui.horizontal(|ui| {
-                                for color in &params.palette.colors {
-                                    let color32 = egui::Color32::from_rgb(
-                                        (color.x * 255.0) as u8,
-                                        (color.y * 255.0) as u8,
-                                        (color.z * 255.0) as u8,
-                                    );
-                                    let (rect, _response) = ui.allocate_exact_size(
-                                        egui::vec2(20.0, 20.0),
-                                        egui::Sense::hover()
-                                    );
-                                    ui.painter().rect_filled(rect, 2.0, color32);
+                            // Show procedural palette preview (generate 8 sample colors)
+                            if params.procedural_palette != crate::fractal::ProceduralPalette::None {
+                                ui.horizontal(|ui| {
+                                    for i in 0..8 {
+                                        let t = i as f32 / 7.0;
+                                        let color = get_procedural_preview_color(params.procedural_palette, t, &params.procedural_brightness, &params.procedural_contrast, &params.procedural_frequency, &params.procedural_phase);
+                                        let color32 = egui::Color32::from_rgb(
+                                            (color[0] * 255.0) as u8,
+                                            (color[1] * 255.0) as u8,
+                                            (color[2] * 255.0) as u8,
+                                        );
+                                        let (rect, _response) = ui.allocate_exact_size(
+                                            egui::vec2(20.0, 20.0),
+                                            egui::Sense::hover()
+                                        );
+                                        ui.painter().rect_filled(rect, 2.0, color32);
+                                    }
+                                });
+
+                                // Custom palette parameters when Custom is selected
+                                if params.procedural_palette == crate::fractal::ProceduralPalette::Custom {
+                                    ui.separator();
+                                    ui.label("Custom Palette Parameters:")
+                                        .on_hover_text("Adjust cosine palette formula: color = a + b * cos(2π * (c * t + d))");
+
+                                    ui.horizontal(|ui| {
+                                        ui.label("Brightness:");
+                                        changed |= ui.add(egui::DragValue::new(&mut params.procedural_brightness[0]).speed(0.01).range(0.0..=1.0).prefix("R: ")).changed();
+                                        changed |= ui.add(egui::DragValue::new(&mut params.procedural_brightness[1]).speed(0.01).range(0.0..=1.0).prefix("G: ")).changed();
+                                        changed |= ui.add(egui::DragValue::new(&mut params.procedural_brightness[2]).speed(0.01).range(0.0..=1.0).prefix("B: ")).changed();
+                                    });
+
+                                    ui.horizontal(|ui| {
+                                        ui.label("Contrast:");
+                                        changed |= ui.add(egui::DragValue::new(&mut params.procedural_contrast[0]).speed(0.01).range(0.0..=1.0).prefix("R: ")).changed();
+                                        changed |= ui.add(egui::DragValue::new(&mut params.procedural_contrast[1]).speed(0.01).range(0.0..=1.0).prefix("G: ")).changed();
+                                        changed |= ui.add(egui::DragValue::new(&mut params.procedural_contrast[2]).speed(0.01).range(0.0..=1.0).prefix("B: ")).changed();
+                                    });
+
+                                    ui.horizontal(|ui| {
+                                        ui.label("Frequency:");
+                                        changed |= ui.add(egui::DragValue::new(&mut params.procedural_frequency[0]).speed(0.01).range(0.0..=5.0).prefix("R: ")).changed();
+                                        changed |= ui.add(egui::DragValue::new(&mut params.procedural_frequency[1]).speed(0.01).range(0.0..=5.0).prefix("G: ")).changed();
+                                        changed |= ui.add(egui::DragValue::new(&mut params.procedural_frequency[2]).speed(0.01).range(0.0..=5.0).prefix("B: ")).changed();
+                                    });
+
+                                    ui.horizontal(|ui| {
+                                        ui.label("Phase:");
+                                        changed |= ui.add(egui::DragValue::new(&mut params.procedural_phase[0]).speed(0.01).range(0.0..=1.0).prefix("R: ")).changed();
+                                        changed |= ui.add(egui::DragValue::new(&mut params.procedural_phase[1]).speed(0.01).range(0.0..=1.0).prefix("G: ")).changed();
+                                        changed |= ui.add(egui::DragValue::new(&mut params.procedural_phase[2]).speed(0.01).range(0.0..=1.0).prefix("B: ")).changed();
+                                    });
                                 }
-                            });
+                            }
+
+                            // Static Palette Selection (only shown when not using procedural)
+                            if params.procedural_palette == crate::fractal::ProceduralPalette::None {
+                                ui.separator();
+                                ui.label("Static Palette:")
+                                    .on_hover_text("Choose from built-in color palettes [P to cycle]");
+                                ui.horizontal(|ui| {
+                                    if ui.button("◀ Previous").on_hover_text("Switch to previous palette").clicked() {
+                                        params.prev_palette();
+                                        self.show_toast(format!("Palette: {}", params.palette.name));
+                                        changed = true;
+                                    }
+                                    ui.label(params.palette.name);
+                                    if ui.button("Next ▶").on_hover_text("Switch to next palette [P]").clicked() {
+                                        params.next_palette();
+                                        self.show_toast(format!("Palette: {}", params.palette.name));
+                                        changed = true;
+                                    }
+                                });
+
+                                // Show palette colors
+                                ui.horizontal(|ui| {
+                                    for color in &params.palette.colors {
+                                        let color32 = egui::Color32::from_rgb(
+                                            (color.x * 255.0) as u8,
+                                            (color.y * 255.0) as u8,
+                                            (color.z * 255.0) as u8,
+                                        );
+                                        let (rect, _response) = ui.allocate_exact_size(
+                                            egui::vec2(20.0, 20.0),
+                                            egui::Sense::hover()
+                                        );
+                                        ui.painter().rect_filled(rect, 2.0, color32);
+                                    }
+                                });
+                            }
 
                             // Palette Animation Controls
                             ui.separator();
@@ -2922,19 +3119,18 @@ impl UI {
                     ui.separator();
                     ui.add_space(4.0);
 
-                    ui.collapsing("What's New in v0.3.0", |ui| {
-                        ui.label("• 6 new 2D strange attractors (Hopalong, Martin, etc.)");
-                        ui.label("• 3 new 3D strange attractors (Lorenz, Pickover, Rossler)");
-                        ui.label("• Command palette: shading, fog, channel source commands");
-                        ui.label("• Hit-based rendering for attractors");
-                        ui.label("• Toast notifications for palette changes");
-                        ui.label("• Removed TgladFormula3D (consolidated into IFS)");
+                    ui.collapsing("What's New in v0.4.0", |ui| {
+                        ui.label("• 12 procedural palettes (Fire Storm, Rainbow, etc.)");
+                        ui.label("• Classic Fractint 'firestrm' palette support");
+                        ui.label("• Custom procedural palette with adjustable parameters");
+                        ui.label("• Shift+P to cycle procedural palettes");
+                        ui.label("• Fixed command palette fractal selection");
                     });
 
                     ui.collapsing("Features", |ui| {
                         ui.label("• 19 2D fractals (13 escape-time + 6 attractors)");
                         ui.label("• 15 3D fractals (12 ray-marched + 3 attractors)");
-                        ui.label("• 33+ color palettes with animation");
+                        ui.label("• 46 static + 12 procedural color palettes");
                         ui.label("• PBR shading, AO, soft shadows, DoF");
                         ui.label("• Screenshot & video recording");
                         ui.label("• Preset system with import/export");

@@ -132,15 +132,18 @@ pub struct Uniforms {
     // Aspect ratio stored in a vec4 slot to guarantee 16-byte alignment
     aspect_ratio: [f32; 4], // .x = width/height, others unused
 
-    // Reserved fields (unused, maintained for struct alignment)
-    _reserved1: u32,
-    _reserved2: u32,
-    _reserved3: u32,
-    _reserved4: u32,
+    // Procedural palette parameters
+    procedural_palette_type: u32, // 0=None (use static), 1=Firestrm, 2=Rainbow, etc.
+    _padding_proc_pal: [u32; 3],  // Align to 16 bytes
+    /// Custom procedural palette: brightness (a), contrast (b), frequency (c), phase (d)
+    /// color(t) = a + b * cos(2π * (c * t + d))
+    procedural_brightness: [f32; 4], // [r, g, b, _]
+    procedural_contrast: [f32; 4], // [r, g, b, _]
+    procedural_frequency: [f32; 4], // [r, g, b, _]
+    procedural_phase: [f32; 4],   // [r, g, b, _]
 
-    // Padding for 16-byte alignment
-    _padding_end: [f32; 12], // 48 bytes (reduced from 96 to account for 3 extra palette colors)
-    _padding_end2: [f32; 4], // 16 bytes
+    // Padding for 16-byte alignment (reduced to accommodate procedural palette)
+    _padding_end: [f32; 8], // 32 bytes
 }
 
 impl Default for Uniforms {
@@ -255,13 +258,15 @@ impl Uniforms {
 
             aspect_ratio: [16.0 / 9.0, 0.0, 0.0, 0.0], // Default aspect ratio
 
-            _reserved1: 0,
-            _reserved2: 0,
-            _reserved3: 0,
-            _reserved4: 0,
+            // Procedural palette defaults
+            procedural_palette_type: 0, // None (use static palette)
+            _padding_proc_pal: [0; 3],
+            procedural_brightness: [0.5, 0.5, 0.5, 0.0],
+            procedural_contrast: [0.5, 0.5, 0.5, 0.0],
+            procedural_frequency: [1.0, 1.0, 1.0, 0.0],
+            procedural_phase: [0.0, 0.333, 0.667, 0.0],
 
-            _padding_end: [0.0; 12],
-            _padding_end2: [0.0; 4],
+            _padding_end: [0.0; 8],
         }
     }
 
@@ -357,6 +362,33 @@ impl Uniforms {
         for (i, color) in params.palette.colors.iter().enumerate() {
             self.palette[i] = [color.x, color.y, color.z, 1.0];
         }
+
+        // Update procedural palette
+        self.procedural_palette_type = params.procedural_palette.shader_index();
+        self.procedural_brightness = [
+            params.procedural_brightness[0],
+            params.procedural_brightness[1],
+            params.procedural_brightness[2],
+            0.0,
+        ];
+        self.procedural_contrast = [
+            params.procedural_contrast[0],
+            params.procedural_contrast[1],
+            params.procedural_contrast[2],
+            0.0,
+        ];
+        self.procedural_frequency = [
+            params.procedural_frequency[0],
+            params.procedural_frequency[1],
+            params.procedural_frequency[2],
+            0.0,
+        ];
+        self.procedural_phase = [
+            params.procedural_phase[0],
+            params.procedural_phase[1],
+            params.procedural_phase[2],
+            0.0,
+        ];
 
         self.ambient_occlusion = if params.ambient_occlusion { 1 } else { 0 };
         // shadow_mode: 0=off,1=hard,2=soft; pass through for shader
@@ -496,8 +528,8 @@ impl Uniforms {
 
 // Compile-time assertion to ensure struct size matches WGSL expectations
 const _: () = assert!(
-    std::mem::size_of::<Uniforms>() == 832,
-    "Uniforms struct must be exactly 832 bytes"
+    std::mem::size_of::<Uniforms>() == 864,
+    "Uniforms struct must be exactly 864 bytes"
 );
 
 // Post-processing uniform structs
