@@ -431,11 +431,16 @@ impl App {
 
                 match touch.phase {
                     TouchPhase::Started => {
-                        // Clear stale touches if we have too many (Ended events might have been lost)
-                        if self.active_touches.len() >= 2 {
-                            log::info!("🔧 Touch: Clearing {} stale touches", self.active_touches.len());
+                        // Clear ALL touches on first touch to prevent phantom/stale touches
+                        // This ensures clean state and prevents accidental pinch detection
+                        if self.active_touches.is_empty() {
+                            log::info!("🔧 Touch: First touch, starting fresh");
+                        } else {
+                            log::info!("🔧 Touch: Clearing {} existing touches for clean start", self.active_touches.len());
                             self.active_touches.clear();
                             self.initial_pinch_distance = None;
+                            self.mouse_pressed = false;
+                            self.last_mouse_pos = None;
                         }
 
                         self.active_touches.insert(touch.id, current_pos);
@@ -459,6 +464,7 @@ impl App {
                             let dy = touches[0].1 - touches[1].1;
                             let distance = (dx * dx + dy * dy).sqrt();
                             self.initial_pinch_distance = Some(distance);
+                            log::info!("🔧 Touch: Starting pinch gesture, initial distance={:.1}", distance);
                         }
                         true
                     }
