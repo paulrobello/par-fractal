@@ -402,18 +402,65 @@ impl App {
                 true
             }
             WindowEvent::Touch(touch) => {
-                // Handle touch events for mobile 2D panning
+                // Handle touch events for mobile 2D panning and pinch-to-zoom
                 match touch.phase {
                     TouchPhase::Started => {
-                        self.mouse_pressed = true;
                         let current_pos = (touch.location.x as f32, touch.location.y as f32);
-                        self.cursor_pos = current_pos;
-                        self.last_mouse_pos = Some(current_pos);
+                        self.active_touches.insert(touch.id, current_pos);
+
+                        // If this is the first touch, enable panning
+                        if self.active_touches.len() == 1 {
+                            self.mouse_pressed = true;
+                            self.cursor_pos = current_pos;
+                            self.last_mouse_pos = Some(current_pos);
+                        }
+                        // If we now have 2 touches, start pinch gesture
+                        else if self.active_touches.len() == 2 {
+                            self.mouse_pressed = false; // Disable panning during pinch
+                            self.last_mouse_pos = None;
+                            // Calculate initial distance between two fingers
+                            let touches: Vec<&(f32, f32)> = self.active_touches.values().collect();
+                            let dx = touches[0].0 - touches[1].0;
+                            let dy = touches[0].1 - touches[1].1;
+                            let distance = (dx * dx + dy * dy).sqrt();
+                            self.initial_pinch_distance = Some(distance);
+                        }
                         true
                     }
                     TouchPhase::Moved => {
-                        if self.mouse_pressed && !self.shift_pressed {
-                            let current_pos = (touch.location.x as f32, touch.location.y as f32);
+                        // Update touch position
+                        let current_pos = (touch.location.x as f32, touch.location.y as f32);
+                        self.active_touches.insert(touch.id, current_pos);
+
+                        // Handle pinch-to-zoom (2 fingers)
+                        if self.active_touches.len() == 2 {
+                            let touches: Vec<&(f32, f32)> = self.active_touches.values().collect();
+                            let dx = touches[0].0 - touches[1].0;
+                            let dy = touches[0].1 - touches[1].1;
+                            let current_distance = (dx * dx + dy * dy).sqrt();
+
+                            if let Some(initial_distance) = self.initial_pinch_distance {
+                                // Calculate zoom factor based on distance change
+                                let zoom_delta = current_distance / initial_distance;
+                                // Apply zoom with smoothing
+                                let zoom_factor = 1.0 + (zoom_delta - 1.0) * 0.05;
+                                self.fractal_params.zoom_2d *= zoom_factor;
+
+                                // Update initial distance for next frame
+                                self.initial_pinch_distance = Some(current_distance);
+
+                                // Calculate center point between two fingers for zoom center
+                                let center_x = (touches[0].0 + touches[1].0) / 2.0;
+                                let center_y = (touches[0].1 + touches[1].1) / 2.0;
+                                self.cursor_pos = (center_x, center_y);
+                            }
+                            true
+                        }
+                        // Handle single-finger pan
+                        else if self.active_touches.len() == 1
+                            && self.mouse_pressed
+                            && !self.shift_pressed
+                        {
                             self.cursor_pos = current_pos;
 
                             if let Some(last_pos) = self.last_mouse_pos {
@@ -436,8 +483,26 @@ impl App {
                         }
                     }
                     TouchPhase::Ended | TouchPhase::Cancelled => {
-                        self.mouse_pressed = false;
-                        self.last_mouse_pos = None;
+                        // Remove this touch from active touches
+                        self.active_touches.remove(&touch.id);
+
+                        // If we're down to 1 or 0 touches, reset pinch state
+                        if self.active_touches.len() < 2 {
+                            self.initial_pinch_distance = None;
+                        }
+
+                        // If all touches ended, reset mouse state
+                        if self.active_touches.is_empty() {
+                            self.mouse_pressed = false;
+                            self.last_mouse_pos = None;
+                        }
+                        // If we're down to 1 touch, re-enable panning
+                        else if self.active_touches.len() == 1 {
+                            let remaining_touch = self.active_touches.values().next().unwrap();
+                            self.mouse_pressed = true;
+                            self.cursor_pos = *remaining_touch;
+                            self.last_mouse_pos = Some(*remaining_touch);
+                        }
                         true
                     }
                 }

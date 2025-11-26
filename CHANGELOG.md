@@ -26,6 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Touch events properly map to pan/drag behavior (TouchPhase::Started/Moved/Ended)
   - Single-finger drag now works for both 2D fractal panning and 3D camera rotation
   - Disabled text selection and tap highlighting during touch interactions
+- **Pinch-to-zoom gesture support** - Two-finger pinch gestures now control zoom on mobile
+  - Multi-touch tracking with HashMap to manage multiple simultaneous touch points
+  - Pinch-in/out gestures smoothly zoom 2D fractals in/out
+  - Zoom center calculated between two fingers for intuitive zooming
+  - Automatic transition between pan (1 finger) and zoom (2 fingers) modes
+  - Smooth zoom factor calculation with 5% sensitivity for precise control
 
 ## [0.4.0] - 2025-11-25
 

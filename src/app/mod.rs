@@ -38,6 +38,9 @@ pub struct App {
     last_mouse_pos: Option<(f32, f32)>,
     cursor_pos: (f32, f32), // Current cursor position for zoom-at-cursor
     shift_pressed: bool,    // Track shift key for continuous zoom
+    // Multi-touch pinch-to-zoom tracking
+    active_touches: std::collections::HashMap<u64, (f32, f32)>, // touch_id -> (x, y)
+    initial_pinch_distance: Option<f32>, // Distance between two fingers at pinch start
     frame_count: u32,
     fps_timer: web_time::Instant,
     current_fps: f32,
@@ -150,6 +153,8 @@ impl App {
             last_mouse_pos: None,
             cursor_pos: (0.0, 0.0),
             shift_pressed: false,
+            active_touches: std::collections::HashMap::new(),
+            initial_pinch_distance: None,
             frame_count: 0,
             fps_timer: web_time::Instant::now(),
             current_fps: 0.0,
@@ -251,6 +256,8 @@ impl App {
             last_mouse_pos: None,
             cursor_pos: (0.0, 0.0),
             shift_pressed: false,
+            active_touches: std::collections::HashMap::new(),
+            initial_pinch_distance: None,
             frame_count: 0,
             fps_timer: web_time::Instant::now(),
             current_fps: 0.0,
