@@ -135,39 +135,57 @@ trunk serve
 
 ## Recent Progress Updates
 
-### Mobile Touch Support (2025-11-26) - IN PROGRESS
+### Mobile Touch Support (2025-11-26) - 95% COMPLETE
 
-**Status**: Core functionality working, one performance issue remains.
+**Status**: Core functionality working. Panning works well, pinch zoom detection needs threshold tuning.
 
-**Completed:**
+**Completed This Session (2025-11-26):**
 - ✅ iOS Safari viewport fills entire screen (viewport-fit=cover, position:fixed)
 - ✅ Browser window resize and orientation change handling
 - ✅ Touch event routing (bypassed egui pointer blocking for touches)
-- ✅ Single-finger pan working in 2D mode
+- ✅ Single-finger pan working smoothly in 2D mode
 - ✅ Single-finger camera rotation working in 3D mode
-- ✅ Two-finger pinch-to-zoom implemented and functional
+- ✅ Pinch zoom sensitivity increased 10x (5% → 50%)
+- ✅ Pinch zoom centers at pinch point (not screen center)
+- ✅ Phantom touch detection implemented (time-distance heuristic)
 - ✅ Fixed touch/mouse event collision (prevented double-processing)
-- ✅ Fixed stale touch accumulation bug (clear phantom touches)
+- ✅ Custom preset storage for web (localStorage)
+- ✅ Preset UI improvements (2x taller scroll area, export buttons)
 
 **Remaining Work:**
-- ⚠️ **CRITICAL:** Pinch zoom sensitivity too low (5%) - needs 10x increase to 50%+
-- 🔧 Remove debug logging after zoom speed confirmed working
+- ⚠️ **CRITICAL:** Phantom touch detection too strict - pinch zoom "flaky"
+  - Current: `elapsed_ms < 100 && distance > 300` rejects legitimate pinches
+  - Recommended: Adjust to `elapsed_ms < 50 && distance > 400` (see handoff.md)
+  - Users must wait before placing second finger or zoom doesn't register
+- 🔧 Remove debug logging (🔧 emoji markers) after threshold tuning complete
 - 📝 Update CHANGELOG.md with final v0.5.0 notes
 
 **Files Modified:**
 - `index.html` - Viewport meta tags, iOS-specific CSS
 - `src/web_main.rs` - Device pixel ratio, resize event listeners
-- `src/app/mod.rs` - Added touch tracking fields (active_touches HashMap)
-- `src/app/input.rs` - Complete touch event handling (pan + pinch)
+- `src/app/mod.rs` - Added touch tracking fields (active_touches, last_touch_time)
+- `src/app/input.rs` - Touch event handling, phantom detection, zoom centering
 - `src/camera.rs` - Touch support for 3D camera
+- `src/ui/mod.rs` - Preset scroll area height, export buttons
+- `src/fractal/presets.rs` - localStorage implementation, export functions
 - `CHANGELOG.md` - v0.5.0 mobile improvements documented
 
 **Key Technical Solutions:**
-1. Bypass egui pointer checks for touch events (egui-winit doesn't update pointer position from touches on web)
-2. Guard mouse handlers when touches active (prevent double-processing)
-3. Clear stale touches on new gesture (mitigate lost TouchPhase::Ended events)
+1. **Phantom Touch Detection**: Time-distance heuristic rejects phantom touches from settings panel close or palm
+   - Rejects if: `elapsed_ms < 100 && distance > 300` (TOO STRICT - needs tuning)
+   - See `src/app/input.rs:448-472`
+2. **Zoom-to-Point**: Converts pinch center to fractal coords, adjusts view center to maintain zoom point
+   - See `src/app/input.rs:475-509`
+3. **Preset Storage**: Web uses localStorage, native uses file system
+   - Export button (💾) next to each preset downloads JSON
+   - See `src/fractal/presets.rs:915-976`
 
-**See:** `handoff.md` for detailed technical implementation notes and next steps.
+**Latest Commits:**
+- `f6ea910` - Phantom touch detection (time-distance heuristic)
+- `3505235` - Zoom-to-pinch-center implementation
+- `06db164` - Preset UI improvements (2x scroll, export buttons)
+
+**See:** `handoff.md` for detailed threshold adjustment recommendations and testing instructions.
 
 ---
 
