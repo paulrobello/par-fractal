@@ -384,6 +384,12 @@ impl App {
         // For mouse: only if egui doesn't want pointer input
         // Also skip camera input during auto-orbit to prevent state accumulation
         if !egui_blocks_mouse {
+            if matches!(event, WindowEvent::Touch(_)) {
+                log::info!(
+                    "Routing touch to mode handler: {:?}",
+                    self.fractal_params.render_mode
+                );
+            }
             match self.fractal_params.render_mode {
                 RenderMode::TwoD => self.handle_2d_input(event),
                 RenderMode::ThreeD => {
@@ -421,15 +427,29 @@ impl App {
                 // Handle touch events for mobile 2D panning and pinch-to-zoom
                 let current_pos = (touch.location.x as f32, touch.location.y as f32);
 
+                log::info!(
+                    "2D Touch: phase={:?}, id={}, pos=({:.1}, {:.1}), active_touches={}",
+                    touch.phase,
+                    touch.id,
+                    current_pos.0,
+                    current_pos.1,
+                    self.active_touches.len()
+                );
+
                 match touch.phase {
                     TouchPhase::Started => {
                         self.active_touches.insert(touch.id, current_pos);
+                        log::info!(
+                            "  -> Started: active_touches now = {}",
+                            self.active_touches.len()
+                        );
 
                         // If this is the first touch, enable panning
                         if self.active_touches.len() == 1 {
                             self.mouse_pressed = true;
                             self.cursor_pos = current_pos;
                             self.last_mouse_pos = Some(current_pos);
+                            log::info!("  -> Enabled panning");
                         }
                         // If we now have 2 touches, start pinch gesture
                         else if self.active_touches.len() == 2 {
@@ -446,9 +466,11 @@ impl App {
                     }
                     TouchPhase::Moved => {
                         self.active_touches.insert(touch.id, current_pos);
+                        log::info!("  -> Moved: active_touches = {}", self.active_touches.len());
 
                         // Handle pinch-to-zoom (2 fingers)
                         if self.active_touches.len() == 2 {
+                            log::info!("  -> Processing pinch zoom");
                             let touches: Vec<&(f32, f32)> = self.active_touches.values().collect();
                             let dx = touches[0].0 - touches[1].0;
                             let dy = touches[0].1 - touches[1].1;
@@ -473,15 +495,22 @@ impl App {
                         }
                         // Handle single-finger pan (simplified - like 3D camera)
                         else if self.active_touches.len() == 1 {
+                            log::info!("  -> Processing single-finger pan");
                             self.cursor_pos = current_pos;
 
                             // Ensure panning is enabled for single touch
                             if !self.mouse_pressed {
                                 self.mouse_pressed = true;
                                 self.last_mouse_pos = Some(current_pos);
+                                log::info!("  -> Enabled mouse_pressed (was off)");
                             }
 
                             if let Some(last_pos) = self.last_mouse_pos {
+                                log::info!(
+                                    "  -> Pan delta: ({:.1}, {:.1})",
+                                    current_pos.0 - last_pos.0,
+                                    current_pos.1 - last_pos.1
+                                );
                                 let delta_x = (current_pos.0 - last_pos.0) as f64
                                     / self.renderer.size.width as f64;
                                 let delta_y = (current_pos.1 - last_pos.1) as f64
