@@ -511,6 +511,10 @@ impl App {
                                     current_pos.0 - last_pos.0,
                                     current_pos.1 - last_pos.1
                                 );
+
+                                let old_center = self.fractal_params.center_2d;
+                                let old_zoom = self.fractal_params.zoom_2d;
+
                                 let delta_x = (current_pos.0 - last_pos.0) as f64
                                     / self.renderer.size.width as f64;
                                 let delta_y = (current_pos.1 - last_pos.1) as f64
@@ -522,6 +526,15 @@ impl App {
                                     delta_x * 2.0 / self.fractal_params.zoom_2d as f64 * aspect;
                                 self.fractal_params.center_2d[1] +=
                                     delta_y * 2.0 / self.fractal_params.zoom_2d as f64;
+
+                                log::info!(
+                                    "  -> Center: [{:.6}, {:.6}] -> [{:.6}, {:.6}]",
+                                    old_center[0],
+                                    old_center[1],
+                                    self.fractal_params.center_2d[0],
+                                    self.fractal_params.center_2d[1]
+                                );
+                                log::info!("  -> Zoom: {:.2} (unchanged)", old_zoom);
                             }
                             self.last_mouse_pos = Some(current_pos);
                             true
