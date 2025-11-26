@@ -41,6 +41,7 @@ pub struct App {
     // Multi-touch pinch-to-zoom tracking
     active_touches: std::collections::HashMap<u64, (f32, f32)>, // touch_id -> (x, y)
     initial_pinch_distance: Option<f32>, // Distance between two fingers at pinch start
+    last_touch_time: Option<web_time::Instant>, // Time of last touch start (for phantom detection)
     frame_count: u32,
     fps_timer: web_time::Instant,
     current_fps: f32,
@@ -155,6 +156,7 @@ impl App {
             shift_pressed: false,
             active_touches: std::collections::HashMap::new(),
             initial_pinch_distance: None,
+            last_touch_time: None,
             frame_count: 0,
             fps_timer: web_time::Instant::now(),
             current_fps: 0.0,
@@ -258,6 +260,7 @@ impl App {
             shift_pressed: false,
             active_touches: std::collections::HashMap::new(),
             initial_pinch_distance: None,
+            last_touch_time: None,
             frame_count: 0,
             fps_timer: web_time::Instant::now(),
             current_fps: 0.0,

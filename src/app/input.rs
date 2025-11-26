@@ -431,18 +431,44 @@ impl App {
 
                 match touch.phase {
                     TouchPhase::Started => {
+                        let now = web_time::Instant::now();
+
                         // Clear stale touches only if we have 2+ already
                         // This prevents phantom touches while allowing valid 2-finger pinch
                         if self.active_touches.is_empty() {
                             log::info!("🔧 Touch: First touch, starting fresh");
+                            self.last_touch_time = Some(now);
                         } else if self.active_touches.len() >= 2 {
                             log::info!("🔧 Touch: Clearing {} stale touches", self.active_touches.len());
                             self.active_touches.clear();
                             self.initial_pinch_distance = None;
                             self.mouse_pressed = false;
                             self.last_mouse_pos = None;
-                        } else {
-                            log::info!("🔧 Touch: Second touch detected (for pinch), active={}", self.active_touches.len());
+                            self.last_touch_time = Some(now);
+                        } else if self.active_touches.len() == 1 {
+                            // Check if this might be a phantom touch (arrives too quickly after first touch)
+                            if let Some(last_time) = self.last_touch_time {
+                                let elapsed_ms = now.duration_since(last_time).as_millis();
+
+                                // Calculate distance from first touch
+                                let first_touch_pos = self.active_touches.values().next().unwrap();
+                                let dx = current_pos.0 - first_touch_pos.0;
+                                let dy = current_pos.1 - first_touch_pos.1;
+                                let distance = (dx * dx + dy * dy).sqrt();
+
+                                // Phantom touch heuristic: if arrives within 100ms AND is far away (>300px), reject it
+                                if elapsed_ms < 100 && distance > 300.0 {
+                                    log::info!("🔧 Touch: PHANTOM DETECTED! Rejecting second touch ({}ms, {:.0}px apart)", elapsed_ms, distance);
+                                    self.active_touches.clear();
+                                    self.initial_pinch_distance = None;
+                                    self.mouse_pressed = false;
+                                    self.last_mouse_pos = None;
+                                    self.last_touch_time = Some(now);
+                                    return true; // Don't process this phantom touch further
+                                } else {
+                                    log::info!("🔧 Touch: Valid second touch for pinch ({}ms, {:.0}px apart)", elapsed_ms, distance);
+                                }
+                            }
                         }
 
                         self.active_touches.insert(touch.id, current_pos);
