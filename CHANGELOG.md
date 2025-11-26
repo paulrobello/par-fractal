@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2025-11-26
+
+### Fixed
+
+#### Web/Mobile Support
+- **iOS Safari viewport fix** - Application now properly fills the entire viewport on iPhone devices
+  - Added `viewport-fit=cover` and `maximum-scale=1.0` to viewport meta tag for proper handling of devices with notches
+  - Fixed canvas sizing to use device pixel ratio for crisp rendering on high-DPI displays
+  - Added `touch-action: none` and other iOS-specific CSS properties for proper touch event handling
+  - Fixed position: fixed layout to prevent iOS Safari layout issues
+  - Added `overscroll-behavior: none` to prevent pull-to-refresh and overscroll bounce
+- **Browser window resize support** - Application now properly resizes when browser window is resized or device orientation changes
+  - Added event listeners for `resize` and `orientationchange` events
+  - Automatically updates canvas dimensions and notifies app of size changes
+  - Properly handles device pixel ratio changes during resize
+- **Touch interaction improvements** - Touch events now work correctly for panning and zooming on mobile devices
+  - Disabled text selection and tap highlighting during touch interactions
+  - Enabled proper touch event propagation to the fractal renderer
+
 ## [0.4.0] - 2025-11-25
 
 ### Added

@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Par Fractal - GPU Accelerated Fractal Renderer</title>
     <meta name="description" content="Cross-platform GPU-accelerated fractal renderer with 2D and 3D support">
     <meta name="theme-color" content="#4a90d9">
@@ -23,12 +23,27 @@
             height: 100%;
             overflow: hidden;
             background: #1a1a1a;
+            /* iOS Safari: prevent pull-to-refresh and overscroll */
+            overscroll-behavior: none;
+            /* iOS Safari: fill entire viewport including safe areas */
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
         }
         canvas {
             width: 100%;
             height: 100%;
             display: block;
             outline: none;
+            /* iOS Safari: enable touch events */
+            touch-action: none;
+            /* iOS Safari: prevent text selection */
+            -webkit-user-select: none;
+            user-select: none;
+            /* iOS Safari: disable tap highlighting */
+            -webkit-tap-highlight-color: transparent;
         }
         #loading {
             position: absolute;

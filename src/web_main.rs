@@ -72,21 +72,41 @@ pub async fn main_web() {
         }
     };
 
-    // Set canvas size to match window
+    // Set canvas size to match window with proper device pixel ratio
+    // Get the actual viewport dimensions
     let width = window
         .inner_width()
         .ok()
         .and_then(|v| v.as_f64())
-        .unwrap_or(800.0) as u32;
+        .unwrap_or(800.0);
     let height = window
         .inner_height()
         .ok()
         .and_then(|v| v.as_f64())
-        .unwrap_or(600.0) as u32;
-    canvas.set_width(width);
-    canvas.set_height(height);
+        .unwrap_or(600.0);
 
-    log::info!("Canvas size: {}x{}", width, height);
+    // Get device pixel ratio for high-DPI displays
+    let device_pixel_ratio = window.device_pixel_ratio();
+
+    // Set canvas backing buffer size (physical pixels)
+    let physical_width = (width * device_pixel_ratio) as u32;
+    let physical_height = (height * device_pixel_ratio) as u32;
+    canvas.set_width(physical_width);
+    canvas.set_height(physical_height);
+
+    // Set CSS size (logical pixels) via style
+    let canvas_style = canvas.style();
+    let _ = canvas_style.set_property("width", &format!("{}px", width));
+    let _ = canvas_style.set_property("height", &format!("{}px", height));
+
+    log::info!(
+        "Canvas size: {}x{} (logical), {}x{} (physical), DPR: {}",
+        width,
+        height,
+        physical_width,
+        physical_height,
+        device_pixel_ratio
+    );
 
     // Create winit event loop
     let event_loop = match EventLoop::new() {
@@ -97,10 +117,13 @@ pub async fn main_web() {
         }
     };
 
-    // Create window attached to canvas with explicit size
+    // Create window attached to canvas with explicit size (physical pixels)
     let window_attrs = winit::window::Window::default_attributes()
         .with_title("Par Fractal")
-        .with_inner_size(winit::dpi::PhysicalSize::new(width, height))
+        .with_inner_size(winit::dpi::PhysicalSize::new(
+            physical_width,
+            physical_height,
+        ))
         .with_canvas(Some(canvas));
 
     let winit_window = match event_loop.create_window(window_attrs) {
@@ -128,6 +151,70 @@ pub async fn main_web() {
 
     // Run event loop (web-compatible non-blocking version)
     let app = std::rc::Rc::new(std::cell::RefCell::new(app));
+
+    // Set up resize handler for mobile orientation changes and window resizing
+    {
+        let window_clone = window.clone();
+        let app_clone = app.clone();
+
+        let closure = Closure::wrap(Box::new(move || {
+            if let Some(canvas_element) = window_clone
+                .document()
+                .and_then(|d| d.get_element_by_id("canvas"))
+            {
+                if let Ok(canvas) = canvas_element.dyn_into::<web_sys::HtmlCanvasElement>() {
+                    // Get updated dimensions
+                    let width = window_clone
+                        .inner_width()
+                        .ok()
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(800.0);
+                    let height = window_clone
+                        .inner_height()
+                        .ok()
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(600.0);
+
+                    let device_pixel_ratio = window_clone.device_pixel_ratio();
+                    let physical_width = (width * device_pixel_ratio) as u32;
+                    let physical_height = (height * device_pixel_ratio) as u32;
+
+                    // Update canvas size
+                    canvas.set_width(physical_width);
+                    canvas.set_height(physical_height);
+
+                    let canvas_style = canvas.style();
+                    let _ = canvas_style.set_property("width", &format!("{}px", width));
+                    let _ = canvas_style.set_property("height", &format!("{}px", height));
+
+                    // Notify app of resize
+                    let mut app = app_clone.borrow_mut();
+                    app.resize(winit::dpi::PhysicalSize::new(
+                        physical_width,
+                        physical_height,
+                    ));
+
+                    log::info!(
+                        "Window resized: {}x{} (logical), {}x{} (physical)",
+                        width,
+                        height,
+                        physical_width,
+                        physical_height
+                    );
+                }
+            }
+        }) as Box<dyn FnMut()>);
+
+        // Listen for both resize and orientationchange events
+        let _ = window.add_event_listener_with_callback("resize", closure.as_ref().unchecked_ref());
+        let _ = window.add_event_listener_with_callback(
+            "orientationchange",
+            closure.as_ref().unchecked_ref(),
+        );
+
+        // Keep closure alive for the lifetime of the application
+        closure.forget();
+    }
 
     event_loop.spawn(move |event, target| {
         let mut app = app.borrow_mut();
