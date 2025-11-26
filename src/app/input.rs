@@ -431,16 +431,18 @@ impl App {
 
                 match touch.phase {
                     TouchPhase::Started => {
-                        // Clear ALL touches on first touch to prevent phantom/stale touches
-                        // This ensures clean state and prevents accidental pinch detection
+                        // Clear stale touches only if we have 2+ already
+                        // This prevents phantom touches while allowing valid 2-finger pinch
                         if self.active_touches.is_empty() {
                             log::info!("🔧 Touch: First touch, starting fresh");
-                        } else {
-                            log::info!("🔧 Touch: Clearing {} existing touches for clean start", self.active_touches.len());
+                        } else if self.active_touches.len() >= 2 {
+                            log::info!("🔧 Touch: Clearing {} stale touches", self.active_touches.len());
                             self.active_touches.clear();
                             self.initial_pinch_distance = None;
                             self.mouse_pressed = false;
                             self.last_mouse_pos = None;
+                        } else {
+                            log::info!("🔧 Touch: Second touch detected (for pinch), active={}", self.active_touches.len());
                         }
 
                         self.active_touches.insert(touch.id, current_pos);
