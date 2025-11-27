@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2025-11-26
+
+### Added
+
+#### Variable Power for 2D Fractals
+- **Power slider for 6 escape-time 2D fractals** - Mandelbrot, Julia, Burning Ship, Tricorn, Phoenix, and Celtic fractals now support variable power (z^n + c)
+  - Power range: -32 to 32 with 0.1 step increments
+  - Classic fractals use power=2 by default
+  - Power=3, 4, 5... creates multi-fold symmetry patterns (Multibrot, Multicorn, Multi-ship)
+  - Negative powers create inverse fractal patterns
+  - Smooth coloring adjusted for variable power with dynamic escape radius
+
+### Fixed
+
+#### Palette Animation
+- **Fixed color jump when changing animation speed** - Palette animation now uses delta-time accumulation instead of elapsed-time multiplication
+  - Changing speed no longer causes colors to jump to a different position
+  - Animation continues smoothly from current position when speed is adjusted
+  - Properly handles reverse animation direction with `rem_euclid`
+
 ## [0.5.0] - 2025-11-26
 
 ### Fixed

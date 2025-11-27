@@ -183,6 +183,7 @@ graph TD
 
 **`app/input.rs`** - Input Event Processing
 - Keyboard and mouse event handling
+- Multi-touch gesture support (single-finger pan, two-finger pinch-to-zoom)
 - Camera control input processing
 - UI interaction detection
 - Hotkey management
@@ -239,6 +240,10 @@ pub struct App {
     last_mouse_pos: Option<(f32, f32)>,
     cursor_pos: (f32, f32),
     shift_pressed: bool,
+    // Multi-touch support for mobile (pinch-to-zoom)
+    active_touches: HashMap<u64, (f32, f32)>,
+    initial_pinch_distance: Option<f32>,
+    last_touch_time: Option<Instant>,
     // Screenshot and rendering control
     save_screenshot: bool,
     save_hires_render: Option<(u32, u32)>,
@@ -285,7 +290,7 @@ pub struct App {
 **Submodules:**
 
 **`fractal/types.rs`** - Fractal Type Definitions
-- `FractalType` enum (34 fractal types: 19 2D escape-time + 6 2D strange attractors + 12 3D ray-marched + 3 3D strange attractors)
+- `FractalType` enum (34 fractal types: 13 2D escape-time + 6 2D strange attractors + 12 3D ray-marched + 3 3D strange attractors)
 - `RenderMode` enum (TwoD, ThreeD)
 - `ShadingModel` enum (BlinnPhong, PBR)
 - `ColorMode` enum (16 visualization modes: Palette, RaySteps, Normals, OrbitTrapXYZ, OrbitTrapRadial, WorldPosition, LocalPosition, AmbientOcclusion, PerChannel, DistanceField, Depth, Convergence, LightingOnly, ShadowMap, CameraDistanceLOD, DistanceGrayscale)
@@ -293,10 +298,12 @@ pub struct App {
 - `FogMode` enum (Linear, Exponential, Quadratic)
 
 **`fractal/palettes.rs`** - Color Palette System
-- `ColorPalette` struct with predefined palettes
+- `ColorPalette` struct with 46 predefined static palettes
+- 12 procedural palettes using cosine-based GPU computation (Fire Storm, Rainbow, Electric, Sunset, Forest, Ocean, Grayscale, Hot, Cool, Plasma, Viridis, Custom)
 - Custom palette creation and management
 - `CustomPalette` and `CustomPaletteGallery` for user palettes
 - Palette serialization and import/export
+- Palette animation support with configurable speed and direction
 
 **`fractal/presets.rs`** - Preset Management
 - `Preset` struct for saved configurations
@@ -369,12 +376,13 @@ pub struct App {
 - GPU enumeration and selection
 
 **`renderer/uniforms.rs`** - Uniform Buffer Management
-- `Uniforms` struct (832 bytes, matching WGSL exactly)
+- `Uniforms` struct (864 bytes, matching WGSL exactly)
 - Fractal type mapping from enum to GPU indices (includes gaps: 25 reserved, 32-34 reserved)
 - `BloomUniforms`, `BlurUniforms`, `PostProcessUniforms`
 - Conversion from `FractalParams` to GPU format via `update()` method
 - Compile-time size assertions to ensure Rust/WGSL synchronization
 - High-precision double-float emulation for deep zoom (zoom > 1,000,000)
+- Procedural palette parameters for GPU-computed color gradients
 
 **`renderer/update.rs`** - Pipeline Execution
 - Uniform buffer updates
@@ -578,7 +586,7 @@ graph LR
 
 The `Uniforms` struct in `renderer/uniforms.rs` must exactly match the `Uniforms` struct in `shaders/fractal.wgsl` for proper GPU data transfer.
 
-**Current Size:** 832 bytes (52 × 16-byte alignment)
+**Current Size:** 864 bytes (54 × 16-byte alignment)
 
 **Key Fields:**
 - Camera matrices (view-projection, inverse view-projection for 3D ray generation)
@@ -596,6 +604,7 @@ The `Uniforms` struct in `renderer/uniforms.rs` must exactly match the `Uniforms
 - Post-processing (brightness, contrast, saturation, hue shift, bloom threshold/intensity/radius, vignette, FXAA)
 - LOD debug visualization (enabled flag, three distance zone thresholds)
 - Aspect ratio for correct rendering (stored in vec4 for 16-byte alignment)
+- Procedural palette parameters (type, brightness, contrast, frequency, phase for cosine-based palettes)
 
 ### Shader Execution
 
@@ -654,7 +663,7 @@ When modifying uniforms:
 
 3. **Verify byte sizes**
    - Both must have identical total size
-   - Rust compile-time assertion: `assert!(std::mem::size_of::<Uniforms>() == 832)`
+   - Rust compile-time assertion: `assert!(std::mem::size_of::<Uniforms>() == 864)`
    - Add explicit padding fields as needed
    - Account for WGSL's implicit padding around vec3 fields
 
@@ -703,8 +712,8 @@ pub(super) struct Uniforms {
 
 // Compile-time size check
 const _: () = assert!(
-    std::mem::size_of::<Uniforms>() == 832,
-    "Uniforms struct must be exactly 832 bytes"
+    std::mem::size_of::<Uniforms>() == 864,
+    "Uniforms struct must be exactly 864 bytes"
 );
 ```
 
@@ -1037,7 +1046,7 @@ When enabled, LOD zones are visualized in 3D space as colored distance rings aro
 2. Calculate expected size: fields + padding for 16-byte alignment
 3. Add explicit padding fields in Rust
 4. Account for WGSL implicit vec3 padding
-5. Verify both structs have identical byte size (832 bytes)
+5. Verify both structs have identical byte size (864 bytes)
 
 ## Web/WASM Support
 

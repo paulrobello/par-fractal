@@ -32,19 +32,24 @@ Complete guide to all 3D fractals in Par Fractal, including ray marching techniq
 
 3D fractals in Par Fractal are rendered using GPU-accelerated ray marching with distance estimation. Unlike 2D fractals which map pixels directly to the complex plane, 3D fractals require casting rays through 3D space and iteratively finding surface intersections.
 
+**Par Fractal includes 15 3D fractal types:**
+- **12 Ray-Marched Fractals:** Mandelbulb, Menger Sponge, Sierpinski Pyramid, Julia Set 3D, Mandelbox, Octahedral IFS, Icosahedral IFS, Apollonian Gasket, Kleinian, Hybrid Mandelbulb-Julia, Quaternion Cubic, Sierpinski Gasket
+- **3 Strange Attractors:** Pickover, Lorenz, Rossler
+
 **Key Features:**
-- Real-time 3D navigation
+- Real-time 3D navigation with WASD+QE controls
 - Multiple shading models (Blinn-Phong, PBR)
 - Advanced lighting effects (AO, soft shadows)
 - Depth of field
-- Dynamic level of detail
-- Camera bookmarks
+- Dynamic level of detail (LOD)
+- Camera bookmarks for saving viewpoints
 
 **Rendering Technique:**
 - Ray marching with distance estimation
 - Sphere tracing for acceleration
 - Normal calculation via finite differences
 - Multiple lighting passes
+- Point cloud rendering for strange attractors
 
 ## Ray Marching Fundamentals
 
@@ -487,8 +492,9 @@ Uses the derivative method common in quaternion fractals:
   - Try: [-0.4, 0.6] for beautiful forms
   - Default: [-0.7, 0.27]
 - **Fractal Scale** (0.5-3.0): Overall size control
+  - Uses inverse scaling (higher value = larger fractal)
   - Default: 1.0
-- **Iterations**: Fixed at 16 for this fractal
+- **Iterations**: Fixed at 16 for this fractal (hardcoded in shader)
 
 **Recommended Settings:**
 - **Classic Julia**: Julia C = [-0.4, 0.6]
@@ -536,24 +542,30 @@ The Mandelbox is a 3D fractal defined by folding and scaling operations in space
 
 **UI Parameters:**
 - **Fractal Scale** (0.5-5.0): Overall size control
-  - Higher values = larger fractal
+  - Uses inverse scaling (higher value = larger fractal)
   - Default: 1.5
-- **Fractal Fold** (0.5-2.0): Controls internal scaling
-  - Classic Mandelbox uses fold = 1.0 (resulting in scale -2.0)
-  - Higher values = more complex structure
+- **Power** (2.0-16.0): Internal scaling parameter
+  - Mapped to internal scale = -(power / 4.0)
+  - Power 8.0 maps to internal scale -2.0 (classic Mandelbox)
+  - Higher values = tighter, more complex structure
+  - Default: 8.0
+- **Fractal Fold** (0.5-2.0): Box fold limit
+  - Controls the fold boundary during box folding
+  - Higher values = more open structure
   - Default: 1.0
 - **Fractal Min Radius** (0.1-2.0): Minimum sphere folding radius
   - Controls the size of small-scale features
+  - Lower values = finer details
   - Default: 0.5
 
 **Recommended Settings:**
-- **Classic Mandelbox**: Scale = 1.5, Fold = 1.0, Min Radius = 0.5
-- **Rounded Features**: Scale = 2.0, Fold = 0.8, Min Radius = 0.4
-- **Sharp Details**: Scale = 1.2, Fold = 1.5, Min Radius = 0.3
+- **Classic Mandelbox**: Scale = 1.5, Power = 8.0, Fold = 1.0, Min Radius = 0.5
+- **Rounded Features**: Scale = 2.0, Power = 6.0, Fold = 0.8, Min Radius = 0.4
+- **Sharp Details**: Scale = 1.2, Power = 12.0, Fold = 1.5, Min Radius = 0.3
 
 **Tips:**
-- Scale around 1.5-2.0: Good starting range
-- Adjust Fold to vary complexity
+- Power is the primary complexity control (try 6-12 range)
+- Fold controls openness of structure
 - Lower Min Radius = finer details
 - Enable AO for depth perception
 - Use soft shadows to enhance 3D appearance
@@ -789,8 +801,11 @@ This creates a fascinating hybrid that exhibits characteristics of both fractals
   - Default: [-0.7, 0.27]
 - **Max Iterations** (8-32): Number of hybrid iterations
   - More iterations = more detail
+  - Even iterations: Mandelbulb mode (z^p + pos)
+  - Odd iterations: Julia mode (z^p + c)
   - Default: 12
 - **Fractal Scale** (0.5-3.0): Overall size control
+  - Uses inverse scaling (higher value = larger fractal)
   - Default: 1.0
 
 **Recommended Settings:**
@@ -851,6 +866,7 @@ Using quaternion multiplication rules
   - More iterations = more detail
   - Default: 16
 - **Fractal Scale** (0.5-3.0): Overall size control
+  - Uses inverse scaling (higher value = larger fractal)
   - Default: 1.0
 
 **Recommended Settings:**
@@ -907,14 +923,14 @@ Where a, b, c, d are parameters that control the attractor's shape.
 - **Julia C [a, b]**: First two attractor parameters
   - Controls overall flow pattern
   - Try: a=2.24, b=0.43 for classic form
-  - Default: [-0.7, 0.27]
+  - Default: [-0.7, 0.27] (from default settings)
 - **Power (c)**: Third parameter
   - Controls vertical complexity
-  - Range: 0.5-3.0
+  - Range: typically 0.5-3.0
   - Default: 8.0
 - **Fractal Fold (d)**: Fourth parameter
   - Controls folding intensity
-  - Range: 0.5-2.0
+  - Range: typically 0.5-2.0
   - Default: 1.0
 - **Fractal Scale**: Overall size control
   - Higher values = larger attractor
@@ -924,6 +940,11 @@ Where a, b, c, d are parameters that control the attractor's shape.
 - **Classic Pickover**: a=2.24, b=0.43, c=1.77, d=-0.65
 - **Flowing Ribbons**: a=2.5, b=0.5, c=1.5, d=0.8
 - **Tight Knot**: a=2.0, b=-2.0, c=0.5, d=0.5
+
+**Note:** The Pickover attractor uses a point cloud rendering technique:
+- 500 iterations to skip transient behavior
+- 1000 sampled points along trajectory
+- Distance estimation to nearest point in cloud
 
 **Exploration Tips:**
 - Start with classic parameters and vary one at a time
@@ -968,8 +989,8 @@ Originally derived from simplified equations for atmospheric convection:
 - Integrate differential equations using Euler method (dt = 0.005)
 - Skip 1000 transient iterations to reach the attractor
 - Sample 2000 points along the trajectory
-- Create small spheres (radius 0.3) at each point
-- Offset center down by 25 units for better viewing
+- Create small spheres (radius 0.3 × scale) at each point
+- Center offset down by 25 units for better viewing (z - 25)
 
 **Key Features:**
 - Iconic "butterfly" or double-wing shape
@@ -985,12 +1006,13 @@ Originally derived from simplified equations for atmospheric convection:
   - σ (x-component): Prandtl number, controls damping
   - ρ (y-component): Rayleigh number, controls instability
   - Classic: σ=10.0, ρ=28.0
-  - Default: [10.0, 28.0]
+  - Default: [10.0, 28.0] (from shader implementation)
 - **Power (β)**: Beta parameter
   - Geometric scaling factor
   - Classic: 8/3 ≈ 2.667
-  - Default: 8.0 (close to classic)
+  - Default: 8.0 (note: not exactly classic value, but close)
 - **Fractal Scale**: Overall size control
+  - Scales the entire attractor
   - Default: 1.0
 
 **Recommended Settings:**
@@ -1043,7 +1065,8 @@ dz/dt = b + z(x - c)
 - Integrate differential equations using Euler method (dt = 0.01)
 - Skip 500 transient iterations to reach the attractor
 - Sample 1500 points along the trajectory
-- Create small spheres (radius 0.15) at each point
+- Create small spheres (radius 0.15 × scale) at each point
+- No center offset (unlike Lorenz)
 
 **Key Features:**
 - Single-lobed spiral structure
@@ -1058,14 +1081,15 @@ dz/dt = b + z(x - c)
 - **Julia C [a, b]**: Parameters a and b
   - a (x-component): Controls spiral folding (0.1-0.3 typical)
   - b (y-component): Base height offset (0.1-0.4 typical)
-  - Default: [0.2, 0.2]
+  - Default: [0.2, 0.2] (from shader implementation)
 - **Power (c)**: Parameter c
   - Critical parameter controlling chaos
   - c < 4: Simple periodic orbit
   - c > 4: Transition to chaos
   - Classic: c = 5.7
-  - Default: 5.7
+  - Default: 5.7 (from shader comments)
 - **Fractal Scale**: Overall size control
+  - Scales the entire attractor
   - Default: 1.0
 
 **Recommended Settings:**

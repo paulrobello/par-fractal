@@ -220,9 +220,9 @@ User Input → UI → FractalParams → Uniforms → GPU → Rendered Frame
 
 ### Color Palettes
 
-**Built-in Palettes (39 total):**
+**Built-in Palettes (47 static + 12 procedural):**
 
-Par Fractal includes 39 professionally-designed color palettes optimized for fractal visualization:
+Par Fractal includes 47 professionally-designed static color palettes and 12 procedural palettes optimized for fractal visualization:
 
 **Classic Palettes (6):**
 - **Fire** - Black → Purple → Red → Orange → Yellow (High contrast, classic look)
@@ -235,15 +235,19 @@ Par Fractal includes 39 professionally-designed color palettes optimized for fra
 **Scientific Visualization (4):**
 - Viridis, Plasma, Inferno, Magma
 
-**Artistic Themes (9):**
+**Artistic Themes (10):**
 - Copper, Cool, Hot, Neon, Purple Dream, Earth, Ice, Lava, Galaxy, Mint, Cherry
 
-**Xfractint Palettes (20):**
+**Xfractint Palettes (27):**
 - Alternating Grey, Blues, Chromatic, Default, Default White
 - Fire Storm, Froth 3, Froth 3-16, Froth 6, Froth 6-16
 - Gamma 1, Gamma 2, 3D Glasses 1, 3D Glasses 2, Good EGA
 - Green, Grey, Grid, Headache, Headache 2
 - Landscape, Lyapunov, XF Neon, PaintJet, Royal, Topo, Volcano
+
+**Procedural Palettes (12):**
+- Fire Storm, Rainbow, Electric, Sunset, Forest, Ocean, Grayscale, Hot, Cool, Plasma, Viridis, Custom
+- Generated mathematically using cosine-based formulas for smooth, continuous gradients
 
 **Custom Palettes:**
 - Create in UI panel
@@ -276,7 +280,7 @@ Par Fractal includes 39 professionally-designed color palettes optimized for fra
 *Strange Attractors (3):*
 - Pickover3D, Lorenz3D, Rossler3D
 
-**Total:** 34 fractal types
+**Total:** 34 fractal types (19 2D + 15 3D)
 
 ### Command-Line Interface
 
@@ -393,9 +397,9 @@ par-fractal --preset "Ocean Julia" --screenshot-delay 5 --exit-delay 6
 
 ### Version Information
 
-**Documentation Version:** 1.1.0
-**Project Version:** 0.3.0
-**Last Updated:** 2025-11-25
+**Documentation Version:** 1.2.0
+**Project Version:** 0.6.0
+**Last Updated:** 2025-11-26
 
 ### Contributing to Documentation
 

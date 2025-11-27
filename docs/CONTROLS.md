@@ -20,8 +20,8 @@ Par Fractal provides intuitive controls for exploring both 2D and 3D fractals. C
 
 **Control Categories:**
 - **Global** - Available in all modes
-- **2D Mode** - Specific to 2D fractals
-- **3D Mode** - Specific to 3D fractals
+- **2D Mode** - Specific to 2D fractals (mouse/touch controls)
+- **3D Mode** - Specific to 3D fractals (keyboard + mouse/touch controls)
 - **UI Panel** - Interactive parameter controls
 - **Command Palette** - Quick command access
 
@@ -29,6 +29,12 @@ Par Fractal provides intuitive controls for exploring both 2D and 3D fractals. C
 - **Ctrl** on Windows/Linux
 - **Cmd** on macOS
 - Documentation uses **Ctrl/Cmd** to indicate platform-specific modifier
+
+**Mobile/Touch Support:**
+- Full touch gesture support for iOS, Android, and web browsers
+- Single-finger drag for panning (2D) or camera rotation (3D)
+- Two-finger pinch-to-zoom for 2D fractals
+- Optimized viewport handling for devices with notches (iPhone)
 
 ## Global Controls
 
@@ -56,7 +62,7 @@ Par Fractal provides intuitive controls for exploring both 2D and 3D fractals. C
 | **9** | Lyapunov | Lyapunov fractal |
 | **0** | Nova | Nova fractal |
 
-**Note:** Additional 2D fractals accessible via UI and command palette only: Magnet2D, Collatz2D, Sierpinski Triangle2D, and Strange Attractors (Hopalong, Martin, Gingerbreadman, Chip, Quadruptwo, Threeply).
+**Note:** Additional 2D fractals accessible via UI and command palette only: Magnet, Collatz, Sierpinski Triangle, and Strange Attractors (Hopalong, Martin, Gingerbreadman, Chip, Quadruptwo, Threeply).
 
 ### Fractal Type Switching - 3D Fractals
 
@@ -73,7 +79,7 @@ Par Fractal provides intuitive controls for exploring both 2D and 3D fractals. C
 | **F9** | Kleinian | Kleinian limit set |
 | **F10** | Hybrid Mandelbulb-Julia | Hybrid 3D fractal |
 
-**Note:** Additional 3D fractals accessible via UI and command palette only: QuaternionCubic3D, Sierpinski Gasket3D, and Strange Attractors (Pickover, Lorenz, Rossler).
+**Note:** Additional 3D fractals accessible via UI and command palette only: Quaternion Cubic, Sierpinski Gasket, and Strange Attractors (Pickover, Lorenz, Rossler).
 
 ### View Controls
 
@@ -87,20 +93,21 @@ Par Fractal provides intuitive controls for exploring both 2D and 3D fractals. C
 |-----|--------|-------------|
 | **F12** | Quick Screenshot | Capture current view as PNG (saved to current directory) |
 
-**Note:** High-resolution screenshots and video recording controls are available via the UI panel and command palette.
+**Note:** High-resolution screenshots and video recording controls are available via the UI panel and command palette. The README shows **F9** for screenshots, but the actual implementation uses **F12**.
 
 ### Color and Appearance
 
 | Key | Action | Description |
 |-----|--------|-------------|
-| **P** | Next Palette | Cycle to next color palette |
+| **P** | Next Static Palette | Cycle to next static color palette |
+| **Shift+P** | Next Procedural Palette | Cycle to next procedural palette |
 
 ### Command Palette
 
 | Key | Action | Description |
 |-----|--------|-------------|
 | **/** | Open Command Palette | Quick access to all commands (fuzzy search) |
-| **Ctrl/Cmd+K** | Open Command Palette | Alternative VS Code-style shortcut |
+| **Ctrl/Cmd+K** | Open Command Palette | VS Code-style shortcut |
 
 ### Effects and Visual Settings
 
@@ -132,6 +139,15 @@ Par Fractal provides intuitive controls for exploring both 2D and 3D fractals. C
 | **Scroll Down** | Zoom Out | At cursor position |
 | **Shift + Click + Drag** | Continuous Zoom | Smooth zoom animation |
 
+### Touch Controls (Mobile)
+
+| Gesture | Effect | Description |
+|---------|--------|-------------|
+| **Single Finger Drag** | Pan view | Move around complex plane |
+| **Two Finger Pinch** | Zoom | Pinch in/out to zoom at gesture center |
+
+**Note:** Touch gestures are fully supported on iOS, Android, and web browsers. Pinch-to-zoom automatically calculates the zoom center between your two fingers for intuitive zooming.
+
 ### Keyboard Navigation
 
 **Note:** In 2D mode, navigation is primarily mouse-based. Use click-and-drag to pan, and scroll to zoom. Arrow keys are used for camera movement in 3D mode only.
@@ -159,20 +175,28 @@ Par Fractal provides intuitive controls for exploring both 2D and 3D fractals. C
 | **Q** | Move Down | Camera speed | Move along world Y axis down |
 
 **Alternative Keys:**
-- Arrow keys work same as WASD
-- Up/Down arrows: Forward/Backward
-- Left/Right arrows: Strafe Left/Right
+- **Arrow Keys** work same as WASD
+  - Up/Down arrows: Forward/Backward
+  - Left/Right arrows: Strafe Left/Right
 
 ### Camera Look
 
 | Action | Effect | Sensitivity |
 |--------|--------|-------------|
-| **Mouse Drag** | Rotate View | Adjustable in settings |
+| **Mouse Drag** | Rotate View | Fixed at 0.003 |
 | **Mouse X** | Yaw (horizontal) | Left/right rotation |
 | **Mouse Y** | Pitch (vertical) | Up/down rotation |
 
 **Pitch Limits:**
 - Clamped to ±89° to avoid gimbal lock
+
+### Touch Controls (Mobile)
+
+| Gesture | Effect | Description |
+|---------|--------|-------------|
+| **Single Finger Drag** | Rotate View | Look around in 3D space |
+
+**Note:** Touch gestures are fully supported on mobile devices and web browsers for 3D camera rotation. WASD movement is keyboard-only (unavailable on touch devices without physical keyboard).
 
 ### Camera Speed
 
@@ -318,7 +342,7 @@ Par Fractal provides intuitive controls for exploring both 2D and 3D fractals. C
 
 **Keyboard:**
 - `/` (Slash key)
-- `Ctrl/Cmd+K` (VS Code style)
+- `Ctrl/Cmd+K` (VS Code-style)
 
 ### Using the Palette
 
@@ -333,7 +357,7 @@ Par Fractal provides intuitive controls for exploring both 2D and 3D fractals. C
 The command palette provides access to all application features through fuzzy search:
 
 **Fractal Commands:**
-- All 24 fractal types (2D and 3D)
+- All 34 fractal types (19 2D and 15 3D)
 - Quick switching with aliases (e.g., "mb" for Mandelbrot)
 
 **Effect Commands:**
@@ -430,7 +454,8 @@ Mouse Drag     Look Around (rotate camera)
 ### Effects and Visuals
 
 ```
-P              Next Palette
+P              Next Static Palette
+Shift+P        Next Procedural Palette
 O              Toggle Auto-Orbit
 L              Toggle Ambient Occlusion
 T              Toggle Depth of Field
@@ -473,17 +498,35 @@ graph LR
 
 **Note:** In 3D mode, the mouse wheel does not control camera speed. Camera speed is adjusted via the UI slider in the Camera section.
 
+### Touch Controls Summary
+
+**2D Mode Touch:**
+- **Single Finger Drag** - Pan around complex plane
+- **Two Finger Pinch** - Zoom in/out (zoom center calculated between fingers)
+
+**3D Mode Touch:**
+- **Single Finger Drag** - Rotate camera (look around)
+- **Note:** WASD movement requires physical keyboard (not available on touchscreen-only devices)
+
+**Touch Gesture Details:**
+- Touch events work on iOS, Android, and WebGPU-enabled browsers
+- Automatic gesture detection (no mode switching required)
+- Smooth transitions between single-touch and multi-touch gestures
+- Touch state properly managed to prevent conflicts with UI interactions
+
 ## Customization
 
 ### Mouse Sensitivity
 
 **Camera Sensitivity (3D):**
 - Look-around sensitivity is fixed at 0.003 (controls rotation speed)
+- Defined in `src/camera.rs` in `CameraController::new()` as `rotate_speed: 0.003`
 
 **Zoom Sensitivity (2D):**
 - Zoom factor is 1.1 per scroll step
+- Defined in `src/app/input.rs` in `handle_2d_input()` as `1.1f32.powf(zoom_delta)`
 
-**Note:** Mouse sensitivity settings are not exposed in the UI and require code modification in `src/camera.rs` to adjust.
+**Note:** Mouse sensitivity settings are not exposed in the UI and require code modification to adjust.
 
 ### UI Panel Layout
 

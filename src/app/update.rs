@@ -176,9 +176,8 @@ impl App {
             );
         }
 
-        // Update palette animation
-        let elapsed_time = self.start_time.elapsed().as_secs_f32();
-        self.fractal_params.palette_offset = self.ui.get_palette_animation_offset(elapsed_time);
+        // Update palette animation (uses delta time to avoid jumps when changing speed)
+        self.fractal_params.palette_offset = self.ui.update_palette_animation(dt);
 
         // Update LOD system (must be done before renderer.update())
         let camera_forward = (self.camera.target - self.camera.position).normalize();

@@ -241,7 +241,7 @@ Par Fractal supports 15 different 3D fractals organized into two categories:
 ### Command Palette
 
 **Quick Access:**
-- **Ctrl/Cmd+P** - Open palette
+- **/** (Slash) or **Ctrl/Cmd+K** - Open palette
 - Fuzzy search
 - Keyboard-driven workflow
 - All commands accessible
@@ -346,6 +346,21 @@ Par Fractal supports 15 different 3D fractals organized into two categories:
 - **Royal** - Purple and gold royal colors
 - **Topo** - Topographic map colors
 - **Volcano** - Volcanic red-yellow gradient
+
+**Procedural Palettes (12 types):**
+Mathematically-generated palettes using cosine-based formulas for smooth, continuous color gradients:
+- **Firestrm** - RGB phase-shifted cosines (classic Fractint fire storm)
+- **Rainbow** - Full spectrum HSV-like gradient
+- **Electric** - Cyan to blue to purple
+- **Sunset** - Warm oranges to purples
+- **Forest** - Greens and earth tones
+- **Ocean** - Deep blues to cyan
+- **Grayscale** - Simple black to white
+- **Hot** - Black to red to yellow to white
+- **Cool** - Cyan to magenta gradient
+- **Plasma** - Purple to orange (scientific visualization)
+- **Viridis** - Perceptually uniform (scientific visualization)
+- **Custom** - User-defined cosine palette parameters with adjustable brightness, contrast, frequency, and phase
 
 **Custom Palettes:**
 - Create 8-color gradient palettes
@@ -502,7 +517,7 @@ Custom channel sources for R/G/B:
 ### Color Controls
 
 **Palette Options:**
-- 21 built-in palettes + custom palettes
+- 48 built-in static palettes (21 specialty + 27 Xfractint) + custom palettes
 - Color offset adjustment (shift colors)
 - Interactive palette switching (P key)
 - Palette animation with speed control

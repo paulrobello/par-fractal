@@ -550,18 +550,33 @@ fn tricorn_hp(c_hi: vec2<f32>, c_lo: vec2<f32>) -> f32 {
 // 2D Fractals (Standard Precision)
 // ============================================================================
 
+// Complex power function: z^n using polar form
+// z = r * e^(i*theta), z^n = r^n * e^(i*n*theta)
+fn complex_pow(z: vec2<f32>, n: f32) -> vec2<f32> {
+    let r = length(z);
+    // Handle zero case
+    if (r < 0.0000001) {
+        return vec2<f32>(0.0, 0.0);
+    }
+    let theta = atan2(z.y, z.x);
+    let r_n = pow(r, n);
+    let n_theta = n * theta;
+    return vec2<f32>(r_n * cos(n_theta), r_n * sin(n_theta));
+}
+
 fn mandelbrot(c: vec2<f32>) -> f32 {
     var z = vec2<f32>(0.0, 0.0);
     var iteration = 0u;
+    let n = uniforms.power;
+    let escape_radius = select(4.0, pow(2.0, 2.0 / abs(n)), abs(n) < 2.0);
 
     for (var i = 0u; i < uniforms.max_iterations; i = i + 1u) {
-        if (dot(z, z) > 4.0) {
+        if (dot(z, z) > escape_radius * escape_radius) {
             break;
         }
 
-        let z_real = z.x * z.x - z.y * z.y + c.x;
-        let z_imag = 2.0 * z.x * z.y + c.y;
-        z = vec2<f32>(z_real, z_imag);
+        // z = z^n + c using complex power
+        z = complex_pow(z, n) + c;
         iteration = i;
     }
 
@@ -569,24 +584,25 @@ fn mandelbrot(c: vec2<f32>) -> f32 {
         return 0.0;
     }
 
-    // Smooth coloring
+    // Smooth coloring (adjusted for variable power)
     let log_zn = log(dot(z, z)) / 2.0;
-    let nu = log(log_zn / log(2.0)) / log(2.0);
+    let nu = log(log_zn / log(escape_radius)) / log(abs(n));
     return (f32(iteration) + 1.0 - nu) / f32(uniforms.max_iterations);
 }
 
 fn julia(z_start: vec2<f32>) -> f32 {
     var z = z_start;
     var iteration = 0u;
+    let n = uniforms.power;
+    let escape_radius = select(4.0, pow(2.0, 2.0 / abs(n)), abs(n) < 2.0);
 
     for (var i = 0u; i < uniforms.max_iterations; i = i + 1u) {
-        if (dot(z, z) > 4.0) {
+        if (dot(z, z) > escape_radius * escape_radius) {
             break;
         }
 
-        let z_real = z.x * z.x - z.y * z.y + uniforms.julia_c.x;
-        let z_imag = 2.0 * z.x * z.y + uniforms.julia_c.y;
-        z = vec2<f32>(z_real, z_imag);
+        // z = z^n + c using complex power
+        z = complex_pow(z, n) + uniforms.julia_c;
         iteration = i;
     }
 
@@ -594,8 +610,9 @@ fn julia(z_start: vec2<f32>) -> f32 {
         return 0.0;
     }
 
+    // Smooth coloring (adjusted for variable power)
     let log_zn = log(dot(z, z)) / 2.0;
-    let nu = log(log_zn / log(2.0)) / log(2.0);
+    let nu = log(log_zn / log(escape_radius)) / log(abs(n));
     return (f32(iteration) + 1.0 - nu) / f32(uniforms.max_iterations);
 }
 
@@ -718,17 +735,17 @@ fn sierpinski_triangle_hp(coord_hi: vec2<f32>, coord_lo: vec2<f32>) -> f32 {
 fn burning_ship(c: vec2<f32>) -> f32 {
     var z = vec2<f32>(0.0, 0.0);
     var iteration = 0u;
+    let n = uniforms.power;
+    let escape_radius = select(4.0, pow(2.0, 2.0 / abs(n)), abs(n) < 2.0);
 
     for (var i = 0u; i < uniforms.max_iterations; i = i + 1u) {
-        if (dot(z, z) > 4.0) {
+        if (dot(z, z) > escape_radius * escape_radius) {
             break;
         }
 
-        // Burning Ship: z = (|Re(z)| + i|Im(z)|)^2 + c
+        // Burning Ship: z = (|Re(z)| + i|Im(z)|)^n + c
         let z_abs = abs(z);
-        let z_real = z_abs.x * z_abs.x - z_abs.y * z_abs.y + c.x;
-        let z_imag = 2.0 * z_abs.x * z_abs.y + c.y;
-        z = vec2<f32>(z_real, z_imag);
+        z = complex_pow(z_abs, n) + c;
         iteration = i;
     }
 
@@ -737,24 +754,24 @@ fn burning_ship(c: vec2<f32>) -> f32 {
     }
 
     let log_zn = log(dot(z, z)) / 2.0;
-    let nu = log(log_zn / log(2.0)) / log(2.0);
+    let nu = log(log_zn / log(escape_radius)) / log(abs(n));
     return (f32(iteration) + 1.0 - nu) / f32(uniforms.max_iterations);
 }
 
 fn tricorn(c: vec2<f32>) -> f32 {
     var z = vec2<f32>(0.0, 0.0);
     var iteration = 0u;
+    let n = uniforms.power;
+    let escape_radius = select(4.0, pow(2.0, 2.0 / abs(n)), abs(n) < 2.0);
 
     for (var i = 0u; i < uniforms.max_iterations; i = i + 1u) {
-        if (dot(z, z) > 4.0) {
+        if (dot(z, z) > escape_radius * escape_radius) {
             break;
         }
 
-        // Tricorn (Mandelbar): z = conj(z)^2 + c
+        // Tricorn (Mandelbar/Multicorn): z = conj(z)^n + c
         let z_conj = vec2<f32>(z.x, -z.y);
-        let z_real = z_conj.x * z_conj.x - z_conj.y * z_conj.y + c.x;
-        let z_imag = 2.0 * z_conj.x * z_conj.y + c.y;
-        z = vec2<f32>(z_real, z_imag);
+        z = complex_pow(z_conj, n) + c;
         iteration = i;
     }
 
@@ -763,7 +780,7 @@ fn tricorn(c: vec2<f32>) -> f32 {
     }
 
     let log_zn = log(dot(z, z)) / 2.0;
-    let nu = log(log_zn / log(2.0)) / log(2.0);
+    let nu = log(log_zn / log(escape_radius)) / log(abs(n));
     return (f32(iteration) + 1.0 - nu) / f32(uniforms.max_iterations);
 }
 
@@ -771,20 +788,26 @@ fn phoenix(c: vec2<f32>) -> f32 {
     var z = vec2<f32>(0.0, 0.0);
     var z_prev = vec2<f32>(0.0, 0.0);
     var iteration = 0u;
+    let n = uniforms.power;
+    let escape_radius = select(4.0, pow(2.0, 2.0 / abs(n)), abs(n) < 2.0);
 
     // Phoenix parameters
     let p = vec2<f32>(0.5667, 0.0);
 
     for (var i = 0u; i < uniforms.max_iterations; i = i + 1u) {
-        if (dot(z, z) > 4.0) {
+        if (dot(z, z) > escape_radius * escape_radius) {
             break;
         }
 
-        // Phoenix: z = z^2 + c + p*z_prev
-        let z_real = z.x * z.x - z.y * z.y + c.x + p.x * z_prev.x - p.y * z_prev.y;
-        let z_imag = 2.0 * z.x * z.y + c.y + p.x * z_prev.y + p.y * z_prev.x;
+        // Phoenix: z = z^n + c + p*z_prev
+        let z_powered = complex_pow(z, n);
+        // Complex multiplication for p * z_prev
+        let p_times_prev = vec2<f32>(
+            p.x * z_prev.x - p.y * z_prev.y,
+            p.x * z_prev.y + p.y * z_prev.x
+        );
         z_prev = z;
-        z = vec2<f32>(z_real, z_imag);
+        z = z_powered + c + p_times_prev;
         iteration = i;
     }
 
@@ -793,25 +816,24 @@ fn phoenix(c: vec2<f32>) -> f32 {
     }
 
     let log_zn = log(dot(z, z)) / 2.0;
-    let nu = log(log_zn / log(2.0)) / log(2.0);
+    let nu = log(log_zn / log(escape_radius)) / log(abs(n));
     return (f32(iteration) + 1.0 - nu) / f32(uniforms.max_iterations);
 }
 
 fn celtic(c: vec2<f32>) -> f32 {
     var z = vec2<f32>(0.0, 0.0);
     var iteration = 0u;
+    let n = uniforms.power;
+    let escape_radius = select(4.0, pow(2.0, 2.0 / abs(n)), abs(n) < 2.0);
 
     for (var i = 0u; i < uniforms.max_iterations; i = i + 1u) {
-        if (dot(z, z) > 4.0) {
+        if (dot(z, z) > escape_radius * escape_radius) {
             break;
         }
 
-        // Celtic: z = (|Re(z^2)| + i*Im(z^2)) + c
-        let z_sq_real = z.x * z.x - z.y * z.y;
-        let z_sq_imag = 2.0 * z.x * z.y;
-        let z_real = abs(z_sq_real) + c.x;
-        let z_imag = z_sq_imag + c.y;
-        z = vec2<f32>(z_real, z_imag);
+        // Celtic: z = (|Re(z^n)| + i*Im(z^n)) + c
+        let z_pow = complex_pow(z, n);
+        z = vec2<f32>(abs(z_pow.x) + c.x, z_pow.y + c.y);
         iteration = i;
     }
 
@@ -820,7 +842,7 @@ fn celtic(c: vec2<f32>) -> f32 {
     }
 
     let log_zn = log(dot(z, z)) / 2.0;
-    let nu = log(log_zn / log(2.0)) / log(2.0);
+    let nu = log(log_zn / log(escape_radius)) / log(abs(n));
     return (f32(iteration) + 1.0 - nu) / f32(uniforms.max_iterations);
 }
 

@@ -97,8 +97,9 @@ impl UI {
             });
     }
 
-    /// Get the current palette animation offset based on time
-    pub fn get_palette_animation_offset(&self, elapsed_time: f32) -> f32 {
+    /// Update and get the current palette animation offset using delta time
+    /// This accumulates the offset incrementally to avoid jumps when changing speed
+    pub fn update_palette_animation(&mut self, delta_time: f32) -> f32 {
         if !self.palette_animation_enabled {
             return 0.0;
         }
@@ -108,7 +109,14 @@ impl UI {
         } else {
             1.0
         };
-        (elapsed_time * self.palette_animation_speed * direction) % 1.0
+
+        // Accumulate offset using delta time (avoids jumps when speed changes)
+        self.palette_animation_offset += delta_time * self.palette_animation_speed * direction;
+
+        // Keep offset in [0, 1) range
+        self.palette_animation_offset = self.palette_animation_offset.rem_euclid(1.0);
+
+        self.palette_animation_offset
     }
 
     /// Update frame time history for performance overlay

@@ -32,13 +32,14 @@ See the [Quick Start Guide](docs/QUICKSTART.md) for detailed instructions.
 ## Features
 
 - **GPU-Accelerated** - Efficient WebGPU rendering for 2D and 3D fractals
-- **31 Fractal Types** - 19 2D and 12 3D fractals including Mandelbrot, Julia, Mandelbulb, Menger Sponge, strange attractors, and more
+- **34 Fractal Types** - 19 2D and 15 3D fractals including Mandelbrot, Julia, Mandelbulb, Menger Sponge, strange attractors, and more
+- **Variable Power** - Adjustable exponent (z^n + c) for 6 escape-time fractals: Multibrot, Multicorn, Multi-ship, and more
 - **Advanced Rendering** - PBR shading, ambient occlusion, soft shadows, depth of field
 - **Real-time Interaction** - Smooth pan/zoom, camera controls, parameter adjustment
 - **Mobile Touch Support** - Full gesture support: single-finger pan, two-finger pinch zoom on iOS/Android
 - **High-Quality Output** - PNG screenshots, video recording, custom resolutions
 - **Productivity Tools** - Command palette, presets, bookmarks, undo/redo
-- **Custom Palettes** - 46 static palettes, 12 procedural palettes (including Fractint-style), plus custom color schemes
+- **Custom Palettes** - 48 static palettes, 12 procedural palettes (including Fractint-style), plus custom color schemes
 - **Web Browser Support** - Run directly in browser via WebGPU/WASM
 - **Performance Tuning** - LOD system, quality profiles, GPU selection
 

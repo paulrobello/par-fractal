@@ -1,8 +1,10 @@
 # 2D Fractals Guide
 
-Complete guide to all 13 2D fractals available in Par Fractal, including mathematical background, usage, and exploration tips.
+Complete guide to all 19 2D fractals available in Par Fractal, including mathematical background, usage, and exploration tips.
 
 **Available 2D Fractals:**
+
+**Escape-Time Fractals (13 types):**
 1. Mandelbrot Set - The iconic fractal with infinite self-similar detail
 2. Julia Set - Dynamic fractal that morphs with parameter C
 3. Sierpinski Carpet - Classic square-based geometric fractal with perfect self-similarity
@@ -16,6 +18,14 @@ Complete guide to all 13 2D fractals available in Par Fractal, including mathema
 11. Nova - Hybrid Newton-Mandelbrot fractal
 12. Magnet - Physics-inspired rational iteration formula
 13. Collatz - Experimental complex number extension of 3n+1 problem
+
+**Strange Attractors (6 types):**
+14. Hopalong - Barry Martin's hopalong attractor with chaotic point clouds
+15. Martin - Barry Martin's original strange attractor
+16. Gingerbreadman - Chaotic 2D map with cookie-like patterns
+17. Chip - Chip attractor variant
+18. Quadruptwo - Quadruptwo strange attractor
+19. Threeply - Threeply strange attractor
 
 ## Table of Contents
 - [Overview](#overview)
@@ -34,6 +44,13 @@ Complete guide to all 13 2D fractals available in Par Fractal, including mathema
 - [Nova Fractal](#nova-fractal)
 - [Magnet Fractal](#magnet-fractal)
 - [Collatz Fractal](#collatz-fractal)
+- [Strange Attractors](#strange-attractors)
+  - [Hopalong](#hopalong)
+  - [Martin](#martin)
+  - [Gingerbreadman](#gingerbreadman)
+  - [Chip](#chip)
+  - [Quadruptwo](#quadruptwo)
+  - [Threeply](#threeply)
 - [Color Techniques](#color-techniques)
 - [Exploration Tips](#exploration-tips)
 - [Related Documentation](#related-documentation)
@@ -46,7 +63,7 @@ Complete guide to all 13 2D fractals available in Par Fractal, including mathema
 - Real-time GPU computation
 - High-precision zoom mode (emulated double-float precision on GPU)
 - Smooth continuous coloring (eliminates banding)
-- 39 built-in color palettes plus custom palette support
+- 54 built-in color palettes plus custom palette support
 - Multiple coloring modes (palette, orbit traps, position-based, etc.)
 - Interactive parameter adjustment with instant preview
 - Screenshot and video capture support
@@ -119,7 +136,7 @@ High-precision mode is more computationally intensive than standard mode, but th
 - **Max Iterations** - Maximum iteration count before considering a point in the set (range: 50-2000, default: 80)
 - **Center X/Y** - Complex plane coordinates (high precision for deep zooms)
 - **Zoom** - Magnification level (can reach 10¹⁴ with high-precision mode)
-- **Color Palette** - Choose from 21 built-in palettes or load custom palettes
+- **Color Palette** - Choose from 54 built-in palettes or load custom palettes
 - **Palette Offset** - Animate or shift color mapping (0.0-1.0, wraps around)
 - **Orbit Trap Scale** - Scale factor for orbit trap coloring modes
 
@@ -744,6 +761,184 @@ Barycentric subdivision rule:
 - Supports high-precision mode for extremely deep zooms
 - Different coloring than Sierpinski Carpet - uses smooth iteration-based shading
 
+## Strange Attractors
+
+Strange attractors are chaotic dynamical systems that create intricate, non-repeating patterns through iterative point plotting. Unlike escape-time fractals, these use accumulation-based rendering where millions of orbit points are plotted to reveal the attractor's structure.
+
+**Key Differences from Escape-Time Fractals:**
+- Use iterative mapping functions (not complex iteration)
+- Render via point accumulation (density visualization)
+- No "escape" condition - orbits are bounded
+- Chaotic behavior creates fractal-like patterns
+- Require many iterations (typically 1000+ per frame) for detail
+
+**Rendering Approach:**
+Strange attractors use a specialized compute shader accumulation system that tracks point densities across frames. Each frame adds more orbit points, gradually revealing the attractor's intricate structure.
+
+**Controls:**
+- Accessed via UI fractal type selector (no dedicated keyboard shortcuts)
+- Parameters (a, b, c, etc.) controlled via julia_c and power sliders
+- Center and zoom work differently than escape-time fractals
+- Max iterations controls orbit length per frame
+
+### Hopalong
+
+Barry Martin's hopalong attractor creates flowing, organic patterns with chaotic trajectories.
+
+**Mathematical Definition:**
+```
+x₀ = 0, y₀ = 0
+xₙ₊₁ = yₙ - sign(xₙ) × √(|b×xₙ - c|)
+yₙ₊₁ = a - xₙ
+```
+
+**Parameters:**
+- a = julia_c.x (default: 0.4)
+- b = julia_c.y (default: 1.0)
+- c = 0.0 (hardcoded)
+
+**Default View:**
+- Center: (0.5, 0.5)
+- Zoom: 0.3
+- Max Iterations: 1000
+
+**Tips:**
+- Try varying parameter 'a' between -1.0 and 2.0
+- Parameter 'b' controls the shape (try 0.5 to 2.0)
+- Produces flowing, organic trails
+- Very sensitive to parameter changes
+
+### Martin
+
+Barry Martin's original strange attractor with simple but elegant chaotic dynamics.
+
+**Mathematical Definition:**
+```
+x₀ = 0, y₀ = 0
+xₙ₊₁ = yₙ - sin(xₙ)
+yₙ₊₁ = a - xₙ
+```
+
+**Parameters:**
+- a = julia_c.x (default: π ≈ 3.14159)
+
+**Default View:**
+- Center: (0.0, 0.0)
+- Zoom: 0.05
+- Max Iterations: 1000
+
+**Tips:**
+- Classic value a = π creates the most well-known pattern
+- Try values near π (2.5 to 4.0) for variations
+- Creates swirling, spiral-like structures
+- Very compact and self-contained
+
+### Gingerbreadman
+
+A chaotic 2D map producing scattered "cookie-like" patterns.
+
+**Mathematical Definition:**
+```
+x₀ = 0, y₀ = 0
+xₙ₊₁ = 1 - yₙ + |xₙ|
+yₙ₊₁ = xₙ
+```
+
+**Parameters:**
+- No adjustable parameters (fixed formula)
+
+**Default View:**
+- Center: (2.0, 2.0)
+- Zoom: 0.15
+- Max Iterations: 1000
+
+**Tips:**
+- Parameter-free - pure chaotic dynamics
+- Creates scattered, organic patterns
+- Named for its resemblance to gingerbread cookies
+- Exhibits interesting clustering behavior
+
+### Chip
+
+The Chip attractor variant with adjustable parameters for varied patterns.
+
+**Mathematical Definition:**
+```
+x₀ = 0, y₀ = 0
+xₙ₊₁ = yₙ - sign(xₙ) × √(|a×xₙ - b|)
+yₙ₊₁ = c - xₙ
+```
+
+**Parameters:**
+- a = julia_c.x (default: -15.0)
+- b = julia_c.y (default: -19.0)
+- c = power (default: 1.0)
+
+**Default View:**
+- Center: (0.0, 0.0)
+- Zoom: 0.002
+- Max Iterations: 1000
+
+**Tips:**
+- Highly sensitive to parameter changes
+- Try extreme negative values for 'a' and 'b'
+- Creates dense, chip-like patterns
+- Very small features require high zoom
+
+### Quadruptwo
+
+The Quadruptwo strange attractor with complex parameter interactions.
+
+**Mathematical Definition:**
+```
+x₀ = 0, y₀ = 0
+xₙ₊₁ = yₙ - sign(xₙ) × √(|a×xₙ - b|)
+yₙ₊₁ = c - xₙ
+```
+
+**Parameters:**
+- a = julia_c.x (default: 34.0)
+- b = julia_c.y (default: 1.0)
+- c = power (default: 5.0)
+
+**Default View:**
+- Center: (15.0, 17.0)
+- Zoom: 0.01
+- Max Iterations: 1000
+
+**Tips:**
+- Large positive parameter values
+- Creates intricate, interleaved patterns
+- Requires appropriate centering for viewing
+- Experiment with 'c' parameter (power slider)
+
+### Threeply
+
+The Threeply strange attractor with unique chaotic dynamics.
+
+**Mathematical Definition:**
+```
+x₀ = 0, y₀ = 0
+xₙ₊₁ = yₙ - sign(xₙ) × √(|a×xₙ - b|)
+yₙ₊₁ = c - xₙ
+```
+
+**Parameters:**
+- a = julia_c.x (default: -55.0)
+- b = julia_c.y (default: -1.0)
+- c = power (default: -42.0)
+
+**Default View:**
+- Center: (0.0, 0.0)
+- Zoom: 1.0
+- Max Iterations: 1000
+
+**Tips:**
+- Uses large negative parameter values
+- Creates three-fold layered patterns (hence "threeply")
+- Dramatic changes with small adjustments
+- Centered at origin for default view
+
 ## Color Techniques
 
 ### Color Modes
@@ -755,7 +950,7 @@ Barycentric subdivision rule:
 
 **Available Palettes:**
 
-Par Fractal includes 39 built-in color palettes organized into several categories:
+Par Fractal includes 54 built-in color palettes organized into several categories:
 
 *Classic Palettes (6):*
 - Fire - Black → Purple → Red → Orange → Yellow
@@ -778,7 +973,7 @@ Par Fractal includes 39 built-in color palettes organized into several categorie
 - Lava - Almost Black → Dark Red → Red → Orange → Yellow-Orange
 
 *Artistic Palettes (7):*
-- Neon - Magenta → Cyan → Green → Yellow → Pink
+- Neon - Magenta → Cyan → Green → Yellow → Pink (bright neon colors)
 - Purple Dream - Dark Purple → Purple → Violet → Lavender → Pale Purple
 - Earth - Dark Brown → Brown → Tan → Olive → Beige-Green
 - Ice - Pale Blue → Light Blue → Blue → Deep Blue → Dark Blue
@@ -786,21 +981,30 @@ Par Fractal includes 39 built-in color palettes organized into several categorie
 - Mint - Dark Teal → Teal → Mint → Light Mint → Pale Mint
 - Cherry - Dark Red → Cherry Red → Red-Pink → Pink → Pale Pink
 
-*XFractint Classic Palettes (18):*
+*XFractint Classic Palettes (33):*
 - XF Altern - Alternating color bands
 - XF Blues - Blue gradient variations
 - XF Chroma - Chromatic color progression
 - XF Default - Classic XFractint default palette
 - XF DefaultW - White-based default variant
 - XF Firestrm - Fire storm effect
+- XF Froth3 - Froth pattern variant 3
+- XF Froth316 - Froth pattern 3-16
+- XF Froth6 - Froth pattern variant 6
+- XF Froth616 - Froth pattern 6-16
+- XF Gamma1 - Gamma correction variant 1
+- XF Gamma2 - Gamma correction variant 2
+- XF Glasses1 - Glasses color scheme 1
+- XF Glasses2 - Glasses color scheme 2
 - XF Goodega - EGA-style retro colors
 - XF Green - Green gradient variations
 - XF Grey - Grayscale variations
 - XF Grid - Grid-like color pattern
+- XF Headach2 - High-contrast psychedelic variant 2
 - XF Headache - High-contrast psychedelic colors
 - XF Landscap - Landscape-inspired earth tones
 - XF Lyapunov - Optimized for Lyapunov fractals
-- XF Neon - Bright neon colors
+- XF Neon - XFractint bright neon palette
 - XF Paintjet - Paintjet printer color set
 - XF Royal - Royal purple and blue tones
 - XF Topo - Topographic map colors

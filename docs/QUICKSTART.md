@@ -147,7 +147,7 @@ graph TD
 | **F12** | Screenshot | Capture current view as PNG |
 | **F** | Toggle FPS | Show/hide FPS counter |
 | **/** | Command Palette | Quick access to all features |
-| **Ctrl/Cmd+K** | Command Palette | Alternative shortcut (VS Code style) |
+| **Ctrl/Cmd+K** | Command Palette | Alternative shortcut |
 | **Esc** | Close/Cancel | Close dialogs or exit fullscreen |
 
 ### Quick Fractal Switching
@@ -172,15 +172,17 @@ graph TD
 | **F4** | Julia Set 3D | **F9** | Kleinian |
 | **F5** | Mandelbox | **F10** | Hybrid Mandelbulb-Julia |
 
-**Note:** The following fractals are accessible via UI or command palette only:
-- **2D:** Magnet, Collatz, Sierpinski Triangle, Hopalong, Martin, Gingerbreadman, Chip, Quadruptwo, Threeply
-- **3D:** Quaternion Cubic, Sierpinski Gasket, Pickover, Lorenz, Rossler
+**Note:** The following fractals are accessible via UI or command palette only (34 total fractal types):
+- **2D Escape-Time (13):** Magnet and Collatz (no hotkeys), plus Sierpinski Triangle
+- **2D Strange Attractors (6):** Hopalong, Martin, Gingerbreadman, Chip, Quadruptwo, Threeply
+- **3D Fractals (15):** Quaternion Cubic and Sierpinski Gasket (no hotkeys), plus 3D attractors: Pickover, Lorenz, Rossler
 
 ### Color Palette Cycling
 
 | Key | Action |
 |-----|--------|
-| **P** | Next palette |
+| **P** | Next static palette |
+| **Shift+P** | Next procedural palette |
 
 ## Your First Fractal
 
@@ -274,13 +276,14 @@ Mouse Wheel → Adjust camera speed
    - Keyboard: `-` to decrease by 32 (2D) or 10 (3D), `+/=` to increase
 
 2. **Color Palette** - Choose visual style
-   - 48 built-in palettes including:
+   - 48 built-in static palettes including:
      - Classic: Fire, Ocean, Rainbow, Forest, Sunset, Grayscale
      - Scientific: Viridis, Plasma, Inferno, Magma, Copper, Cool, Hot
      - Artistic: Neon, Purple Dream, Earth, Ice, Lava, Galaxy, Mint, Cherry
-     - Xfractint: 27 classic fractal palettes (Altern, Blues, Chroma, Default, Fire Storm, Froth, Gamma, Glasses, etc.)
+     - Xfractint: 27 classic fractal palettes (Altern, Blues, Chroma, Default, Defaultw, Fire Storm, Froth variants, Gamma, Glasses, Goodega, Green, Grey, Grid, Headache variants, Landscap, Lyapunov, Neon, Paintjet, Royal, Topo, Volcano)
+   - 12 procedural palettes (mathematical color generation)
    - Custom palette support via YAML or .pal file import
-   - Keyboard: `P` to cycle forward through palettes
+   - Keyboard: `P` to cycle static palettes, `Shift+P` to cycle procedural palettes
 
 **Performance Tip:**
 - Start with default settings
@@ -461,6 +464,8 @@ Save favorite views:
 **Try These:**
 1. **Command Palette** (`/` or `Ctrl/Cmd+K`)
    - Quick access to all 34 fractal types (19 2D + 15 3D)
+   - 19 2D Fractals: 13 escape-time + 6 strange attractors
+   - 15 3D Fractals: 12 ray-marched + 3 strange attractors
    - Toggle effects (AO, shadows, DoF, fog, bloom, FXAA)
    - Switch color modes and LOD profiles
    - Fuzzy search matching for fast command filtering

@@ -1,6 +1,6 @@
 [package]
 name = "par-fractal"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2021"
 authors = ["Paul Robello <probello@gmail.com>"]
 description = "Cross-platform GPU-accelerated fractal renderer with 2D and 3D support"

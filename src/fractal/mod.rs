@@ -179,7 +179,7 @@ impl Default for FractalParams {
             julia_c: [-0.7, 0.27015],
             max_iterations: 80,
 
-            power: 8.0,
+            power: 2.0, // Default for Mandelbrot2D/Julia2D (z^2 + c)
             max_steps: 200,
             min_distance: 0.00035,
             ambient_occlusion: true,
@@ -568,6 +568,17 @@ impl FractalParams {
 
         // Set fractal-specific defaults
         match fractal_type {
+            FractalType::Mandelbrot2D
+            | FractalType::Julia2D
+            | FractalType::BurningShip2D
+            | FractalType::Tricorn2D
+            | FractalType::Phoenix2D
+            | FractalType::Celtic2D => {
+                self.power = 2.0; // Classic z^2 + c
+            }
+            FractalType::Mandelbulb3D => {
+                self.power = 8.0; // Classic Mandelbulb
+            }
             FractalType::MengerSponge3D => {
                 self.fractal_scale = 1.0; // Double the apparent size (half the scale factor)
                 self.max_iterations = 7; // Default iterations for Menger Sponge

@@ -203,6 +203,7 @@ pub struct UI {
     pub palette_animation_enabled: bool,
     pub palette_animation_speed: f32,
     pub palette_animation_reverse: bool,
+    palette_animation_offset: f32, // Current accumulated offset
     // GPU selection
     pub available_gpus: Vec<super::renderer::GpuInfo>,
     #[allow(dead_code)]
@@ -270,6 +271,7 @@ impl UI {
             palette_animation_enabled: false,
             palette_animation_speed: 0.1,
             palette_animation_reverse: false,
+            palette_animation_offset: 0.0,
             available_gpus: Vec::new(),
             selected_gpu_index: None,
             gpu_selection_message: None,
@@ -1451,6 +1453,22 @@ impl UI {
                                         .text("Max Iterations")
                                         .logarithmic(true))
                                         .on_hover_text("Number of iterations before considering a point escaped\nHigher = more detail but slower")
+                                        .changed();
+                                }
+
+                                // Power control for escape-time fractals
+                                if matches!(params.fractal_type,
+                                    FractalType::Mandelbrot2D |
+                                    FractalType::Julia2D |
+                                    FractalType::BurningShip2D |
+                                    FractalType::Tricorn2D |
+                                    FractalType::Phoenix2D |
+                                    FractalType::Celtic2D
+                                ) {
+                                    changed |= ui.add(egui::Slider::new(&mut params.power, -32.0..=32.0)
+                                        .step_by(0.1)
+                                        .text("Power"))
+                                        .on_hover_text("Exponent in z^n + c formula\n2 = classic, 3+ = multi-fold symmetry\nNegative values create inverse fractals")
                                         .changed();
                                 }
 
@@ -3144,17 +3162,16 @@ impl UI {
                     ui.separator();
                     ui.add_space(4.0);
 
-                    ui.collapsing("What's New in v0.4.0", |ui| {
-                        ui.label("• 12 procedural palettes (Fire Storm, Rainbow, etc.)");
-                        ui.label("• Classic Fractint 'firestrm' palette support");
-                        ui.label("• Custom procedural palette with adjustable parameters");
-                        ui.label("• Shift+P to cycle procedural palettes");
-                        ui.label("• Fixed command palette fractal selection");
+                    ui.collapsing("What's New in v0.6.0", |ui| {
+                        ui.label("• Variable power (z^n + c) for 6 escape-time fractals");
+                        ui.label("• Power range -32 to 32 for Multibrot, Multicorn, etc.");
+                        ui.label("• Fixed palette animation color jump on speed change");
                     });
 
                     ui.collapsing("Features", |ui| {
                         ui.label("• 19 2D fractals (13 escape-time + 6 attractors)");
                         ui.label("• 12 3D fractals (ray-marched)");
+                        ui.label("• Variable power for 6 escape-time fractals");
                         ui.label("• 46 static + 12 procedural color palettes");
                         ui.label("• PBR shading, AO, soft shadows, DoF");
                         ui.label("• Screenshot & video recording");
