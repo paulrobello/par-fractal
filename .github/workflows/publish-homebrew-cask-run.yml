@@ -59,11 +59,11 @@ jobs:
           version = os.environ["VERSION"]
           sha_intel = os.environ["SHA_INTEL"]
           sha_arm = os.environ["SHA_ARM"]
-          
+
           # Ensure file exists before reading
           if not path.exists():
               raise FileNotFoundError(f"Cask file not found at: {path}")
-          
+
           text = path.read_text()
 
           def apply(pattern, repl):
@@ -117,10 +117,10 @@ jobs:
             cd "$TAP_DIR" || exit 1
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
-          
+
             # Since we did a fresh clone, pull is rarely needed, but rebase is safe
             git pull --rebase origin "$TAP_BRANCH"
-          
+
             git add Casks/par-fractal.rb
             if git diff --cached --quiet; then
               echo "Tap already up-to-date; skipping commit."

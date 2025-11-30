@@ -98,14 +98,14 @@ jobs:
         run: |
           mkdir -p par-fractal.app/Contents/MacOS
           mkdir -p par-fractal.app/Contents/Resources
-          
+
           # Copy binary
           cp target/${{ matrix.target }}/release/${{ matrix.artifact_name }} par-fractal.app/Contents/MacOS/par-fractal
           chmod +x par-fractal.app/Contents/MacOS/par-fractal
-          
+
           # Copy icon
           cp icons/par-fractal.icns par-fractal.app/Contents/Resources/
-          
+
           # Create Info.plist
           cat <<EOF > par-fractal.app/Contents/Info.plist
           <?xml version="1.0" encoding="UTF-8"?>
@@ -133,10 +133,10 @@ jobs:
           </dict>
           </plist>
           EOF
-          
+
           # Create zip
           zip -r ${{ matrix.asset_name }} par-fractal.app
-          
+
           mkdir -p release-binaries
           mv ${{ matrix.asset_name }} release-binaries/
 
@@ -204,7 +204,7 @@ jobs:
     name: Create GitHub Release
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [publish-crates, build-binaries]
+    needs: [build-binaries]
     permissions:
       contents: write
       id-token: write
