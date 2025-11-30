@@ -7,12 +7,17 @@ on:
         description: "Release version (e.g., 0.6.1)"
         required: true
         type: string
+  repository_dispatch:
+    types:
+      - publish-homebrew-cask
 
 jobs:
   update-and-publish-cask:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      VERSION: ${{ github.event.inputs.version || github.event.client_payload.version }}
 
     steps:
     - name: Checkout repository
@@ -47,7 +52,7 @@ jobs:
     - name: Update Cask file
       env:
         CASK_FILE: homebrew/Casks/par-fractal.rb
-        VERSION: ${{ github.event.inputs.version }}
+        VERSION: ${{ env.VERSION }}
         SHA_INTEL: ${{ steps.sha256_calc.outputs.sha256_intel }}
         SHA_ARM: ${{ steps.sha256_calc.outputs.sha256_arm }}
       run: |
@@ -85,7 +90,7 @@ PY
     - name: Commit and Push changes
       run: |
         git add homebrew/Casks/par-fractal.rb
-        git commit -m "Update par-fractal cask to v${{ github.event.inputs.version }}"
+        git commit -m "Update par-fractal cask to v${VERSION}"
         git push
 
     - name: Sync Homebrew tap repository
@@ -93,7 +98,7 @@ PY
         TAP_REPO: paulrobello/homebrew-par-fractal
         TAP_BRANCH: main
         TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-        VERSION: ${{ github.event.inputs.version }}
+        VERSION: ${{ env.VERSION }}
       run: |
         if [ -z "$TAP_TOKEN" ]; then
           echo "HOMEBREW_TAP_TOKEN secret must be set to push to $TAP_REPO" >&2
