@@ -50,34 +50,35 @@ jobs:
           SHA_ARM: ${{ steps.sha256_calc.outputs.sha256_arm }}
         run: |
           cat > "$CASK_FILE" <<'EOF'
- cask "par-fractal" do
-   arch arm: "aarch64", intel: "x86_64"
- 
-   version "__VERSION__"
-   sha256 arm:   "__SHA_ARM__",
-          intel: "__SHA_INTEL__"
- 
-   url "https://github.com/paulrobello/par-fractal/releases/download/v#{version}/par-fractal-macos-#{arch}.zip"
-   name "par-fractal"
-   desc "Cross-platform GPU-accelerated fractal renderer with 2D and 3D support"
-   homepage "https://github.com/paulrobello/par-fractal"
- 
-   depends_on macos: ">= :catalina"
- 
-   livecheck do
-     url :homepage
-     strategy :github_latest
-   end
- 
-   app "par-fractal.app"
- 
-   zap trash: [
-     "~/Library/Application Support/par-fractal",
-     "~/Library/Preferences/com.paulrobello.par-fractal.plist",
-     "~/Library/Saved Application State/com.paulrobello.par-fractal.savedState",
-   ]
- end
-EOF
+          cask "par-fractal" do
+          arch arm: "aarch64", intel: "x86_64"
+       
+          version "__VERSION__"
+          sha256 arm:   "__SHA_ARM__",
+                 intel: "__SHA_INTEL__"
+       
+          url "https://github.com/paulrobello/par-fractal/releases/download/v#{version}/par-fractal-macos-#{arch}.zip"
+          name "par-fractal"
+          desc "Cross-platform GPU-accelerated fractal renderer with 2D and 3D support"
+          homepage "https://github.com/paulrobello/par-fractal"
+       
+          depends_on macos: ">= :catalina"
+       
+          livecheck do
+            url :homepage
+            strategy :github_latest
+          end
+       
+          app "par-fractal.app"
+       
+          zap trash: [
+            "~/Library/Application Support/par-fractal",
+            "~/Library/Preferences/com.paulrobello.par-fractal.plist",
+            "~/Library/Saved Application State/com.paulrobello.par-fractal.savedState",
+          ]
+          end
+          EOF
+          
           sed -i "s/__VERSION__/${VERSION}/" "$CASK_FILE"
           sed -i "s/__SHA_INTEL__/${SHA_INTEL}/" "$CASK_FILE"
           sed -i "s/__SHA_ARM__/${SHA_ARM}/" "$CASK_FILE"
