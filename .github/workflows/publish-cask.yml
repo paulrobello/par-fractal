@@ -1,0 +1,71 @@
+name: Publish Homebrew Cask
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release Version (e.g., 0.6.1)'
+        required: true
+        type: string
+
+jobs:
+  update-and-publish-cask:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Download release assets
+      run: |
+        BASE_URL="https://github.com/${{ github.repository }}/releases/download/v${{ github.event.inputs.version }}"
+        
+        # Define asset names based on release.yml convention
+        ASSET_INTEL="par-fractal-macos-x86_64.zip"
+        ASSET_ARM="par-fractal-macos-aarch64.zip"
+        
+        echo "Downloading Intel asset: $ASSET_INTEL"
+        curl -L -o "$ASSET_INTEL" "$BASE_URL/$ASSET_INTEL"
+        
+        echo "Downloading ARM asset: $ASSET_ARM"
+        curl -L -o "$ASSET_ARM" "$BASE_URL/$ASSET_ARM"
+
+    - name: Calculate SHA256
+      id: sha256_calc
+      run: |
+        SHA256_INTEL=$(shasum -a 256 "par-fractal-macos-x86_64.zip" | awk '{print $1}')
+        SHA256_ARM=$(shasum -a 256 "par-fractal-macos-aarch64.zip" | awk '{print $1}')
+        
+        echo "Calculated SHA256 (Intel): $SHA256_INTEL"
+        echo "Calculated SHA256 (ARM): $SHA256_ARM"
+        
+        echo "sha256_intel=$SHA256_INTEL" >> "$GITHUB_OUTPUT"
+        echo "sha256_arm=$SHA256_ARM" >> "$GITHUB_OUTPUT"
+
+    - name: Update Cask file
+      run: |
+        CASK_FILE="homebrew/Casks/par-fractal.rb"
+        
+        # Update version
+        sed -i "s/version ".*"/version "${{ github.event.inputs.version }}"/" "$CASK_FILE"
+        
+        # Update SHA256 for Intel
+        # Matches: intel: "..."
+        sed -i "s/intel: ".*"/intel: "${{ steps.sha256_calc.outputs.sha256_intel }}"/" "$CASK_FILE"
+        
+        # Update SHA256 for ARM
+        # Matches: arm:   "..."
+        sed -i "s/arm:   ".*"/arm:   "${{ steps.sha256_calc.outputs.sha256_arm }}"/" "$CASK_FILE"
+        
+        cat "$CASK_FILE" # For debugging purposes
+
+    - name: Configure Git
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+    - name: Commit and Push changes
+      run: |
+        git add homebrew/Casks/par-fractal.rb
+        git commit -m "Update par-fractal cask to v${{ github.event.inputs.version }}"
+        git push

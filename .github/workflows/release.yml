@@ -40,13 +40,13 @@ jobs:
             os: macos-latest
             target: x86_64-apple-darwin
             artifact_name: par-fractal
-            asset_name: par-fractal-macos-x86_64
+            asset_name: par-fractal-macos-x86_64.zip
 
           - name: macOS ARM64
             os: macos-latest
             target: aarch64-apple-darwin
             artifact_name: par-fractal
-            asset_name: par-fractal-macos-aarch64
+            asset_name: par-fractal-macos-aarch64.zip
 
           - name: Windows x86_64
             os: windows-latest
@@ -73,13 +73,19 @@ jobs:
         run: |
           sudo apt-get install -y gcc-aarch64-linux-gnu
 
+      - name: Get version
+        shell: bash
+        run: |
+          VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n1)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
       - name: Build binary
         run: cargo build --release --target ${{ matrix.target }}
         env:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
 
       - name: Strip binary (Unix)
-        if: runner.os != 'Windows'
+        if: runner.os != 'Windows' && runner.os != 'macOS'
         run: |
           if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
             aarch64-linux-gnu-strip target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
@@ -87,7 +93,55 @@ jobs:
             strip target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
           fi
 
-      - name: Rename binary
+      - name: Bundle and Zip (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p par-fractal.app/Contents/MacOS
+          mkdir -p par-fractal.app/Contents/Resources
+          
+          # Copy binary
+          cp target/${{ matrix.target }}/release/${{ matrix.artifact_name }} par-fractal.app/Contents/MacOS/par-fractal
+          chmod +x par-fractal.app/Contents/MacOS/par-fractal
+          
+          # Copy icon
+          cp icons/par-fractal.icns par-fractal.app/Contents/Resources/
+          
+          # Create Info.plist
+          cat <<EOF > par-fractal.app/Contents/Info.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleExecutable</key>
+              <string>par-fractal</string>
+              <key>CFBundleIconFile</key>
+              <string>par-fractal.icns</string>
+              <key>CFBundleIdentifier</key>
+              <string>com.paulrobello.par-fractal</string>
+              <key>CFBundleName</key>
+              <string>par-fractal</string>
+              <key>CFBundlePackageType</key>
+              <string>APPL</string>
+              <key>CFBundleShortVersionString</key>
+              <string>${{ env.VERSION }}</string>
+              <key>CFBundleVersion</key>
+              <string>${{ env.VERSION }}</string>
+              <key>LSMinimumSystemVersion</key>
+              <string>10.13</string>
+              <key>NSHighResolutionCapable</key>
+              <true/>
+          </dict>
+          </plist>
+          EOF
+          
+          # Create zip
+          zip -r ${{ matrix.asset_name }} par-fractal.app
+          
+          mkdir -p release-binaries
+          mv ${{ matrix.asset_name }} release-binaries/
+
+      - name: Rename and Move binary (Linux/Windows)
+        if: runner.os != 'macOS'
         shell: bash
         run: |
           mkdir -p release-binaries
