@@ -89,9 +89,10 @@ PY
 
     - name: Commit and Push changes
       run: |
+        git pull --rebase origin main
         git add homebrew/Casks/par-fractal.rb
-        git commit -m "Update par-fractal cask to v${VERSION}"
-        git push
+        git commit -m "Update par-fractal cask to v${VERSION}" || echo "No changes to commit"
+        git push origin HEAD:main
 
     - name: Sync Homebrew tap repository
       env:
@@ -113,6 +114,7 @@ PY
         pushd "$TAP_DIR"
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
+        git pull --rebase origin "$TAP_BRANCH"
         git add Casks/par-fractal.rb
         if git diff --cached --quiet; then
           echo "Tap already up-to-date; skipping commit."
