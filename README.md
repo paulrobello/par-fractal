@@ -174,6 +174,18 @@ Download pre-compiled binaries from the [GitHub Releases](https://github.com/pau
 
 **macOS users:** Allow the app in System Preferences → Security & Privacy if prompted.
 
+### Using Homebrew (macOS)
+
+For macOS users, `par-fractal` can be easily installed using Homebrew:
+
+```bash
+# Tap the repository (if not already tapped)
+brew tap paulrobello/par-fractal
+
+# Install the application
+brew install --cask par-fractal
+```
+
 ### From Source
 
 ```bash

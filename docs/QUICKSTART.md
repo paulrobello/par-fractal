@@ -90,6 +90,18 @@ $ make install
 $ par-fractal
 ```
 
+### Option 5: Install with Homebrew (macOS)
+
+For macOS users, `par-fractal` can be easily installed using Homebrew:
+
+```bash
+# Tap the repository (if not already tapped)
+$ brew tap paulrobello/par-fractal
+
+# Install the application
+$ brew install --cask par-fractal
+```
+
 ## First Launch
 
 ### Running the Application
