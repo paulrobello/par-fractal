@@ -7,6 +7,11 @@ on:
         description: "Release version (e.g., 0.6.1)"
         required: true
         type: string
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
 
 jobs:
   update-and-publish-cask:
@@ -14,7 +19,7 @@ jobs:
     permissions:
       contents: write
     env:
-      VERSION: ${{ github.event.inputs.version }}
+      VERSION: ${{ github.event.inputs.version || inputs.version }}
 
     steps:
       - name: Checkout repository

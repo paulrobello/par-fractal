@@ -200,7 +200,7 @@ jobs:
         continue-on-error: true
 
   # Create GitHub release
-  github-release:
+github-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -259,6 +259,16 @@ jobs:
           'v${{ steps.get_version.outputs.version }}' binaries/* \
           --repo '${{ github.repository }}' \
           --clobber
+
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+
+  publish-homebrew-cask:
+    name: Publish Homebrew Cask
+    needs: [github-release]
+    uses: ./.github/workflows/publish-homebrew-cask-run.yml
+    with:
+      version: ${{ needs.github-release.outputs.version }}
 
       - name: Discord notification
         if: success()
