@@ -23,7 +23,7 @@ Get up and running with Par Fractal in minutes and start exploring beautiful mat
 
 **Platform-Specific:**
 - **Linux:** Vulkan drivers installed
-- **macOS:** Metal support (macOS 10.13+)
+- **macOS:** Metal support (macOS 10.15 Catalina or newer)
 - **Windows:** DirectX 12 or Vulkan drivers
 
 **Check Rust Installation:**
@@ -95,7 +95,7 @@ $ par-fractal
 For macOS users, `par-fractal` can be easily installed using Homebrew:
 
 ```bash
-# Tap the repository (if not already tapped)
+# Tap the official Homebrew tap
 $ brew tap paulrobello/par-fractal
 
 # Install the application

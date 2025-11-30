@@ -179,12 +179,14 @@ Download pre-compiled binaries from the [GitHub Releases](https://github.com/pau
 For macOS users, `par-fractal` can be easily installed using Homebrew:
 
 ```bash
-# Tap the repository (if not already tapped)
+# Tap the official Homebrew tap
 brew tap paulrobello/par-fractal
 
 # Install the application
 brew install --cask par-fractal
 ```
+
+Homebrew pulls the cask from the dedicated tap repository at `github.com/paulrobello/homebrew-par-fractal`.
 
 ### From Source
 

@@ -11,6 +11,8 @@ on:
 jobs:
   update-and-publish-cask:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
     - name: Checkout repository
@@ -69,3 +71,32 @@ jobs:
         git add homebrew/Casks/par-fractal.rb
         git commit -m "Update par-fractal cask to v${{ github.event.inputs.version }}"
         git push
+
+    - name: Sync Homebrew tap repository
+      env:
+        TAP_REPO: paulrobello/homebrew-par-fractal
+        TAP_BRANCH: main
+        TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        VERSION: ${{ github.event.inputs.version }}
+      run: |
+        if [ -z "$TAP_TOKEN" ]; then
+          echo "HOMEBREW_TAP_TOKEN secret must be set to push to $TAP_REPO" >&2
+          exit 1
+        fi
+
+        TAP_DIR="$(mktemp -d)"
+        git clone "https://${TAP_TOKEN}@github.com/${TAP_REPO}.git" "$TAP_DIR"
+
+        cp homebrew/Casks/par-fractal.rb "$TAP_DIR/Casks/par-fractal.rb"
+
+        pushd "$TAP_DIR"
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add Casks/par-fractal.rb
+        if git diff --cached --quiet; then
+          echo "Tap already up-to-date; skipping commit."
+        else
+          git commit -m "Update par-fractal cask to v${VERSION}"
+          git push origin "$TAP_BRANCH"
+        fi
+        popd

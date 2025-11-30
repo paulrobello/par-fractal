@@ -10,6 +10,8 @@ cask "par-fractal" do
   desc "Cross-platform GPU-accelerated fractal renderer with 2D and 3D support"
   homepage "https://github.com/paulrobello/par-fractal"
 
+  depends_on macos: ">= :catalina"
+
   livecheck do
     url :homepage
     strategy :github_latest
