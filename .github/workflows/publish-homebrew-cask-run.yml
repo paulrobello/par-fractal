@@ -120,12 +120,9 @@ jobs:
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
 
-            # Since we did a fresh clone, pull is rarely needed, but rebase is safe
-            git pull --rebase origin "$TAP_BRANCH"
-
-            git add Casks/par-fractal.rb
-            if git diff --cached --quiet; then
-              echo "Tap already up-to-date; skipping commit."
+          git add Casks/par-fractal.rb
+          if git diff --cached --quiet; then
+            echo "Tap already up-to-date; skipping commit."
             else
               git commit -m "Update par-fractal cask to v${VERSION}"
               git push origin "$TAP_BRANCH"
