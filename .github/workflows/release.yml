@@ -266,7 +266,7 @@ github-release:
   publish-homebrew-cask:
     name: Publish Homebrew Cask
     needs: [github-release]
-    uses: ./.github/workflows/publish-homebrew-cask-run.yml
+    uses: ./.github/workflows/publish-homebrew-cask-core.yml
     with:
       version: ${{ needs.github-release.outputs.version }}
 
