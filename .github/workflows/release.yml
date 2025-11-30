@@ -3,9 +3,6 @@ name: Release and Deploy
 # This workflow handles the complete release process:
 # 1. Builds standalone binaries for multiple platforms (Linux, macOS, Windows)
 # 2. Publishes the library to crates.io
-# 3. Creates a GitHub release with all binary artifacts
-#
-# To trigger: Go to Actions → Release and Deploy → Run workflow
 
 on:
   workflow_dispatch:
@@ -200,7 +197,7 @@ jobs:
         continue-on-error: true
 
   # Create GitHub release
-github-release:
+  github-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
     timeout-minutes: 15
