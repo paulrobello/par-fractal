@@ -46,40 +46,42 @@ jobs:
       - name: Update Cask file
         env:
           CASK_FILE: homebrew/Casks/par-fractal.rb
-          # VERSION is inherited from Job env, strictly not needed here
           SHA_INTEL: ${{ steps.sha256_calc.outputs.sha256_intel }}
           SHA_ARM: ${{ steps.sha256_calc.outputs.sha256_arm }}
         run: |
-          python <<'PY'
-          import os
-          import re
-          from pathlib import Path
-
-          path = Path(os.environ["CASK_FILE"])
-          version = os.environ["VERSION"]
-          sha_intel = os.environ["SHA_INTEL"]
-          sha_arm = os.environ["SHA_ARM"]
-
-          # Ensure file exists before reading
-          if not path.exists():
-              raise FileNotFoundError(f"Cask file not found at: {path}")
-
-          text = path.read_text()
-
-          def apply(pattern, repl):
-              global text
-              new_text, count = re.subn(pattern, repl, text, count=1)
-              if count != 1:
-                  raise SystemExit(f"Failed to replace pattern: {pattern}")
-              return new_text
-
-          text = apply(r'version\s+"[^"]+"', f'version "{version}"')
-          text = apply(r'(sha256\s+arm:\s+)"[^"]+"', r'\1"' + sha_arm + '"')
-          text = apply(r'(\s+intel:\s+)"[^"]+"', r'\1"' + sha_intel + '"')
-
-          path.write_text(text)
-          print(text)
-          PY
+          cat > "$CASK_FILE" <<'EOF'
+ cask "par-fractal" do
+   arch arm: "aarch64", intel: "x86_64"
+ 
+   version "__VERSION__"
+   sha256 arm:   "__SHA_ARM__",
+          intel: "__SHA_INTEL__"
+ 
+   url "https://github.com/paulrobello/par-fractal/releases/download/v#{version}/par-fractal-macos-#{arch}.zip"
+   name "par-fractal"
+   desc "Cross-platform GPU-accelerated fractal renderer with 2D and 3D support"
+   homepage "https://github.com/paulrobello/par-fractal"
+ 
+   depends_on macos: ">= :catalina"
+ 
+   livecheck do
+     url :homepage
+     strategy :github_latest
+   end
+ 
+   app "par-fractal.app"
+ 
+   zap trash: [
+     "~/Library/Application Support/par-fractal",
+     "~/Library/Preferences/com.paulrobello.par-fractal.plist",
+     "~/Library/Saved Application State/com.paulrobello.par-fractal.savedState",
+   ]
+ end
+EOF
+          sed -i "s/__VERSION__/${VERSION}/" "$CASK_FILE"
+          sed -i "s/__SHA_INTEL__/${SHA_INTEL}/" "$CASK_FILE"
+          sed -i "s/__SHA_ARM__/${SHA_ARM}/" "$CASK_FILE"
+          cat "$CASK_FILE"
 
       - name: Configure Git
         run: |
@@ -88,7 +90,6 @@ jobs:
 
       - name: Commit and Push to Source Repo
         run: |
-          git pull --rebase origin main
           git add homebrew/Casks/par-fractal.rb
           git commit -m "Update par-fractal cask to v${VERSION}" || echo "No changes to commit"
           git push origin HEAD:main
