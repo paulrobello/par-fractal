@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2025-11-29
+
+### Added
+- **macOS App Bundle Support** - `make bundle` and `make run-bundle` targets for creating and running a proper macOS .app bundle with icon.
+
 ## [0.6.0] - 2025-11-26
 
 ### Added

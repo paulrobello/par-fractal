@@ -287,6 +287,60 @@ release:
 	@echo ""
 
 # ============================================================================
+# macOS Bundle
+# ============================================================================
+
+# macOS app bundle
+bundle: build-release
+ifeq ($(shell uname),Darwin)
+	@echo "Creating macOS app bundle..."
+	@mkdir -p target/release/bundle/par-fractal.app/Contents/MacOS
+	@mkdir -p target/release/bundle/par-fractal.app/Contents/Resources
+	@cp target/release/par-fractal target/release/bundle/par-fractal.app/Contents/MacOS/
+	@cp icons/par-fractal.icns target/release/bundle/par-fractal.app/Contents/Resources/
+	@echo '<?xml version="1.0" encoding="UTF-8"?>' > target/release/bundle/par-fractal.app/Contents/Info.plist
+	@echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' >> target/release/bundle/par-fractal.app/Contents/Info.plist
+	@echo '<plist version="1.0">' >> target/release/bundle/par-fractal.app/Contents/Info.plist
+	@echo '<dict>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
+	@echo '    <key>CFBundleName</key>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
+	@echo '    <string>par-fractal</string>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
+	@echo '    <key>CFBundleDisplayName</key>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
+	@echo '    <string>par-fractal</string>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
+	@echo '    <key>CFBundleIdentifier</key>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
+	@echo '    <string>com.paulrobello.par-fractal</string>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
+	@echo '    <key>CFBundleVersion</key>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
+	@echo '    <string>0.6.1</string>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
+	@echo '    <key>CFBundleShortVersionString</key>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
+	@echo '    <string>0.6.1</string>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
+	@echo '    <key>CFBundleExecutable</key>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
+	@echo '    <string>par-fractal</string>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
+	@echo '    <key>CFBundleIconFile</key>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
+	@echo '    <string>par-fractal</string>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
+	@echo '    <key>CFBundlePackageType</key>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
+	@echo '    <string>APPL</string>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
+	@echo '    <key>NSHighResolutionCapable</key>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
+	@echo '    <true/>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
+	@echo '    <key>LSMinimumSystemVersion</key>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
+	@echo '    <string>11.0</string>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
+	@echo '</dict>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
+	@echo '</plist>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
+	@echo "Bundle created at: target/release/bundle/par-fractal.app"
+else
+	@echo "App bundle creation is only supported on macOS"
+endif
+
+# Run macOS app bundle (shows proper dock icon)
+run-bundle: bundle
+ifeq ($(shell uname),Darwin)
+	@echo "Running par-fractal.app..."
+	@open target/release/bundle/par-fractal.app
+else
+	@echo "App bundle is only supported on macOS"
+	@echo "Running regular binary instead..."
+	cargo run --release
+endif
+
+# ============================================================================
 # System
 # ============================================================================
 
