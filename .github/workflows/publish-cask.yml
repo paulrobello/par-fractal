@@ -45,21 +45,37 @@ jobs:
         echo "sha256_arm=$SHA256_ARM" >> "$GITHUB_OUTPUT"
 
     - name: Update Cask file
+      env:
+        CASK_FILE: homebrew/Casks/par-fractal.rb
+        VERSION: ${{ github.event.inputs.version }}
+        SHA_INTEL: ${{ steps.sha256_calc.outputs.sha256_intel }}
+        SHA_ARM: ${{ steps.sha256_calc.outputs.sha256_arm }}
       run: |
-        CASK_FILE="homebrew/Casks/par-fractal.rb"
-        
-        # Update version
-        sed -i "s/version ".*"/version "${{ github.event.inputs.version }}"/" "$CASK_FILE"
-        
-        # Update SHA256 for Intel
-        # Matches: intel: "..."
-        sed -i "s/intel: ".*"/intel: "${{ steps.sha256_calc.outputs.sha256_intel }}"/" "$CASK_FILE"
-        
-        # Update SHA256 for ARM
-        # Matches: arm:   "..."
-        sed -i "s/arm:   ".*"/arm:   "${{ steps.sha256_calc.outputs.sha256_arm }}"/" "$CASK_FILE"
-        
-        cat "$CASK_FILE" # For debugging purposes
+        python <<'PY'
+import os
+import re
+from pathlib import Path
+
+path = Path(os.environ["CASK_FILE"])
+version = os.environ["VERSION"]
+sha_intel = os.environ["SHA_INTEL"]
+sha_arm = os.environ["SHA_ARM"]
+text = path.read_text()
+
+def apply(pattern, repl):
+    global text
+    new_text, count = re.subn(pattern, repl, text, count=1)
+    if count != 1:
+        raise SystemExit(f"Failed to replace pattern: {pattern}")
+    return new_text
+
+text = apply(r'version\s+"[^"]+"', f'version "{version}"')
+text = apply(r'(sha256\s+arm:\s+)"[^"]+"', r'\1"' + sha_arm + '"')
+text = apply(r'(\s+intel:\s+)"[^"]+"', r'\1"' + sha_intel + '"')
+
+path.write_text(text)
+print(text)
+PY
 
     - name: Configure Git
       run: |
