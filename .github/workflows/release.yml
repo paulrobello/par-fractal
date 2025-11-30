@@ -270,15 +270,6 @@ github-release:
     with:
       version: ${{ needs.github-release.outputs.version }}
 
-      - name: Discord notification
-        if: success()
-        env:
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-        uses: Ilshidur/action-discord@master
-        with:
-          args: 'A new release v${{ steps.get_version.outputs.version }} has been created for {{ EVENT_PAYLOAD.repository.full_name }}.'
-        continue-on-error: true
-
   # Build and deploy web version to GitHub Pages
   deploy-web:
     name: Deploy Web Version
