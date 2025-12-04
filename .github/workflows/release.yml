@@ -266,6 +266,7 @@ jobs:
     uses: ./.github/workflows/publish-homebrew-cask-core.yml
     with:
       version: ${{ needs.github-release.outputs.version }}
+    secrets: inherit
 
   # Build and deploy web version to GitHub Pages
   deploy-web:
