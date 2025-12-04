@@ -4,7 +4,10 @@ mod initialization;
 pub mod uniforms;
 mod update;
 
-use compute::{AccumulationDisplayUniforms, AccumulationTexture, AttractorComputePipeline};
+use compute::{
+    AccumulationDisplayUniforms, AccumulationTexture, AttractorComputePipeline,
+    BuddhabrotAccumulationBuffer, BuddhabrotComputePipeline,
+};
 use uniforms::*;
 
 #[derive(Debug, Clone)]
@@ -67,9 +70,15 @@ pub struct Renderer {
     pub blur_v_params_bind_group: wgpu::BindGroup,
     pub composite_params_bind_group: wgpu::BindGroup,
 
-    // Compute shader infrastructure for strange attractor accumulation
+    // Compute shader infrastructure for accumulation-based fractals
     pub attractor_compute: Option<AttractorComputePipeline>,
+    pub buddhabrot_compute: Option<BuddhabrotComputePipeline>,
     pub accumulation_texture: Option<AccumulationTexture>,
+    /// Atomic storage buffer for Buddhabrot accumulation (separate from texture-based attractors)
+    pub buddhabrot_accumulation_buffer: Option<BuddhabrotAccumulationBuffer>,
+    /// Compute pipeline to copy from Buddhabrot buffer to texture for display
+    pub buddhabrot_copy_pipeline: Option<wgpu::ComputePipeline>,
+    pub buddhabrot_copy_bind_group: Option<wgpu::BindGroup>,
     pub accumulation_display_pipeline: wgpu::RenderPipeline, // Uses fs_accumulation_display
     pub accumulation_display_bind_group: Option<wgpu::BindGroup>,
     pub accumulation_display_uniform_buffer: wgpu::Buffer,

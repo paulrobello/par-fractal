@@ -214,7 +214,8 @@ fn test_all_fractal_types_switchable() {
             | FractalType::Gingerbreadman2D
             | FractalType::Chip2D
             | FractalType::Quadruptwo2D
-            | FractalType::Threeply2D => {
+            | FractalType::Threeply2D
+            | FractalType::Buddhabrot2D => {
                 assert_eq!(params.render_mode, RenderMode::TwoD);
             }
             FractalType::Mandelbulb3D

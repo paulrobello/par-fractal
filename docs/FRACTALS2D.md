@@ -1,6 +1,6 @@
 # 2D Fractals Guide
 
-Complete guide to all 19 2D fractals available in Par Fractal, including mathematical background, usage, and exploration tips.
+Complete guide to all 20 2D fractals available in Par Fractal, including mathematical background, usage, and exploration tips.
 
 **Available 2D Fractals:**
 
@@ -19,13 +19,16 @@ Complete guide to all 19 2D fractals available in Par Fractal, including mathema
 12. Magnet - Physics-inspired rational iteration formula
 13. Collatz - Experimental complex number extension of 3n+1 problem
 
+**Density Visualization (1 type):**
+14. Buddhabrot - Mandelbrot escape trajectory probability distribution
+
 **Strange Attractors (6 types):**
-14. Hopalong - Barry Martin's hopalong attractor with chaotic point clouds
-15. Martin - Barry Martin's original strange attractor
-16. Gingerbreadman - Chaotic 2D map with cookie-like patterns
-17. Chip - Chip attractor variant
-18. Quadruptwo - Quadruptwo strange attractor
-19. Threeply - Threeply strange attractor
+15. Hopalong - Barry Martin's hopalong attractor with chaotic point clouds
+16. Martin - Barry Martin's original strange attractor
+17. Gingerbreadman - Chaotic 2D map with cookie-like patterns
+18. Chip - Chip attractor variant
+19. Quadruptwo - Quadruptwo strange attractor
+20. Threeply - Threeply strange attractor
 
 ## Table of Contents
 - [Overview](#overview)
@@ -44,6 +47,7 @@ Complete guide to all 19 2D fractals available in Par Fractal, including mathema
 - [Nova Fractal](#nova-fractal)
 - [Magnet Fractal](#magnet-fractal)
 - [Collatz Fractal](#collatz-fractal)
+- [Buddhabrot](#buddhabrot)
 - [Strange Attractors](#strange-attractors)
   - [Hopalong](#hopalong)
   - [Martin](#martin)
@@ -760,6 +764,64 @@ Barycentric subdivision rule:
 - Try different palettes to visualize the iteration depths
 - Supports high-precision mode for extremely deep zooms
 - Different coloring than Sierpinski Carpet - uses smooth iteration-based shading
+
+## Buddhabrot
+
+### Description
+
+The Buddhabrot is a probability distribution visualization of escape trajectories from the Mandelbrot set, discovered by Melinda Green in 1993. Unlike traditional Mandelbrot rendering which colors each pixel based on escape time, the Buddhabrot traces the full trajectory of escaping points and accumulates hit counts at each pixel, creating an image that resembles a seated Buddha figure.
+
+**Algorithm:**
+1. Sample random c values in the complex plane
+2. Test if c escapes the Mandelbrot iteration (|z| > 2)
+3. If it escapes, trace the full escape trajectory
+4. For each point z in the trajectory, increment the pixel counter at that location
+5. Points that don't escape (inside Mandelbrot set) are discarded
+
+**Mathematical Definition:**
+```
+z₀ = 0
+zₙ₊₁ = zₙ² + c
+```
+For random c values, if the sequence escapes, plot all intermediate zₙ values.
+
+**Key Features:**
+- Density-based visualization (not escape-time)
+- Uses GPU compute shaders for real-time accumulation
+- Higher iterations reveal more detail but sparser structures
+- Image builds up progressively over time as more samples are traced
+- Resembles a seated Buddha figure in meditation pose
+
+### How to Explore
+
+**Start Position:**
+- Center: (-0.5, 0.0)
+- Zoom: 0.35 (zoomed out to see full figure)
+- Max Iterations: 1000
+
+**UI Parameters:**
+- **Max Iterations:** Controls detail level - higher values show more intricate trajectories but sparser density (try 500-5000)
+- **Iterations/Frame:** Number of random samples tested per frame (higher = faster convergence)
+- **Log Scale:** Adjusts visualization contrast for density display
+
+**Rendering Notes:**
+- The Buddhabrot uses accumulation-based rendering like strange attractors
+- Image quality improves over time as more samples are accumulated
+- Panning or zooming clears the accumulation buffer and restarts sampling
+- Higher iteration counts create more detailed but sparser images
+
+**Tips:**
+- Start with lower max iterations (500-1000) for faster initial visualization
+- Let the image accumulate for 10-30 seconds to see detail emerge
+- Try increasing max iterations to 2000-5000 for finer filament structures
+- The "Nebulabrot" technique uses different iteration counts for RGB channels
+- Use Log Scale to adjust visibility of faint trajectory structures
+
+### Nebulabrot Coloring
+
+The Nebulabrot is a color variation discovered by Melinda Green where different maximum iteration counts are used for the red, green, and blue color channels (e.g., R=5000, G=500, B=50). This creates false-color images similar to astronomical nebula photographs.
+
+**Note:** The current implementation uses a single iteration count. Future versions may add per-channel iteration control for full Nebulabrot support.
 
 ## Strange Attractors
 

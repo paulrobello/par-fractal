@@ -541,6 +541,20 @@ impl UI {
                         });
 
                         ui.separator();
+                        ui.label("2D Density Fractals:");
+                        // Buddhabrot needs accumulation mode enabled
+                        {
+                            let selected = params.fractal_type == FractalType::Buddhabrot2D;
+                            if ui.selectable_label(selected, "Buddhabrot").on_hover_text("Buddhabrot - Mandelbrot escape trajectory density visualization (discovered by Melinda Green, 1993)").clicked() {
+                                params.fractal_type = FractalType::Buddhabrot2D;
+                                params.attractor_accumulation_enabled = true;
+                                params.attractor_pending_clear = true;
+                                params.attractor_total_iterations = 0;
+                                changed = true;
+                            }
+                        }
+
+                        ui.separator();
                         ui.label("2D Strange Attractors:");
                         // Helper macro-like closure to create attractor buttons that auto-enable accumulation
                         let mut attractor_button = |ui: &mut egui::Ui, fractal: FractalType, label: &str, hover: &str| {
@@ -1447,9 +1461,14 @@ impl UI {
                             .show(ui, |ui| {
                                 // Hide iterations slider for Collatz (doesn't affect it)
                                 // Hide max iterations for strange attractors (they use accumulation mode)
-                                // and for Collatz which doesn't use iterations
+                                // Buddhabrot needs higher range for max iterations
                                 if params.fractal_type != FractalType::Collatz2D && !params.fractal_type.is_2d_attractor() {
-                                    changed |= ui.add(egui::Slider::new(&mut params.max_iterations, 1..=1024)
+                                    let max_iter_range = if params.fractal_type.is_buddhabrot() {
+                                        1..=10000 // Buddhabrot needs higher iterations for detail
+                                    } else {
+                                        1..=1024
+                                    };
+                                    changed |= ui.add(egui::Slider::new(&mut params.max_iterations, max_iter_range)
                                         .text("Max Iterations")
                                         .logarithmic(true))
                                         .on_hover_text("Number of iterations before considering a point escaped\nHigher = more detail but slower")
@@ -1495,32 +1514,65 @@ impl UI {
                                     changed = true;
                                 }
 
-                                // Accumulation controls for strange attractors (always enabled)
-                                if params.fractal_type.is_2d_attractor() {
-                                    // Ensure accumulation is always enabled for strange attractors
+                                // Accumulation controls for strange attractors and Buddhabrot
+                                if params.fractal_type.uses_accumulation() {
+                                    // Ensure accumulation is always enabled for these fractal types
                                     params.attractor_accumulation_enabled = true;
 
                                     ui.separator();
                                     ui.label("🎯 Accumulation Settings");
 
-                                    changed |= ui.add(egui::Slider::new(&mut params.attractor_iterations_per_frame, 10_000..=1_000_000)
+                                    changed |= ui.add(egui::Slider::new(&mut params.attractor_iterations_per_frame, 1_000..=500_000)
                                         .text("Iterations/Frame")
                                         .logarithmic(true))
-                                        .on_hover_text("Number of orbit iterations per frame\nHigher = faster accumulation, lower FPS")
+                                        .on_hover_text("Number of orbit iterations per frame\nLower = better FPS, Higher = faster accumulation")
                                         .changed();
 
-                                    changed |= ui.add(egui::Slider::new(&mut params.attractor_log_scale, 0.5..=5.0)
+                                    changed |= ui.add(egui::Slider::new(&mut params.attractor_log_scale, 0.5..=6.0)
                                         .text("Density Scale"))
-                                        .on_hover_text("Controls saturation point (hits needed for white)\n0.5 = ~30 hits, 1.0 = ~100, 2.0 = ~1000, 3.0 = ~10k")
+                                        .on_hover_text("Controls saturation point (hits needed for white)\n0.5 = ~30 hits, 1.0 = ~100, 2.0 = ~1000, 3.0 = ~10k, 4.0 = ~100k")
                                         .changed();
 
-                                    ui.label(format!("Total Iterations: {}", params.attractor_total_iterations));
+                                    // Format numbers with commas
+                                    let format_with_commas = |n: u64| -> String {
+                                        let s = n.to_string();
+                                        let mut result = String::new();
+                                        for (i, c) in s.chars().rev().enumerate() {
+                                            if i > 0 && i % 3 == 0 {
+                                                result.push(',');
+                                            }
+                                            result.push(c);
+                                        }
+                                        result.chars().rev().collect()
+                                    };
 
-                                    if ui.button("Clear Accumulation").on_hover_text("Reset accumulated density").clicked() {
-                                        params.attractor_pending_clear = true;
-                                        params.attractor_total_iterations = 0;
-                                        changed = true;
-                                    }
+                                    ui.label(format!("Total: {} / {}",
+                                        format_with_commas(params.attractor_total_iterations),
+                                        format_with_commas(params.attractor_max_iterations)));
+
+                                    ui.horizontal(|ui| {
+                                        ui.label("Max:");
+                                        let mut max_millions = (params.attractor_max_iterations / 1_000_000) as u32;
+                                        if ui.add(egui::DragValue::new(&mut max_millions)
+                                            .range(1..=100)
+                                            .suffix("M"))
+                                            .on_hover_text("Maximum iterations before auto-pause (in millions)")
+                                            .changed() {
+                                            params.attractor_max_iterations = max_millions as u64 * 1_000_000;
+                                        }
+                                    });
+
+                                    ui.horizontal(|ui| {
+                                        let pause_text = if params.attractor_paused { "▶ Resume" } else { "⏸ Pause" };
+                                        if ui.button(pause_text).on_hover_text("Pause/resume accumulation").clicked() {
+                                            params.attractor_paused = !params.attractor_paused;
+                                        }
+                                        if ui.button("Clear").on_hover_text("Reset accumulated density").clicked() {
+                                            params.attractor_pending_clear = true;
+                                            params.attractor_total_iterations = 0;
+                                            changed = true;
+                                        }
+                                    });
 
                                     // Attractor-specific parameter controls
                                     ui.separator();
@@ -3162,15 +3214,15 @@ impl UI {
                     ui.separator();
                     ui.add_space(4.0);
 
-                    ui.collapsing("What's New in v0.6.0", |ui| {
-                        ui.label("• Variable power (z^n + c) for 6 escape-time fractals");
-                        ui.label("• Power range -32 to 32 for Multibrot, Multicorn, etc.");
-                        ui.label("• Fixed palette animation color jump on speed change");
+                    ui.collapsing("What's New in v0.7.0", |ui| {
+                        ui.label("• Buddhabrot - density visualization of escape trajectories");
+                        ui.label("• Compute shader accumulation for Buddhabrot rendering");
+                        ui.label("• New preset: Buddhabrot Classic");
                     });
 
                     ui.collapsing("Features", |ui| {
-                        ui.label("• 19 2D fractals (13 escape-time + 6 attractors)");
-                        ui.label("• 12 3D fractals (ray-marched)");
+                        ui.label("• 20 2D fractals (13 escape-time + 1 density + 6 attractors)");
+                        ui.label("• 15 3D fractals (12 ray-marched + 3 attractors)");
                         ui.label("• Variable power for 6 escape-time fractals");
                         ui.label("• 46 static + 12 procedural color palettes");
                         ui.label("• PBR shading, AO, soft shadows, DoF");

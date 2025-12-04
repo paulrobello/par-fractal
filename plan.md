@@ -315,3 +315,52 @@ The following 3D fractals have visual clipping issues:
 - Apollonian Gasket (F8)
 
 Parts of these fractals clip in and out depending on camera distance. See `handoff.md` for investigation steps.
+
+---
+
+## Buddhabrot Implementation (2025-12-03)
+
+### Status: IN PROGRESS - Buffer persistence issue
+
+**Version:** 0.7.0
+
+### Completed Work
+- [x] Added `Buddhabrot2D` to `FractalType` enum
+- [x] Created `buddhabrot_compute.wgsl` compute shader
+- [x] Added `BuddhabrotComputePipeline` to renderer
+- [x] Added UI selection under "2D Density Fractals"
+- [x] Added "Buddhabrot Classic" preset
+- [x] Updated documentation (FEATURES.md, FRACTALS2D.md)
+- [x] All tests passing
+- [x] Converted to atomic storage buffer (fixes race conditions)
+- [x] Created `buddhabrot_copy.wgsl` for buffer-to-texture copy
+- [x] Added `BuddhabrotAccumulationBuffer` struct
+- [x] Fixed X-axis flip in coordinate transformation
+
+### Current Issue
+**Buffer not persisting between frames.** Yellow square flashes briefly then screen goes black. This indicates:
+1. Compute shader IS running
+2. Buffer-to-texture copy IS working
+3. Something is **recreating the buffer every frame**
+
+### Latest Investigation (2025-12-03)
+- Disabled view_changed auto-clear for Buddhabrot
+- Commented out buffer.clear() in initialization
+- Issue persists - buffer/texture likely being recreated, not just cleared
+- `init_buddhabrot_compute()` is called every frame and may be triggering recreation
+
+### Next Steps
+1. Add logging to `needs_buffer` and `needs_texture` checks to identify recreation trigger
+2. Move initialization out of render loop (only init once when fractal type changes)
+3. Check if `self.renderer.size` is changing between frames
+
+### Files Added/Modified
+- `src/shaders/buddhabrot_copy.wgsl` - NEW buffer-to-texture copy shader
+- `src/renderer/compute.rs` - Added `BuddhabrotAccumulationBuffer`, `create_buddhabrot_storage_layout()`
+- `src/renderer/initialization.rs` - Added `ensure_accumulation_texture_for_buddhabrot()`
+- `src/app/render.rs` - Updated for atomic buffer, disabled auto-clear
+
+### See Also
+- `handoff.md` - Detailed handoff document with investigation steps
+- `src/shaders/buddhabrot_compute.wgsl` - Main compute shader (has debug code enabled)
+- `src/app/render.rs:25-135` - Render loop integration

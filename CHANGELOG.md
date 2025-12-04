@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2025-12-03
+
+### Added
+
+#### New Fractal Type - Buddhabrot
+- **Buddhabrot 2D** - Density visualization of Mandelbrot escape trajectories
+  - Discovered by Melinda Green in 1993, resembles a seated Buddha figure
+  - Uses compute shaders with atomic storage buffers for accumulation
+  - Renders escape paths that leave the Mandelbrot set
+  - Higher iteration counts reveal more detail in the "Buddha" shape
+  - Preset: "Buddhabrot Classic" with optimized settings
+
+### Changed
+- Total fractal count increased from 34 to 35 (20 2D + 15 3D)
+- Gallery updated with Buddhabrot and Julia 3D screenshots
+
 ## [0.6.1] - 2025-11-29
 
 ### Added
@@ -197,6 +213,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Settings persistence (YAML)
 - Cross-platform support: Windows (DX12/Vulkan), macOS (Metal), Linux (Vulkan)
 
+[0.7.0]: https://github.com/paulrobello/par-fractal/compare/v0.6.1...v0.7.0
+[0.6.1]: https://github.com/paulrobello/par-fractal/compare/v0.6.0...v0.6.1
+[0.6.0]: https://github.com/paulrobello/par-fractal/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/paulrobello/par-fractal/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/paulrobello/par-fractal/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/paulrobello/par-fractal/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/paulrobello/par-fractal/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/paulrobello/par-fractal/releases/tag/v0.1.0

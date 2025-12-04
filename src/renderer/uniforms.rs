@@ -319,6 +319,8 @@ impl Uniforms {
             crate::fractal::FractalType::Nova2D => 10,
             crate::fractal::FractalType::Magnet2D => 11,
             crate::fractal::FractalType::Collatz2D => 12,
+            // 2D Density fractals
+            crate::fractal::FractalType::Buddhabrot2D => 25, // Rendered via compute shader, not main shader
             // 3D fractals (13-25)
             crate::fractal::FractalType::Mandelbulb3D => 13,
             crate::fractal::FractalType::MengerSponge3D => 14,

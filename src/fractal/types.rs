@@ -31,6 +31,9 @@ pub enum FractalType {
     QuaternionCubic3D,
     SierpinskiGasket3D,
 
+    // 2D Fractals - Density/Accumulation based
+    Buddhabrot2D,
+
     // 2D Fractals - Strange Attractors (from xfractint)
     Hopalong2D,
     Martin2D,
@@ -57,6 +60,16 @@ impl FractalType {
                 | FractalType::Quadruptwo2D
                 | FractalType::Threeply2D
         )
+    }
+
+    /// Returns true if this is the Buddhabrot fractal type
+    pub fn is_buddhabrot(&self) -> bool {
+        matches!(self, FractalType::Buddhabrot2D)
+    }
+
+    /// Returns true if this fractal type uses accumulation rendering
+    pub fn uses_accumulation(&self) -> bool {
+        self.is_2d_attractor() || self.is_buddhabrot()
     }
 
     /// Returns the index of the 2D attractor type for the compute shader.
@@ -101,6 +114,8 @@ impl FractalType {
             FractalType::HybridMandelbulbJulia3D => "hybrid_bulb_julia",
             FractalType::QuaternionCubic3D => "quaternion_cubic",
             FractalType::SierpinskiGasket3D => "sierpinski_gasket",
+            // Density/Accumulation based
+            FractalType::Buddhabrot2D => "buddhabrot",
             // Strange Attractors 2D
             FractalType::Hopalong2D => "hopalong",
             FractalType::Martin2D => "martin",

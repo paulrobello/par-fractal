@@ -12,9 +12,9 @@ Complete feature documentation for Par Fractal's rendering capabilities, effects
 
 ## Fractal Types
 
-### 2D Fractals (19 types)
+### 2D Fractals (20 types)
 
-Par Fractal supports 19 different 2D fractals organized into two categories:
+Par Fractal supports 20 different 2D fractals organized into three categories:
 
 **Escape-Time Fractals (13 types):**
 - **Mandelbrot2D** - The classic fractal with infinite detail at all zoom levels
@@ -30,6 +30,9 @@ Par Fractal supports 19 different 2D fractals organized into two categories:
 - **Nova2D** - Newton-Raphson hybrid fractal
 - **Magnet2D** - Magnetic field-inspired patterns
 - **Collatz2D** - Collatz conjecture visualization
+
+**Density Visualization (1 type):**
+- **Buddhabrot2D** - Mandelbrot escape trajectory probability distribution, discovered by Melinda Green in 1993. Uses GPU compute shaders for real-time accumulation rendering.
 
 **Strange Attractors (6 types):**
 - **Hopalong2D** - Barry Martin's hopalong attractor with chaotic point clouds

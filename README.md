@@ -32,7 +32,7 @@ See the [Quick Start Guide](docs/QUICKSTART.md) for detailed instructions.
 ## Features
 
 - **GPU-Accelerated** - Efficient WebGPU rendering for 2D and 3D fractals
-- **34 Fractal Types** - 19 2D and 15 3D fractals including Mandelbrot, Julia, Mandelbulb, Menger Sponge, strange attractors, and more
+- **35 Fractal Types** - 20 2D and 15 3D fractals including Mandelbrot, Julia, Buddhabrot, Mandelbulb, Menger Sponge, strange attractors, and more
 - **Variable Power** - Adjustable exponent (z^n + c) for 6 escape-time fractals: Multibrot, Multicorn, Multi-ship, and more
 - **Advanced Rendering** - PBR shading, ambient occlusion, soft shadows, depth of field
 - **Real-time Interaction** - Smooth pan/zoom, camera controls, parameter adjustment
@@ -112,23 +112,43 @@ See [Features](docs/FEATURES.md) for complete feature documentation.
 
 </td>
 </tr>
+<tr>
+<td>
+
+**Buddhabrot**
+
+![Buddhabrot](https://raw.githubusercontent.com/paulrobello/par-fractal/main/screenshots/buddhabrot.png)
+
+</td>
+<td>
+
+**Julia Set 3D**
+
+![Julia 3D](https://raw.githubusercontent.com/paulrobello/par-fractal/main/screenshots/julia_3d.png)
+
+</td>
+</tr>
 </table>
 
 ## Supported Fractals
 
-### 2D Fractals (19)
+### 2D Fractals (20)
 **Escape-Time:** Mandelbrot, Julia, Sierpinski Carpet, Sierpinski Triangle, Burning Ship, Tricorn, Phoenix, Celtic, Newton, Lyapunov, Nova, Magnet, Collatz
+
+**Density Visualization:** Buddhabrot - escape trajectory probability distribution
 
 **Strange Attractors:** Hopalong, Martin, Gingerbreadman, Chip, Quadruptwo, Threeply
 
-### 3D Fractals (12)
+### 3D Fractals (15)
 **Ray-Marched:** Mandelbulb, Menger Sponge, Sierpinski Pyramid, Julia Set 3D, Mandelbox, Octahedral IFS, Icosahedral IFS, Apollonian Gasket, Kleinian, Hybrid Mandelbulb-Julia, Quaternion Cubic, Sierpinski Gasket
+
+**Strange Attractors:** Pickover, Lorenz, Rossler
 
 ## Command Palette
 
 Press **Ctrl/Cmd+P** to open the command palette for quick access to all features:
 
-- **Fractal Selection** - Switch between all 31 fractal types
+- **Fractal Selection** - Switch between all 35 fractal types
 - **Effects** - Toggle AO, shadows, DoF, fog, bloom, FXAA
 - **Color Modes** - Palette, normals, orbit traps, debug visualization
 - **LOD Profiles** - Balanced, Quality First, Performance First

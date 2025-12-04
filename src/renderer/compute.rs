@@ -85,6 +85,48 @@ pub struct AttractorComputeUniforms {
     pub _padding: [u32; 2],
 }
 
+/// Uniforms for the Buddhabrot compute shader
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+pub struct BuddhabrotComputeUniforms {
+    // View transform
+    pub center_x: f32,
+    pub center_y: f32,
+    pub zoom: f32,
+    pub aspect_ratio: f32,
+
+    // Rendering parameters
+    pub width: u32,
+    pub height: u32,
+    pub iterations_per_frame: u32,
+    pub max_iterations: u32,
+
+    // Accumulation control
+    pub total_iterations: u32,
+    pub clear_accumulation: u32,
+    pub min_iterations: u32, // Minimum iterations for trajectory to be plotted
+    pub _padding: u32,
+}
+
+impl Default for BuddhabrotComputeUniforms {
+    fn default() -> Self {
+        Self {
+            center_x: -0.4,
+            center_y: 0.0,
+            zoom: 0.4,
+            aspect_ratio: 16.0 / 9.0,
+            width: 1920,
+            height: 1080,
+            iterations_per_frame: 20_000,
+            max_iterations: 2000,
+            total_iterations: 0,
+            clear_accumulation: 1,
+            min_iterations: 20, // Filter out short trajectories
+            _padding: 0,
+        }
+    }
+}
+
 impl Default for AttractorComputeUniforms {
     fn default() -> Self {
         Self {
@@ -279,6 +321,82 @@ pub fn create_compute_storage_layout(device: &wgpu::Device) -> wgpu::BindGroupLa
     })
 }
 
+/// Creates the bind group layout for Buddhabrot atomic storage buffer access.
+/// This uses a storage buffer with atomics instead of a texture for race-free accumulation.
+pub fn create_buddhabrot_storage_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("Buddhabrot Storage Buffer Layout"),
+        entries: &[wgpu::BindGroupLayoutEntry {
+            binding: 0,
+            visibility: wgpu::ShaderStages::COMPUTE,
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Storage { read_only: false },
+                has_dynamic_offset: false,
+                min_binding_size: None, // Dynamic size based on resolution
+            },
+            count: None,
+        }],
+    })
+}
+
+/// Manages an atomic storage buffer for thread-safe Buddhabrot accumulation.
+///
+/// Uses a storage buffer with atomic operations instead of a texture
+/// to prevent race conditions during concurrent accumulation.
+pub struct BuddhabrotAccumulationBuffer {
+    /// The storage buffer for atomic accumulation
+    pub buffer: wgpu::Buffer,
+    /// Bind group for compute shader access
+    pub compute_bind_group: wgpu::BindGroup,
+    /// Buffer dimensions
+    pub width: u32,
+    pub height: u32,
+}
+
+impl BuddhabrotAccumulationBuffer {
+    /// Create a new atomic accumulation buffer.
+    pub fn new(
+        device: &wgpu::Device,
+        width: u32,
+        height: u32,
+        compute_bind_group_layout: &wgpu::BindGroupLayout,
+    ) -> Self {
+        let buffer_size = (width * height * std::mem::size_of::<u32>() as u32) as u64;
+
+        let buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Buddhabrot Accumulation Buffer"),
+            size: buffer_size,
+            usage: wgpu::BufferUsages::STORAGE
+                | wgpu::BufferUsages::COPY_DST
+                | wgpu::BufferUsages::COPY_SRC,
+            mapped_at_creation: false,
+        });
+
+        let compute_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Buddhabrot Accumulation Compute Bind Group"),
+            layout: compute_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: buffer.as_entire_binding(),
+            }],
+        });
+
+        Self {
+            buffer,
+            compute_bind_group,
+            width,
+            height,
+        }
+    }
+
+    /// Clear the buffer to zeros.
+    pub fn clear(&self, queue: &wgpu::Queue) {
+        let buffer_size = (self.width * self.height * std::mem::size_of::<u32>() as u32) as usize;
+        let zeros = vec![0u8; buffer_size];
+        queue.write_buffer(&self.buffer, 0, &zeros);
+    }
+}
+
 /// Creates the bind group layout for uniform buffer access in compute shaders.
 pub fn create_compute_uniform_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -406,6 +524,132 @@ impl AttractorComputePipeline {
         compute_pass.set_bind_group(1, &self.uniform_bind_group, &[]);
         // Each workgroup handles multiple orbits
         // Dispatch enough workgroups to generate iterations_per_frame points
+        compute_pass.dispatch_workgroups(num_workgroups, 1, 1);
+    }
+}
+
+/// Creates the bind group layout for Buddhabrot uniform buffer access in compute shaders.
+pub fn create_buddhabrot_uniform_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("Buddhabrot Compute Uniform Layout"),
+        entries: &[wgpu::BindGroupLayoutEntry {
+            binding: 0,
+            visibility: wgpu::ShaderStages::COMPUTE,
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Uniform,
+                has_dynamic_offset: false,
+                min_binding_size: Some(
+                    std::num::NonZeroU64::new(
+                        std::mem::size_of::<BuddhabrotComputeUniforms>() as u64
+                    )
+                    .unwrap(),
+                ),
+            },
+            count: None,
+        }],
+    })
+}
+
+/// Manages the compute pipeline for Buddhabrot accumulation.
+pub struct BuddhabrotComputePipeline {
+    /// The compute pipeline
+    pub pipeline: wgpu::ComputePipeline,
+    /// Uniform buffer for compute parameters
+    pub uniform_buffer: wgpu::Buffer,
+    /// Bind group for uniforms
+    pub uniform_bind_group: wgpu::BindGroup,
+    /// Layout for storage texture binding
+    pub storage_layout: wgpu::BindGroupLayout,
+    /// Current uniform values
+    pub uniforms: BuddhabrotComputeUniforms,
+}
+
+impl BuddhabrotComputePipeline {
+    /// Create a new Buddhabrot compute pipeline.
+    /// Uses a storage buffer layout for atomic accumulation instead of texture.
+    pub fn new(device: &wgpu::Device) -> Self {
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Buddhabrot Compute Shader"),
+            source: wgpu::ShaderSource::Wgsl(
+                include_str!("../shaders/buddhabrot_compute.wgsl").into(),
+            ),
+        });
+
+        // Use storage buffer layout for atomic operations (not texture)
+        let storage_layout = create_buddhabrot_storage_layout(device);
+        let uniform_layout = create_buddhabrot_uniform_layout(device);
+
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("Buddhabrot Compute Pipeline Layout"),
+            bind_group_layouts: &[&storage_layout, &uniform_layout],
+            push_constant_ranges: &[],
+        });
+
+        let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some("Buddhabrot Compute Pipeline"),
+            layout: Some(&pipeline_layout),
+            module: &shader,
+            entry_point: Some("main"),
+            compilation_options: Default::default(),
+            cache: None,
+        });
+
+        let uniforms = BuddhabrotComputeUniforms::default();
+        let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Buddhabrot Compute Uniform Buffer"),
+            size: std::mem::size_of::<BuddhabrotComputeUniforms>() as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        let uniform_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Buddhabrot Compute Uniform Bind Group"),
+            layout: &uniform_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: uniform_buffer.as_entire_binding(),
+            }],
+        });
+
+        Self {
+            pipeline,
+            uniform_buffer,
+            uniform_bind_group,
+            storage_layout,
+            uniforms,
+        }
+    }
+
+    /// Update the uniform buffer with current parameters.
+    pub fn update_uniforms(&mut self, queue: &wgpu::Queue) {
+        queue.write_buffer(
+            &self.uniform_buffer,
+            0,
+            bytemuck::cast_slice(&[self.uniforms]),
+        );
+    }
+
+    /// Dispatch the compute shader to accumulate Buddhabrot points.
+    ///
+    /// # Arguments
+    /// * `encoder` - Command encoder to record to
+    /// * `accumulation_bind_group` - Bind group for the accumulation texture
+    /// * `num_workgroups` - Number of workgroups to dispatch
+    pub fn dispatch(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        accumulation_bind_group: &wgpu::BindGroup,
+        num_workgroups: u32,
+    ) {
+        let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            label: Some("Buddhabrot Compute Pass"),
+            timestamp_writes: None,
+        });
+
+        compute_pass.set_pipeline(&self.pipeline);
+        compute_pass.set_bind_group(0, accumulation_bind_group, &[]);
+        compute_pass.set_bind_group(1, &self.uniform_bind_group, &[]);
+        // Each workgroup (256 threads) tests samples_per_thread samples each
         compute_pass.dispatch_workgroups(num_workgroups, 1, 1);
     }
 }

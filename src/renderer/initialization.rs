@@ -1,6 +1,7 @@
 use super::{
     AccumulationDisplayUniforms, AccumulationTexture, AttractorComputePipeline, BloomUniforms,
-    BlurUniforms, GpuInfo, PostProcessUniforms, Renderer, Uniforms,
+    BlurUniforms, BuddhabrotAccumulationBuffer, BuddhabrotComputePipeline, GpuInfo,
+    PostProcessUniforms, Renderer, Uniforms,
 };
 use wgpu::util::DeviceExt;
 
@@ -887,7 +888,11 @@ impl Renderer {
 
             // Compute shader infrastructure (initialized lazily when needed)
             attractor_compute: None,
+            buddhabrot_compute: None,
             accumulation_texture: None,
+            buddhabrot_accumulation_buffer: None,
+            buddhabrot_copy_pipeline: None,
+            buddhabrot_copy_bind_group: None,
             accumulation_display_pipeline,
             accumulation_display_bind_group: None,
             accumulation_display_uniform_buffer,
@@ -899,11 +904,140 @@ impl Renderer {
     /// This is called lazily when accumulation mode is first enabled.
     /// Also handles recreation of textures when window is resized.
     pub fn init_accumulation_compute(&mut self) {
-        // Initialize compute pipeline if needed (doesn't depend on window size)
+        // Initialize attractor compute pipeline if needed (doesn't depend on window size)
         if self.attractor_compute.is_none() {
             self.attractor_compute = Some(AttractorComputePipeline::new(&self.device));
         }
 
+        self.ensure_accumulation_texture();
+    }
+
+    /// Initialize the Buddhabrot compute shader infrastructure.
+    /// This is called lazily when Buddhabrot fractal type is selected.
+    ///
+    /// Buddhabrot uses:
+    /// - Atomic storage buffer for thread-safe accumulation
+    /// - Copy compute shader to transfer buffer to texture
+    /// - Existing accumulation display pipeline for visualization
+    pub fn init_buddhabrot_compute(&mut self) {
+        // Initialize Buddhabrot compute pipeline if needed
+        if self.buddhabrot_compute.is_none() {
+            self.buddhabrot_compute = Some(BuddhabrotComputePipeline::new(&self.device));
+        }
+
+        // Check if we need to (re)create the buffer and related resources
+        let needs_buffer = match &self.buddhabrot_accumulation_buffer {
+            None => true,
+            Some(buf) => buf.width != self.size.width || buf.height != self.size.height,
+        };
+
+        if needs_buffer {
+            log::info!(
+                "Creating Buddhabrot accumulation buffer {}x{}",
+                self.size.width,
+                self.size.height
+            );
+
+            // Create the atomic accumulation buffer
+            if let Some(ref buddhabrot) = self.buddhabrot_compute {
+                let buffer = BuddhabrotAccumulationBuffer::new(
+                    &self.device,
+                    self.size.width,
+                    self.size.height,
+                    &buddhabrot.storage_layout,
+                );
+
+                // Create copy pipeline if not yet created
+                if self.buddhabrot_copy_pipeline.is_none() {
+                    let copy_shader =
+                        self.device
+                            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                                label: Some("Buddhabrot Copy Shader"),
+                                source: wgpu::ShaderSource::Wgsl(
+                                    include_str!("../shaders/buddhabrot_copy.wgsl").into(),
+                                ),
+                            });
+
+                    let copy_layout =
+                        self.device
+                            .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                                label: Some("Buddhabrot Copy Layout"),
+                                entries: &[
+                                    // Source buffer (read)
+                                    wgpu::BindGroupLayoutEntry {
+                                        binding: 0,
+                                        visibility: wgpu::ShaderStages::COMPUTE,
+                                        ty: wgpu::BindingType::Buffer {
+                                            ty: wgpu::BufferBindingType::Storage {
+                                                read_only: true,
+                                            },
+                                            has_dynamic_offset: false,
+                                            min_binding_size: None,
+                                        },
+                                        count: None,
+                                    },
+                                    // Dest texture (write)
+                                    wgpu::BindGroupLayoutEntry {
+                                        binding: 1,
+                                        visibility: wgpu::ShaderStages::COMPUTE,
+                                        ty: wgpu::BindingType::StorageTexture {
+                                            access: wgpu::StorageTextureAccess::WriteOnly,
+                                            format: wgpu::TextureFormat::R32Uint,
+                                            view_dimension: wgpu::TextureViewDimension::D2,
+                                        },
+                                        count: None,
+                                    },
+                                    // Uniforms (width, height)
+                                    wgpu::BindGroupLayoutEntry {
+                                        binding: 2,
+                                        visibility: wgpu::ShaderStages::COMPUTE,
+                                        ty: wgpu::BindingType::Buffer {
+                                            ty: wgpu::BufferBindingType::Uniform,
+                                            has_dynamic_offset: false,
+                                            min_binding_size: None,
+                                        },
+                                        count: None,
+                                    },
+                                ],
+                            });
+
+                    let copy_pipeline_layout =
+                        self.device
+                            .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                                label: Some("Buddhabrot Copy Pipeline Layout"),
+                                bind_group_layouts: &[&copy_layout],
+                                push_constant_ranges: &[],
+                            });
+
+                    let copy_pipeline =
+                        self.device
+                            .create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                                label: Some("Buddhabrot Copy Pipeline"),
+                                layout: Some(&copy_pipeline_layout),
+                                module: &copy_shader,
+                                entry_point: Some("main"),
+                                compilation_options: Default::default(),
+                                cache: None,
+                            });
+
+                    self.buddhabrot_copy_pipeline = Some(copy_pipeline);
+                }
+
+                // DON'T clear the buffer during init - let it accumulate
+                // buffer.clear(&self.queue);
+
+                self.buddhabrot_accumulation_buffer = Some(buffer);
+            }
+        }
+
+        // Always ensure the display texture exists (for the copy target)
+        // This must be outside needs_buffer check because resize() clears the texture
+        self.ensure_accumulation_texture_for_buddhabrot();
+    }
+
+    /// Ensure the accumulation texture exists for Buddhabrot display.
+    /// This creates a texture that the copy shader writes to, separate from the attractor path.
+    fn ensure_accumulation_texture_for_buddhabrot(&mut self) {
         // Check if accumulation texture needs (re)creation due to missing or wrong size
         let needs_texture = match &self.accumulation_texture {
             None => true,
@@ -911,15 +1045,147 @@ impl Renderer {
         };
 
         if needs_texture {
-            let attractor_compute = self.attractor_compute.as_ref().unwrap();
+            log::info!(
+                "Creating Buddhabrot display texture {}x{}",
+                self.size.width,
+                self.size.height
+            );
+
+            // Create a simple R32Uint texture for display (no compute bind group needed)
+            let texture = self.device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("Buddhabrot Display Texture"),
+                size: wgpu::Extent3d {
+                    width: self.size.width,
+                    height: self.size.height,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::R32Uint,
+                usage: wgpu::TextureUsages::STORAGE_BINDING
+                    | wgpu::TextureUsages::TEXTURE_BINDING
+                    | wgpu::TextureUsages::COPY_DST,
+                view_formats: &[],
+            });
+
+            let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+            // Create the copy bind group (buffer -> texture)
+            if let (Some(ref buffer), Some(ref copy_pipeline)) = (
+                &self.buddhabrot_accumulation_buffer,
+                &self.buddhabrot_copy_pipeline,
+            ) {
+                // Create uniform buffer for copy dimensions
+                let copy_uniforms_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
+                    label: Some("Buddhabrot Copy Uniforms"),
+                    size: 16, // width, height, padding[2]
+                    usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                    mapped_at_creation: false,
+                });
+
+                // Write dimensions
+                let dims: [u32; 4] = [self.size.width, self.size.height, 0, 0];
+                self.queue
+                    .write_buffer(&copy_uniforms_buffer, 0, bytemuck::cast_slice(&dims));
+
+                let copy_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: Some("Buddhabrot Copy Bind Group"),
+                    layout: &copy_pipeline.get_bind_group_layout(0),
+                    entries: &[
+                        wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: buffer.buffer.as_entire_binding(),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 1,
+                            resource: wgpu::BindingResource::TextureView(&view),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 2,
+                            resource: copy_uniforms_buffer.as_entire_binding(),
+                        },
+                    ],
+                });
+
+                self.buddhabrot_copy_bind_group = Some(copy_bind_group);
+            }
+
+            // Create display bind group
+            let accumulation_display_bind_group =
+                self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: Some("Buddhabrot Display Bind Group"),
+                    layout: &self.accumulation_display_pipeline.get_bind_group_layout(0),
+                    entries: &[wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&view),
+                    }],
+                });
+
+            // Create a placeholder AccumulationTexture (we only need the view for display)
+            // For Buddhabrot, the compute_bind_group won't be used since we use the buffer
+            if let Some(ref buddhabrot) = self.buddhabrot_compute {
+                let compute_bind_group =
+                    self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                        label: Some("Buddhabrot Texture Compute Bind Group (unused)"),
+                        layout: &buddhabrot.storage_layout,
+                        // This bind group expects a buffer, not a texture, so we use the buffer
+                        entries: &[wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: self
+                                .buddhabrot_accumulation_buffer
+                                .as_ref()
+                                .unwrap()
+                                .buffer
+                                .as_entire_binding(),
+                        }],
+                    });
+
+                self.accumulation_texture = Some(AccumulationTexture {
+                    texture,
+                    view,
+                    compute_bind_group,
+                    width: self.size.width,
+                    height: self.size.height,
+                });
+            }
+
+            self.accumulation_display_bind_group = Some(accumulation_display_bind_group);
+        }
+    }
+
+    /// Ensure the accumulation texture exists and has the correct size.
+    /// Used by both attractor and Buddhabrot compute pipelines.
+    fn ensure_accumulation_texture(&mut self) {
+        // Check if accumulation texture needs (re)creation due to missing or wrong size
+        let needs_texture = match &self.accumulation_texture {
+            None => true,
+            Some(tex) => tex.width != self.size.width || tex.height != self.size.height,
+        };
+
+        if needs_texture {
+            log::info!(
+                "Creating accumulation texture {}x{}",
+                self.size.width,
+                self.size.height
+            );
+            // Get storage layout from whichever pipeline is available
+            let storage_layout = if let Some(ref attractor) = self.attractor_compute {
+                &attractor.storage_layout
+            } else if let Some(ref buddhabrot) = self.buddhabrot_compute {
+                &buddhabrot.storage_layout
+            } else {
+                // Need at least one pipeline initialized first
+                return;
+            };
 
             // Create accumulation texture with current window size
             let accumulation_texture = AccumulationTexture::new(
                 &self.device,
                 self.size.width,
                 self.size.height,
-                &attractor_compute.storage_layout,
-                "Attractor Accumulation Texture",
+                storage_layout,
+                "Accumulation Texture",
             );
 
             // Create bind group for sampling the accumulation texture
@@ -934,6 +1200,9 @@ impl Renderer {
                         resource: wgpu::BindingResource::TextureView(&accumulation_texture.view),
                     }],
                 });
+
+            // Clear the texture immediately to avoid garbage data
+            accumulation_texture.clear(&self.device, &self.queue);
 
             self.accumulation_texture = Some(accumulation_texture);
             self.accumulation_display_bind_group = Some(accumulation_display_bind_group);

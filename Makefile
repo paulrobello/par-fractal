@@ -309,9 +309,9 @@ ifeq ($(shell uname),Darwin)
 	@echo '    <key>CFBundleIdentifier</key>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
 	@echo '    <string>com.paulrobello.par-fractal</string>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
 	@echo '    <key>CFBundleVersion</key>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
-	@echo '    <string>0.6.1</string>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
+	@echo '    <string>0.7.0</string>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
 	@echo '    <key>CFBundleShortVersionString</key>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
-	@echo '    <string>0.6.1</string>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
+	@echo '    <string>0.7.0</string>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
 	@echo '    <key>CFBundleExecutable</key>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
 	@echo '    <string>par-fractal</string>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
 	@echo '    <key>CFBundleIconFile</key>' >> target/release/bundle/par-fractal.app/Contents/Info.plist

@@ -143,6 +143,10 @@ pub struct FractalParams {
     pub attractor_log_scale: f32,
     /// Flag to clear accumulation on next frame
     pub attractor_pending_clear: bool,
+    /// Flag to pause accumulation
+    pub attractor_paused: bool,
+    /// Maximum iterations before auto-pause (0 = unlimited)
+    pub attractor_max_iterations: u64,
     /// Last view center for detecting pan (triggers auto-clear)
     pub attractor_last_center: [f64; 2],
     /// Last zoom level for detecting zoom (triggers auto-clear)
@@ -253,10 +257,12 @@ impl Default for FractalParams {
 
             // Strange attractor accumulation (disabled by default)
             attractor_accumulation_enabled: false,
-            attractor_iterations_per_frame: 100_000,
+            attractor_iterations_per_frame: 10_000,
             attractor_total_iterations: 0,
             attractor_log_scale: 4.0,
             attractor_pending_clear: false,
+            attractor_paused: false,
+            attractor_max_iterations: 8_000_000,
             attractor_last_center: [0.0, 0.0],
             attractor_last_zoom: 1.0,
             attractor_last_julia_c: [-0.7, 0.27015],
@@ -375,7 +381,8 @@ impl FractalParams {
             | FractalType::Gingerbreadman2D
             | FractalType::Chip2D
             | FractalType::Quadruptwo2D
-            | FractalType::Threeply2D => RenderMode::TwoD,
+            | FractalType::Threeply2D
+            | FractalType::Buddhabrot2D => RenderMode::TwoD,
             FractalType::Mandelbulb3D
             | FractalType::MengerSponge3D
             | FractalType::SierpinskiPyramid3D
@@ -476,6 +483,8 @@ impl FractalParams {
             attractor_total_iterations: 0, // Always reset on load
             attractor_log_scale: settings.attractor_log_scale,
             attractor_pending_clear: false,
+            attractor_paused: false,
+            attractor_max_iterations: 8_000_000,
             attractor_last_center: settings.center_2d,
             attractor_last_zoom: settings.zoom_2d,
             attractor_last_julia_c: settings.julia_c,
@@ -548,7 +557,8 @@ impl FractalParams {
             | FractalType::Gingerbreadman2D
             | FractalType::Chip2D
             | FractalType::Quadruptwo2D
-            | FractalType::Threeply2D => RenderMode::TwoD,
+            | FractalType::Threeply2D
+            | FractalType::Buddhabrot2D => RenderMode::TwoD,
             FractalType::Mandelbulb3D
             | FractalType::MengerSponge3D
             | FractalType::SierpinskiPyramid3D
@@ -659,6 +669,15 @@ impl FractalParams {
                 self.max_iterations = 1000;
                 self.julia_c = [-55.0, -1.0];
                 self.power = -42.0;
+            }
+            // Buddhabrot - density visualization of Mandelbrot escape trajectories
+            FractalType::Buddhabrot2D => {
+                self.center_2d = [0.4, 0.0]; // Centered for flipped Buddha view
+                self.zoom_2d = 0.45; // Zoomed to see full Buddha figure
+                self.max_iterations = 5000; // High iterations for detailed Buddha structure
+                self.attractor_accumulation_enabled = true; // Requires accumulation
+                self.attractor_iterations_per_frame = 50_000; // More samples for faster accumulation
+                self.attractor_log_scale = 1.0; // Lower for better contrast
             }
             // 3D Strange Attractors
             FractalType::Pickover3D => {

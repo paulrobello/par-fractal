@@ -418,6 +418,23 @@ impl PresetGallery {
                     ..default_settings.clone()
                 },
             },
+            // Buddhabrot - density visualization of Mandelbrot escape trajectories
+            Preset {
+                name: "Buddhabrot Classic".to_string(),
+                description: "Mandelbrot escape trajectory density - resembles a seated Buddha figure. Discovered by Melinda Green in 1993.".to_string(),
+                category: PresetCategory::TwoDFractals,
+                settings: Settings {
+                    fractal_type: FractalType::Buddhabrot2D,
+                    center_2d: [0.0f64, 0.4f64], // Center on rotated Mandelbrot set region
+                    zoom_2d: 0.35,                // Zoom to see full Buddha shape
+                    max_iterations: 5000,         // Higher for better Buddha detail
+                    palette_index: 6,             // Electric (blues/purples work well)
+                    attractor_accumulation_enabled: true,
+                    attractor_iterations_per_frame: 10_000, // Lower for better FPS, adjust in UI
+                    attractor_log_scale: 4.0,     // High scale for gradual density reveal (saturates at ~100k hits)
+                    ..default_settings.clone()
+                },
+            },
             // Octahedral IFS
             Preset {
                 name: "Octahedron Kaleidoscope".to_string(),

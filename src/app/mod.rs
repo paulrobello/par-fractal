@@ -86,16 +86,22 @@ impl App {
 
         // Load fractal params from preset if specified, otherwise from saved settings
         let fractal_params = if let Some(preset) = preset_name {
-            // Try to load the specified preset
-            match crate::fractal::PresetGallery::load_preset(&preset) {
-                Ok(preset_data) => {
-                    println!("Loaded preset: {}", preset);
-                    FractalParams::from_settings(preset_data.settings)
-                }
-                Err(e) => {
-                    eprintln!("Failed to load preset '{}': {}", preset, e);
-                    eprintln!("Falling back to saved settings or defaults");
-                    FractalParams::load_from_file().unwrap_or_default()
+            // First try built-in presets
+            if let Some(preset_data) = crate::fractal::PresetGallery::get_builtin_preset(&preset) {
+                println!("Loaded built-in preset: {}", preset);
+                FractalParams::from_settings(preset_data.settings.clone())
+            } else {
+                // Try to load user preset from file
+                match crate::fractal::PresetGallery::load_preset(&preset) {
+                    Ok(preset_data) => {
+                        println!("Loaded user preset: {}", preset);
+                        FractalParams::from_settings(preset_data.settings)
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to load preset '{}': {}", preset, e);
+                        eprintln!("Falling back to saved settings or defaults");
+                        FractalParams::load_from_file().unwrap_or_default()
+                    }
                 }
             }
         } else {
