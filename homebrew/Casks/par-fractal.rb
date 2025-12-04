@@ -1,9 +1,9 @@
 cask "par-fractal" do
 arch arm: "aarch64", intel: "x86_64"
 
-version "0.6.1"
-sha256 arm:   "e6acffbaa6a734a681e4176cb3d122a2899b4fc5f5216409f96032221725308b",
-       intel: "36618d1cb09ef3e248b8683d49a87495814d54fb2deb3a7085e546601719c1a7"
+version "0.7.0"
+sha256 arm:   "33af66330da0fd957c1192f4eea389dfbb4af3a5f3a63d4ad6674fb91eff96d8",
+       intel: "2f7d4d1c0045b7390c5e490a113fb64e4998b0b408ccec5171ec1674380c39fa"
 
 url "https://github.com/paulrobello/par-fractal/releases/download/v#{version}/par-fractal-macos-#{arch}.zip"
 name "par-fractal"
