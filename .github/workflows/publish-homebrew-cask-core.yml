@@ -89,8 +89,14 @@ jobs:
       - name: Commit and Push to Source Repo
         run: |
           git add homebrew/Casks/par-fractal.rb
-          git commit -m "Update par-fractal cask to v${VERSION}" || echo "No changes to commit"
-          git push origin HEAD:main
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update par-fractal cask to v${VERSION}"
+            git fetch origin main
+            git rebase origin/main
+            git push origin HEAD:main
+          fi
 
       - name: Sync Homebrew tap repository
         env:
