@@ -3214,6 +3214,10 @@ impl UI {
                     ui.separator();
                     ui.add_space(4.0);
 
+                    ui.collapsing("What's New in v0.7.1", |ui| {
+                        ui.label("• Fixed Buddhabrot high-resolution screenshot capture");
+                    });
+
                     ui.collapsing("What's New in v0.7.0", |ui| {
                         ui.label("• Buddhabrot - density visualization of escape trajectories");
                         ui.label("• Compute shader accumulation for Buddhabrot rendering");
@@ -3224,7 +3228,7 @@ impl UI {
                         ui.label("• 20 2D fractals (13 escape-time + 1 density + 6 attractors)");
                         ui.label("• 15 3D fractals (12 ray-marched + 3 attractors)");
                         ui.label("• Variable power for 6 escape-time fractals");
-                        ui.label("• 46 static + 12 procedural color palettes");
+                        ui.label("• 48 static + 12 procedural color palettes");
                         ui.label("• PBR shading, AO, soft shadows, DoF");
                         ui.label("• Screenshot & video recording");
                         ui.label("• Preset system with import/export");

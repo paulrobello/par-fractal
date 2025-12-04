@@ -406,9 +406,9 @@ impl App {
                 });
 
         // Pass 1: Render fractal to scene texture
-        // For strange attractors with accumulation, use the accumulation display pipeline
+        // For strange attractors and Buddhabrot with accumulation, use the accumulation display pipeline
         let use_accumulation = self.fractal_params.attractor_accumulation_enabled
-            && self.fractal_params.fractal_type.is_2d_attractor()
+            && self.fractal_params.fractal_type.uses_accumulation()
             && self.renderer.accumulation_display_bind_group.is_some();
 
         {
@@ -429,7 +429,7 @@ impl App {
             });
 
             if use_accumulation {
-                // Use accumulation display pipeline for strange attractors
+                // Use accumulation display pipeline for strange attractors and Buddhabrot
                 // This samples the existing accumulation texture
                 if let Some(ref bind_group) = self.renderer.accumulation_display_bind_group {
                     pass.set_pipeline(&self.renderer.accumulation_display_pipeline);
