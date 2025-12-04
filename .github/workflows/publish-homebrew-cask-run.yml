@@ -14,3 +14,5 @@ jobs:
     with:
       version: ${{ github.event.inputs.version }}
     secrets: inherit
+    permissions:
+      contents: write
