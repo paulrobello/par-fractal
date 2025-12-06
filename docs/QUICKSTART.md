@@ -461,6 +461,39 @@ Save favorite views:
    $ RUST_LOG=debug cargo run --release
    ```
 
+### Issue: macOS "App is damaged" or Won't Open (Quarantine)
+
+**Symptom:** macOS shows "app is damaged and can't be opened" or "app can't be opened because Apple cannot check it for malicious software"
+
+**Cause:** macOS applies a quarantine attribute to apps downloaded from the internet. Since Par Fractal is not notarized with Apple (requires paid developer account), Gatekeeper blocks execution.
+
+**Solutions:**
+
+**Option 1: Use Homebrew (Recommended)**
+
+Homebrew automatically handles quarantine removal:
+```bash
+$ brew tap paulrobello/par-fractal
+$ brew install --cask par-fractal
+```
+
+**Option 2: Remove Quarantine Manually**
+
+If you downloaded the `.zip` from GitHub Releases:
+```bash
+# Remove quarantine attribute from the app
+$ sudo xattr -r -d com.apple.quarantine /Applications/par-fractal.app
+```
+
+**Option 3: Right-click to Open**
+
+1. Right-click (or Control-click) on `par-fractal.app`
+2. Select "Open" from the context menu
+3. Click "Open" in the dialog that appears
+4. The app will be remembered and open normally in the future
+
+**Note:** This is standard behavior for open-source macOS applications distributed outside the App Store. The app is safe - macOS just can't verify it because it's not signed with an Apple Developer ID certificate.
+
 ## Next Steps
 
 ### Learn More
