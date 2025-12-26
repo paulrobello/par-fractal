@@ -121,7 +121,8 @@ impl App {
             };
             println!("Setting quality level: {}", quality_name);
 
-            // Set the LOD system to use the specified quality level
+            // Enable LOD system and set to use the specified quality level
+            fractal_params.lod_config.enabled = true;
             fractal_params.lod_state.current_level = level;
             fractal_params.lod_state.target_level = level;
             fractal_params.lod_state.transition_progress = 1.0;
@@ -130,6 +131,10 @@ impl App {
 
             // Set min_quality_level so LOD won't drop below the requested level
             fractal_params.lod_config.min_quality_level = level;
+
+            // Apply the quality settings to fractal params immediately
+            fractal_params.max_steps = fractal_params.lod_state.active_quality.max_steps;
+            fractal_params.min_distance = fractal_params.lod_state.active_quality.min_distance;
         }
 
         let mut camera = Camera::new(size.width, size.height);
@@ -268,7 +273,8 @@ impl App {
             };
             log::info!("Setting quality level: {}", quality_name);
 
-            // Set the LOD system to use the specified quality level
+            // Enable LOD system and set to use the specified quality level
+            fractal_params.lod_config.enabled = true;
             fractal_params.lod_state.current_level = level;
             fractal_params.lod_state.target_level = level;
             fractal_params.lod_state.transition_progress = 1.0;
@@ -277,6 +283,10 @@ impl App {
 
             // Set min_quality_level so LOD won't drop below the requested level
             fractal_params.lod_config.min_quality_level = level;
+
+            // Apply the quality settings to fractal params immediately
+            fractal_params.max_steps = fractal_params.lod_state.active_quality.max_steps;
+            fractal_params.min_distance = fractal_params.lod_state.active_quality.min_distance;
         }
 
         let mut camera = Camera::new(size.width, size.height);
