@@ -320,8 +320,9 @@ par-fractal --preset "Ocean Julia" --screenshot-delay 5 --exit-delay 6
 **Web URL Parameters:**
 
 ```
-# Set quality level via URL
+# Quality levels: ultra (u), high (h), medium (m), low (l)
 https://par-fractal.pardev.net/?quality=high
+https://par-fractal.pardev.net/?q=l              # Short forms work too
 
 # Combine quality and preset
 https://par-fractal.pardev.net/?q=medium&preset=Mandelbulb

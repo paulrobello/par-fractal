@@ -422,8 +422,11 @@ Mathematically-generated palettes using cosine-based formulas for smooth, contin
 
 **Web URL Parameters:**
 - `?quality=<level>` or `?q=<level>` - Set quality level
+  - Values: `ultra` (or `u`), `high` (or `h`), `medium` (or `m`), `low` (or `l`)
 - `?preset=<name>` or `?p=<name>` - Load specific preset
-- Example: `https://par-fractal.pardev.net/?quality=high&preset=Mandelbulb`
+- Examples:
+  - `https://par-fractal.pardev.net/?quality=high&preset=Mandelbulb`
+  - `https://par-fractal.pardev.net/?q=l&p=Mandelbulb` (short form)
 
 ## Performance Optimization
 

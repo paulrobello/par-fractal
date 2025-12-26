@@ -25,7 +25,7 @@ make r
 # Or try it in your browser (WebGPU required)
 ```
 
-**[Try Par Fractal in your browser](https://par-fractal.pardev.net)** - No installation required! ([Low quality mode](https://par-fractal.pardev.net/?quality=low) for slower devices)
+**[Try Par Fractal in your browser](https://par-fractal.pardev.net)** - No installation required! ([Low quality mode](https://par-fractal.pardev.net/?quality=low&preset=Mandelbulb) for slower devices) - See [URL parameters](docs/FEATURES.md#command-line-interface) for more options.
 
 See the [Quick Start Guide](docs/QUICKSTART.md) for detailed instructions.
 
