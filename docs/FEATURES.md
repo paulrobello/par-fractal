@@ -414,10 +414,16 @@ Mathematically-generated palettes using cosine-based formulas for smooth, contin
 **Command-Line Features:**
 - `--clear-settings` - Reset all saved preferences
 - `--preset "name"` - Load specific preset on startup
+- `--quality <level>` / `-q <level>` - Set quality level (low, medium, high, ultra)
 - `--list-presets` - List available presets
 - `--screenshot-delay N` - Take screenshot after N seconds
 - `--exit-delay N` - Exit application after N seconds
 - Useful for automation and batch rendering
+
+**Web URL Parameters:**
+- `?quality=<level>` or `?q=<level>` - Set quality level
+- `?preset=<name>` or `?p=<name>` - Load specific preset
+- Example: `https://par-fractal.pardev.net/?quality=high&preset=Mandelbulb`
 
 ## Performance Optimization
 

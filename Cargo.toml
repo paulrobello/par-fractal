@@ -1,6 +1,6 @@
 [package]
 name = "par-fractal"
-version = "0.7.2"
+version = "0.8.0"
 edition = "2021"
 authors = ["Paul Robello <probello@gmail.com>"]
 description = "Cross-platform GPU-accelerated fractal renderer with 2D and 3D support"
@@ -61,45 +61,45 @@ required-features = ["native"]
 
 [dependencies]
 # Core graphics
-wgpu = "27"
-winit = "0.30"
+wgpu = "27.0"  # Pinned to 27.x - egui-wgpu 0.33 requires wgpu ^27
+winit = "0.30.12"
 
 # Math
-glam = "0.30"
+glam = "0.30.9"
 
 # UI
-egui = { version = "0.33", default-features = false, features = ["default_fonts"] }
-egui-wgpu = "0.33"
-egui-winit = { version = "0.33", default-features = false, features = ["links"] }
+egui = { version = "0.33.3", default-features = false, features = ["default_fonts"] }
+egui-wgpu = "0.33.3"
+egui-winit = { version = "0.33.3", default-features = false, features = ["links"] }
 
 # Utilities
-bytemuck = { version = "1.24", features = ["derive"] }
-log = "0.4"
-rand = "0.9"
-image = { version = "0.25", default-features = false, features = ["png"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_yaml = "0.9"
-serde_json = "1.0"
-base64 = "0.22"
-web-time = "1.1"  # Cross-platform time for native and WASM
+bytemuck = { version = "1.24.0", features = ["derive"] }
+log = "0.4.29"
+rand = "0.9.2"
+image = { version = "0.25.9", default-features = false, features = ["png"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_yaml = "0.9.34"
+serde_json = "1.0.147"
+base64 = "0.22.1"
+web-time = "1.1.0"  # Cross-platform time for native and WASM
 
 # Native-only dependencies (optional, enabled by "native" feature)
-pollster = { version = "0.4", optional = true }
-directories = { version = "6.0", optional = true }
-rfd = { version = "0.16", optional = true }
-open = { version = "5", optional = true }
-crossbeam-channel = { version = "0.5", optional = true }
-chrono = { version = "0.4", optional = true }
-env_logger = { version = "0.11", optional = true }
+pollster = { version = "0.4.0", optional = true }
+directories = { version = "6.0.0", optional = true }
+rfd = { version = "0.16.0", optional = true }
+open = { version = "5.3.3", optional = true }
+crossbeam-channel = { version = "0.5.15", optional = true }
+chrono = { version = "0.4.42", optional = true }
+env_logger = { version = "0.11.8", optional = true }
 
 # Web-only dependencies (optional, enabled by "web" feature)
-wasm-bindgen = { version = "0.2", optional = true }
-wasm-bindgen-futures = { version = "0.4", optional = true }
-js-sys = { version = "0.3", optional = true }
-console_log = { version = "1.0", optional = true }
-console_error_panic_hook = { version = "0.1", optional = true }
-gloo-timers = { version = "0.3", optional = true, features = ["futures"] }
-getrandom = { version = "0.3", optional = true, features = ["wasm_js"] }
+wasm-bindgen = { version = "0.2.106", optional = true }
+wasm-bindgen-futures = { version = "0.4.56", optional = true }
+js-sys = { version = "0.3.83", optional = true }
+console_log = { version = "1.0.0", optional = true }
+console_error_panic_hook = { version = "0.1.7", optional = true }
+gloo-timers = { version = "0.3.0", optional = true, features = ["futures"] }
+getrandom = { version = "0.3.4", optional = true, features = ["wasm_js"] }
 
 [dependencies.web-sys]
 version = "0.3.83"

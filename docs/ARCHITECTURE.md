@@ -163,6 +163,7 @@ graph TD
 **Key Features:**
 - `--clear-settings` - Reset all saved preferences
 - `--preset <name>` - Load specific preset on startup
+- `--quality <level>` / `-q <level>` - Set quality level (low, medium, high, ultra)
 - `--list-presets` - Display available presets
 - `--screenshot-delay <s>` - Automated screenshot capture
 - `--exit-delay <s>` - Automated application exit

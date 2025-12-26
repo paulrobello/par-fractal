@@ -292,6 +292,8 @@ par-fractal [OPTIONS]
 Options:
   --clear-settings         Clear all saved settings
   --preset <name>          Load preset on startup
+  --quality <level>        Set quality: low, medium, high, ultra
+  -q <level>               Short form of --quality
   --list-presets           List all available presets
   --screenshot-delay <s>   Auto-screenshot after N seconds
   --exit-delay <s>         Auto-exit after N seconds
@@ -307,8 +309,25 @@ par-fractal --list-presets
 # Load specific preset
 par-fractal --preset "Mandelbulb Power 8"
 
+# Set quality level
+par-fractal --quality low
+par-fractal -q high
+
 # Automated screenshot capture
 par-fractal --preset "Ocean Julia" --screenshot-delay 5 --exit-delay 6
+```
+
+**Web URL Parameters:**
+
+```
+# Set quality level via URL
+https://par-fractal.pardev.net/?quality=high
+
+# Combine quality and preset
+https://par-fractal.pardev.net/?q=medium&preset=Mandelbulb
+
+# Also works with hash format
+https://par-fractal.pardev.net/#quality=low&p=Mandelbulb
 ```
 
 ## Additional Resources

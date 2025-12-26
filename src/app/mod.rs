@@ -71,6 +71,7 @@ impl App {
         screenshot_delay: Option<f32>,
         exit_delay: Option<f32>,
         preset_name: Option<String>,
+        quality_level: Option<usize>,
     ) -> Self {
         let window = Arc::new(window);
         let size = window.inner_size();
@@ -107,6 +108,29 @@ impl App {
         } else {
             FractalParams::load_from_file().unwrap_or_default()
         };
+
+        // Apply quality level from CLI if specified
+        let mut fractal_params = fractal_params;
+        if let Some(level) = quality_level {
+            let level = level.min(3); // Clamp to valid range 0-3
+            let quality_name = match level {
+                0 => "Ultra",
+                1 => "High",
+                2 => "Medium",
+                _ => "Low",
+            };
+            println!("Setting quality level: {}", quality_name);
+
+            // Set the LOD system to use the specified quality level
+            fractal_params.lod_state.current_level = level;
+            fractal_params.lod_state.target_level = level;
+            fractal_params.lod_state.transition_progress = 1.0;
+            fractal_params.lod_state.active_quality =
+                fractal_params.lod_config.quality_presets[level];
+
+            // Set min_quality_level so LOD won't drop below the requested level
+            fractal_params.lod_config.min_quality_level = level;
+        }
 
         let mut camera = Camera::new(size.width, size.height);
         camera.fovy = fractal_params.camera_fov;
@@ -191,6 +215,7 @@ impl App {
         screenshot_delay: Option<f32>,
         exit_delay: Option<f32>,
         preset_name: Option<String>,
+        quality_level: Option<usize>,
     ) -> Result<Self, String> {
         let window = Arc::new(window);
         let mut size = window.inner_size();
@@ -230,6 +255,29 @@ impl App {
         } else {
             FractalParams::default()
         };
+
+        // Apply quality level from URL parameter if specified
+        let mut fractal_params = fractal_params;
+        if let Some(level) = quality_level {
+            let level = level.min(3); // Clamp to valid range 0-3
+            let quality_name = match level {
+                0 => "Ultra",
+                1 => "High",
+                2 => "Medium",
+                _ => "Low",
+            };
+            log::info!("Setting quality level: {}", quality_name);
+
+            // Set the LOD system to use the specified quality level
+            fractal_params.lod_state.current_level = level;
+            fractal_params.lod_state.target_level = level;
+            fractal_params.lod_state.transition_progress = 1.0;
+            fractal_params.lod_state.active_quality =
+                fractal_params.lod_config.quality_presets[level];
+
+            // Set min_quality_level so LOD won't drop below the requested level
+            fractal_params.lod_config.min_quality_level = level;
+        }
 
         let mut camera = Camera::new(size.width, size.height);
         camera.fovy = fractal_params.camera_fov;

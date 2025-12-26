@@ -8,6 +8,80 @@ use winit::platform::web::{EventLoopExtWebSys, WindowAttributesExtWebSys};
 
 use crate::app::App;
 
+/// Parse quality level string to LOD level index (0=ultra, 1=high, 2=medium, 3=low)
+fn parse_quality_level(s: &str) -> Option<usize> {
+    match s.to_lowercase().as_str() {
+        "ultra" | "u" => Some(0),
+        "high" | "h" => Some(1),
+        "medium" | "med" | "m" => Some(2),
+        "low" | "l" => Some(3),
+        _ => None,
+    }
+}
+
+/// Parse URL parameters (query string and hash) for quality and preset settings
+fn parse_url_params() -> (Option<String>, Option<usize>) {
+    let window = match web_sys::window() {
+        Some(w) => w,
+        None => return (None, None),
+    };
+
+    let location = window.location();
+
+    let mut preset_name: Option<String> = None;
+    let mut quality_level: Option<usize> = None;
+
+    // Parse query string: ?quality=high&preset=Mandelbulb
+    if let Ok(search) = location.search() {
+        if !search.is_empty() {
+            // Remove leading '?'
+            let query = search.trim_start_matches('?');
+            for param in query.split('&') {
+                if let Some((key, value)) = param.split_once('=') {
+                    match key.to_lowercase().as_str() {
+                        "quality" | "q" => {
+                            quality_level = parse_quality_level(value);
+                        }
+                        "preset" | "p" => {
+                            preset_name = Some(value.to_string());
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+
+    // Also check hash: #quality=high&preset=Mandelbulb (some prefer this for SPAs)
+    if let Ok(hash) = location.hash() {
+        if !hash.is_empty() {
+            // Remove leading '#'
+            let hash_params = hash.trim_start_matches('#');
+            for param in hash_params.split('&') {
+                if let Some((key, value)) = param.split_once('=') {
+                    match key.to_lowercase().as_str() {
+                        "quality" | "q" => {
+                            // Only set if not already set from query string
+                            if quality_level.is_none() {
+                                quality_level = parse_quality_level(value);
+                            }
+                        }
+                        "preset" | "p" => {
+                            // Only set if not already set from query string
+                            if preset_name.is_none() {
+                                preset_name = Some(value.to_string());
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+
+    (preset_name, quality_level)
+}
+
 /// Hide the loading indicator and show the canvas
 fn hide_loading() {
     if let Some(window) = web_sys::window() {
@@ -136,8 +210,23 @@ pub async fn main_web() {
 
     log::info!("Window created, initializing app...");
 
+    // Parse URL parameters for preset and quality settings
+    let (preset_name, quality_level) = parse_url_params();
+    if let Some(ref preset) = preset_name {
+        log::info!("URL preset parameter: {}", preset);
+    }
+    if let Some(quality) = quality_level {
+        let quality_name = match quality {
+            0 => "ultra",
+            1 => "high",
+            2 => "medium",
+            _ => "low",
+        };
+        log::info!("URL quality parameter: {}", quality_name);
+    }
+
     // Initialize app (async for wgpu)
-    let app = match App::new_async(winit_window, None, None, None).await {
+    let app = match App::new_async(winit_window, None, None, preset_name, quality_level).await {
         Ok(app) => {
             hide_loading();
             log::info!("App initialized successfully");

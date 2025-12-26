@@ -19,10 +19,23 @@ fn print_help() {
     println!("Options:");
     println!("  --clear-settings         Clear all saved settings and start fresh");
     println!("  --preset <name>          Load a specific preset on startup");
+    println!("  --quality <level>        Set quality level: low, medium, high, ultra");
+    println!("  -q <level>               Short form of --quality");
     println!("  --list-presets           List all available presets and exit");
     println!("  --screenshot-delay <s>   Take a screenshot after N seconds");
     println!("  --exit-delay <s>         Exit application after N seconds");
     println!("  --help, -h               Show this help message");
+}
+
+/// Parse quality level string to LOD level index (0=ultra, 1=high, 2=medium, 3=low)
+fn parse_quality_level(s: &str) -> Option<usize> {
+    match s.to_lowercase().as_str() {
+        "ultra" | "u" => Some(0),
+        "high" | "h" => Some(1),
+        "medium" | "med" | "m" => Some(2),
+        "low" | "l" => Some(3),
+        _ => None,
+    }
 }
 
 fn clear_settings() {
@@ -120,6 +133,7 @@ fn main() {
     let mut screenshot_delay: Option<f32> = None;
     let mut exit_delay: Option<f32> = None;
     let mut preset_name: Option<String> = None;
+    let mut quality_level: Option<usize> = None;
 
     let mut i = 1;
     while i < args.len() {
@@ -134,6 +148,28 @@ fn main() {
                     i += 2;
                 } else {
                     eprintln!("--preset requires a preset name");
+                    print_help();
+                    return;
+                }
+            }
+            "--quality" | "-q" => {
+                if i + 1 < args.len() {
+                    match parse_quality_level(&args[i + 1]) {
+                        Some(level) => {
+                            quality_level = Some(level);
+                            i += 2;
+                        }
+                        None => {
+                            eprintln!(
+                                "Invalid quality level '{}'. Valid options: low, medium, high, ultra",
+                                args[i + 1]
+                            );
+                            print_help();
+                            return;
+                        }
+                    }
+                } else {
+                    eprintln!("--quality requires a value (low, medium, high, ultra)");
                     print_help();
                     return;
                 }
@@ -209,7 +245,13 @@ fn main() {
     #[allow(deprecated)]
     let window = event_loop.create_window(window_attributes).unwrap();
 
-    let mut app = pollster::block_on(App::new(window, screenshot_delay, exit_delay, preset_name));
+    let mut app = pollster::block_on(App::new(
+        window,
+        screenshot_delay,
+        exit_delay,
+        preset_name,
+        quality_level,
+    ));
 
     #[allow(deprecated)]
     event_loop

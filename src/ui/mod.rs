@@ -3214,11 +3214,14 @@ impl UI {
                     ui.separator();
                     ui.add_space(4.0);
 
-                    ui.collapsing("What's New in v0.7.1", |ui| {
-                        ui.label("• Fixed Buddhabrot high-resolution screenshot capture");
+                    ui.collapsing("What's New in v0.8.0", |ui| {
+                        ui.label("• Quality level CLI parameter (--quality / -q)");
+                        ui.label("• URL parameters for web (quality, preset)");
+                        ui.label("• Updated dependencies to latest versions");
                     });
 
-                    ui.collapsing("What's New in v0.7.0", |ui| {
+                    ui.collapsing("What's New in v0.7.x", |ui| {
+                        ui.label("• Fixed Buddhabrot high-resolution screenshot capture");
                         ui.label("• Buddhabrot - density visualization of escape trajectories");
                         ui.label("• Compute shader accumulation for Buddhabrot rendering");
                         ui.label("• New preset: Buddhabrot Classic");
