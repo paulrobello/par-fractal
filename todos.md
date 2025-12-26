@@ -67,3 +67,41 @@ Re-enable 3D strange attractors (Lorenz, Rossler, Pickover) with a viable render
 - `src/shaders/fractal.wgsl` - Currently has `pickover_attractor_de`, `lorenz_attractor_de`, `rossler_attractor_de`
 - `src/ui/mod.rs` - Buttons commented out
 - `src/fractal/types.rs` - Types still defined: `Pickover3D`, `Lorenz3D`, `Rossler3D`
+
+---
+
+### Emulated Double Precision for 2D Deep Zoom
+**Priority**: Medium
+**Complexity**: High
+**Status**: Planned
+
+Implement emulated f64 (double-single arithmetic) for 2D fractals to enable deeper zoom levels beyond the ~10^7 limit of f32.
+
+**Why needed**: Standard f32 has ~7 decimal digits of precision. At deep zoom levels, adjacent pixels become indistinguishable, causing blocky/pixelated artifacts. Emulated f64 would extend precision to ~15 digits, enabling zoom to ~10^15.
+
+**Implementation approach**:
+1. **Double-single arithmetic in WGSL**: Use two f32 values to represent one extended-precision number
+   - Dekker/Knuth techniques for add, subtract, multiply
+   - ~2-4x performance cost
+2. **2D only**: Apply only to escape-time 2D fractals (Mandelbrot, Julia, etc.)
+   - 3D ray marching doesn't benefit significantly (camera-based navigation, not mathematical zoom)
+   - Keep f32 for 3D to maintain performance
+3. **Conditional compilation**: Use shader preprocessor to select precision mode
+
+**Reference implementations**:
+- [WebGPU-WGSL-64bit-BigInt](https://github.com/Gold18K/WebGPU-WGSL-64bit-BigInt) - Arbitrary precision in WGSL
+- [GAPFixFractal](https://github.com/bernds/GAPFixFractal) - Fixed-point GPU fractals (CUDA)
+- XaoS project uses compile-time selectable precision (double, long double, __float128)
+
+**Files to modify**:
+- `src/shaders/fractal.wgsl` - Add double-single math functions, update 2D fractal calculations
+- `src/fractal/mod.rs` - Add precision mode setting
+- `src/ui/mod.rs` - UI toggle for high-precision mode
+
+**Trade-offs**:
+| Precision | Zoom Depth | Performance |
+|-----------|------------|-------------|
+| f32 (current) | ~10^7 | Fastest |
+| Emulated f64 | ~10^15 | ~2-4x slower |
+
+**Related GitHub issue**: #1 (Feature requests - Higher precision math)
