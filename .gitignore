@@ -25,3 +25,8 @@ fractal_recording*
 fractal*.png
 fractal*.jpg
 todos.md
+
+# Claude Code local session files
+.claude/.cc2cc-session-id
+.claude/scheduled_tasks.lock
+.claude/statusline-*.local.json
