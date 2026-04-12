@@ -722,7 +722,7 @@ impl FractalParams {
 
     /// Randomize fractal parameters for creative exploration
     pub fn randomize(&mut self) {
-        use rand::Rng;
+        use rand::RngExt;
         let mut rng = rand::rng();
 
         // Randomly select a fractal type

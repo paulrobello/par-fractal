@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.2] - 2026-04-11
+
+### Changed
+- Upgraded major dependencies to latest versions
+  - **wgpu** 27 → 29.0.1 (migrated through API breaking changes)
+  - **egui** / **egui-wgpu** / **egui-winit** 0.33 → 0.34.1
+  - **glam** 0.31 → 0.32.1
+  - **rand** 0.9 → 0.10
+  - **image** → 0.25.10, **chrono** → 0.4.44, **env_logger** → 0.11.10
+  - Web: **wasm-bindgen** 0.2.118, **web-sys** / **js-sys** 0.3.95, **wasm-bindgen-futures** 0.4.68, **gloo-timers** 0.4, **getrandom** 0.4.2
+
+### Fixed
+- Migrated to wgpu 29 `CurrentSurfaceTexture` enum-based surface acquisition
+- Updated `InstanceDescriptor` construction for wgpu 29 (no more `Default` impl)
+- Wrapped bind group layout entries in `Option` per wgpu 29 API
+- Renamed `push_constant_ranges` → `immediate_size` per wgpu 28
+- Added `multiview_mask` field to all render pipeline and render pass descriptors per wgpu 29
+- Switched `MipmapFilterMode` for mipmap filtering per wgpu 29
+- Updated `rand` API to use `RngExt` trait for `random_range`/`random_bool`
+- Fixed egui 0.34 deprecations: `egui_wants_pointer_input`, `is_pointer_over_egui`, `egui_is_using_pointer`, `Context::run_ui`
+
 ## [0.8.0] - 2025-12-25
 
 ### Added

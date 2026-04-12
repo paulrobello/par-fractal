@@ -1,6 +1,6 @@
 [package]
 name = "par-fractal"
-version = "0.8.1"
+version = "0.8.2"
 edition = "2021"
 authors = ["Paul Robello <probello@gmail.com>"]
 description = "Cross-platform GPU-accelerated fractal renderer with 2D and 3D support"
@@ -61,22 +61,22 @@ required-features = ["native"]
 
 [dependencies]
 # Core graphics
-wgpu = "27.0"  # Pinned to 27.x - egui-wgpu 0.33 requires wgpu ^27
-winit = "0.30.12"
+wgpu = "29.0.1"  # Requires egui-wgpu 0.34+
+winit = "0.30.13"
 
 # Math
-glam = "0.31.0"
+glam = "0.32.1"
 
 # UI
-egui = { version = "0.33.3", default-features = false, features = ["default_fonts"] }
-egui-wgpu = "0.33.3"
-egui-winit = { version = "0.33.3", default-features = false, features = ["links"] }
+egui = { version = "0.34.1", default-features = false, features = ["default_fonts"] }
+egui-wgpu = "0.34.1"
+egui-winit = { version = "0.34.1", default-features = false, features = ["links"] }
 
 # Utilities
 bytemuck = { version = "1.25.0", features = ["derive"] }
 log = "0.4.29"
-rand = "0.9.2"
-image = { version = "0.25.9", default-features = false, features = ["png"] }
+rand = "0.10.0"
+image = { version = "0.25.10", default-features = false, features = ["png"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_yaml = "0.9.34"
 serde_json = "1.0.149"
@@ -89,20 +89,20 @@ directories = { version = "6.0.0", optional = true }
 rfd = { version = "0.17.2", optional = true }
 open = { version = "5.3.3", optional = true }
 crossbeam-channel = { version = "0.5.15", optional = true }
-chrono = { version = "0.4.43", optional = true }
-env_logger = { version = "0.11.8", optional = true }
+chrono = { version = "0.4.44", optional = true }
+env_logger = { version = "0.11.10", optional = true }
 
 # Web-only dependencies (optional, enabled by "web" feature)
-wasm-bindgen = { version = "0.2.108", optional = true }
-wasm-bindgen-futures = { version = "0.4.58", optional = true }
-js-sys = { version = "0.3.85", optional = true }
+wasm-bindgen = { version = "0.2.118", optional = true }
+wasm-bindgen-futures = { version = "0.4.68", optional = true }
+js-sys = { version = "0.3.95", optional = true }
 console_log = { version = "1.0.0", optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
-gloo-timers = { version = "0.3.0", optional = true, features = ["futures"] }
-getrandom = { version = "0.3.4", optional = true, features = ["wasm_js"] }
+gloo-timers = { version = "0.4.0", optional = true, features = ["futures"] }
+getrandom = { version = "0.4.2", optional = true, features = ["wasm_js"] }
 
 [dependencies.web-sys]
-version = "0.3.85"
+version = "0.3.95"
 optional = true
 features = [
     "Window",

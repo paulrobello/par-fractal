@@ -24,9 +24,9 @@ impl App {
         // This prevents camera movement during UI interactions like window resizing
         let egui_blocks_mouse = if !is_touch {
             let ctx = self.egui_state.egui_ctx();
-            ctx.wants_pointer_input()
-                || ctx.is_pointer_over_area()
-                || ctx.is_using_pointer()
+            ctx.egui_wants_pointer_input()
+                || ctx.is_pointer_over_egui()
+                || ctx.egui_is_using_pointer()
                 || ctx.dragged_id().is_some()
         } else {
             false // Touch events not blocked by egui (already checked consumed flag)

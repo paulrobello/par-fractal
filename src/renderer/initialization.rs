@@ -9,12 +9,11 @@ use wgpu::util::DeviceExt;
 impl Renderer {
     #[cfg(not(target_arch = "wasm32"))]
     pub async fn enumerate_gpus() -> Vec<GpuInfo> {
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::all(),
-            ..Default::default()
-        });
+        let mut desc = wgpu::InstanceDescriptor::new_without_display_handle();
+        desc.backends = wgpu::Backends::all();
+        let instance = wgpu::Instance::new(desc);
 
-        let adapters = instance.enumerate_adapters(wgpu::Backends::all());
+        let adapters = instance.enumerate_adapters(wgpu::Backends::all()).await;
         adapters
             .into_iter()
             .map(|adapter| {
@@ -47,17 +46,16 @@ impl Renderer {
         size: winit::dpi::PhysicalSize<u32>,
         preferred_gpu_index: Option<usize>,
     ) -> Self {
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::all(),
-            ..Default::default()
-        });
+        let mut desc = wgpu::InstanceDescriptor::new_without_display_handle();
+        desc.backends = wgpu::Backends::all();
+        let instance = wgpu::Instance::new(desc);
 
         let surface = instance.create_surface(window).unwrap();
 
         // Select adapter based on preference or fallback to default
         let adapter = if let Some(gpu_index) = preferred_gpu_index {
             // Try to get the adapter at the specified index
-            let adapters = instance.enumerate_adapters(wgpu::Backends::all());
+            let adapters = instance.enumerate_adapters(wgpu::Backends::all()).await;
 
             if gpu_index < adapters.len() {
                 let selected = adapters.into_iter().nth(gpu_index).unwrap();
@@ -103,10 +101,9 @@ impl Renderer {
         _preferred_gpu_index: Option<usize>,
     ) -> Self {
         // On web, browser handles GPU selection - ignore preference
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::BROWSER_WEBGPU,
-            ..Default::default()
-        });
+        let mut desc = wgpu::InstanceDescriptor::new_without_display_handle();
+        desc.backends = wgpu::Backends::BROWSER_WEBGPU;
+        let instance = wgpu::Instance::new(desc);
 
         let surface = instance.create_surface(window).unwrap();
 
@@ -204,8 +201,8 @@ impl Renderer {
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
-                bind_group_layouts: &[&uniform_bind_group_layout],
-                push_constant_ranges: &[],
+                bind_group_layouts: &[Some(&uniform_bind_group_layout)],
+                immediate_size: 0,
             });
 
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -247,7 +244,7 @@ impl Renderer {
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },
-            multiview: None,
+            multiview_mask: None,
         });
 
         // Fullscreen quad vertices
@@ -277,7 +274,7 @@ impl Renderer {
             address_mode_w: wgpu::AddressMode::ClampToEdge,
             mag_filter: wgpu::FilterMode::Linear,
             min_filter: wgpu::FilterMode::Linear,
-            mipmap_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::MipmapFilterMode::Nearest,
             ..Default::default()
         });
 
@@ -448,8 +445,8 @@ impl Renderer {
         // Bloom extract pipeline
         let bloom_extract_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Bloom Extract Layout"),
-            bind_group_layouts: &[&texture_bind_group_layout, &uniform_layout],
-            push_constant_ranges: &[],
+            bind_group_layouts: &[Some(&texture_bind_group_layout), Some(&uniform_layout)],
+            immediate_size: 0,
         });
 
         let bloom_extract_pipeline =
@@ -479,14 +476,14 @@ impl Renderer {
                 },
                 depth_stencil: None,
                 multisample: wgpu::MultisampleState::default(),
-                multiview: None,
+                multiview_mask: None,
             });
 
         // Blur pipeline
         let blur_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Blur Layout"),
-            bind_group_layouts: &[&texture_bind_group_layout, &uniform_layout],
-            push_constant_ranges: &[],
+            bind_group_layouts: &[Some(&texture_bind_group_layout), Some(&uniform_layout)],
+            immediate_size: 0,
         });
 
         let blur_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -515,14 +512,14 @@ impl Renderer {
             },
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
-            multiview: None,
+            multiview_mask: None,
         });
 
         // Composite pipeline
         let composite_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Composite Layout"),
-            bind_group_layouts: &[&composite_texture_layout, &uniform_layout],
-            push_constant_ranges: &[],
+            bind_group_layouts: &[Some(&composite_texture_layout), Some(&uniform_layout)],
+            immediate_size: 0,
         });
 
         let composite_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -551,14 +548,14 @@ impl Renderer {
             },
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
-            multiview: None,
+            multiview_mask: None,
         });
 
         // FXAA pipeline
         let fxaa_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("FXAA Layout"),
-            bind_group_layouts: &[&texture_bind_group_layout],
-            push_constant_ranges: &[],
+            bind_group_layouts: &[Some(&texture_bind_group_layout)],
+            immediate_size: 0,
         });
 
         let fxaa_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -587,14 +584,14 @@ impl Renderer {
             },
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
-            multiview: None,
+            multiview_mask: None,
         });
 
         // Copy/passthrough pipeline (for when FXAA is disabled)
         let copy_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Copy Layout"),
-            bind_group_layouts: &[&texture_bind_group_layout],
-            push_constant_ranges: &[],
+            bind_group_layouts: &[Some(&texture_bind_group_layout)],
+            immediate_size: 0,
         });
 
         let copy_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -623,7 +620,7 @@ impl Renderer {
             },
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
-            multiview: None,
+            multiview_mask: None,
         });
 
         // Accumulation display pipeline (for visualizing accumulated attractor data)
@@ -681,8 +678,11 @@ impl Renderer {
         let accumulation_display_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Accumulation Display Layout"),
-                bind_group_layouts: &[&accumulation_texture_layout, &accumulation_uniform_layout],
-                push_constant_ranges: &[],
+                bind_group_layouts: &[
+                    Some(&accumulation_texture_layout),
+                    Some(&accumulation_uniform_layout),
+                ],
+                immediate_size: 0,
             });
 
         let accumulation_display_pipeline =
@@ -712,7 +712,7 @@ impl Renderer {
                 },
                 depth_stencil: None,
                 multisample: wgpu::MultisampleState::default(),
-                multiview: None,
+                multiview_mask: None,
             });
 
         // Create bind groups for textures
@@ -1005,8 +1005,8 @@ impl Renderer {
                         self.device
                             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                                 label: Some("Buddhabrot Copy Pipeline Layout"),
-                                bind_group_layouts: &[&copy_layout],
-                                push_constant_ranges: &[],
+                                bind_group_layouts: &[Some(&copy_layout)],
+                                immediate_size: 0,
                             });
 
                     let copy_pipeline =

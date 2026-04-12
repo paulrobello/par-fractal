@@ -268,12 +268,7 @@ fn main() {
                         }
                         WindowEvent::RedrawRequested => {
                             app.update();
-                            match app.render() {
-                                Ok(_) => {}
-                                Err(wgpu::SurfaceError::Lost) => app.resize(app.size()),
-                                Err(wgpu::SurfaceError::OutOfMemory) => target.exit(),
-                                Err(e) => eprintln!("{:?}", e),
-                            }
+                            app.render();
                         }
                         _ => {}
                     }

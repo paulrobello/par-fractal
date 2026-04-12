@@ -9,8 +9,32 @@ use crate::video_recorder::VideoRecorder;
 
 /// Render methods
 impl App {
-    pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        let output = self.renderer.surface.get_current_texture()?;
+    pub fn render(&mut self) {
+        let output = match self.renderer.surface.get_current_texture() {
+            wgpu::CurrentSurfaceTexture::Success(frame) => frame,
+            wgpu::CurrentSurfaceTexture::Suboptimal(frame) => {
+                // Reconfigure surface for next frame, but still present the current one
+                self.renderer
+                    .surface
+                    .configure(&self.renderer.device, &self.renderer.config);
+                frame
+            }
+            wgpu::CurrentSurfaceTexture::Timeout | wgpu::CurrentSurfaceTexture::Occluded => {
+                // Skip this frame
+                return;
+            }
+            wgpu::CurrentSurfaceTexture::Outdated | wgpu::CurrentSurfaceTexture::Lost => {
+                // Reconfigure the surface and try again next frame
+                self.renderer
+                    .surface
+                    .configure(&self.renderer.device, &self.renderer.config);
+                return;
+            }
+            wgpu::CurrentSurfaceTexture::Validation => {
+                log::error!("Surface get_current_texture returned a validation error");
+                return;
+            }
+        };
         let view = output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
@@ -281,6 +305,7 @@ impl App {
                     depth_stencil_attachment: None,
                     occlusion_query_set: None,
                     timestamp_writes: None,
+                    multiview_mask: None,
                 });
 
                 let mut render_pass: wgpu::RenderPass<'static> =
@@ -318,6 +343,7 @@ impl App {
                     depth_stencil_attachment: None,
                     occlusion_query_set: None,
                     timestamp_writes: None,
+                    multiview_mask: None,
                 });
 
                 // SAFETY: We drop the render_pass before using encoder again, so this is safe.
@@ -350,6 +376,7 @@ impl App {
                     depth_stencil_attachment: None,
                     occlusion_query_set: None,
                     timestamp_writes: None,
+                    multiview_mask: None,
                 });
 
                 // SAFETY: We drop the render_pass before using encoder again, so this is safe.
@@ -379,6 +406,7 @@ impl App {
                     depth_stencil_attachment: None,
                     occlusion_query_set: None,
                     timestamp_writes: None,
+                    multiview_mask: None,
                 });
 
                 // SAFETY: We drop the render_pass before using encoder again, so this is safe.
@@ -425,6 +453,7 @@ impl App {
                     depth_stencil_attachment: None,
                     occlusion_query_set: None,
                     timestamp_writes: None,
+                    multiview_mask: None,
                 });
 
                 // SAFETY: We drop the render_pass before using encoder again, so this is safe.
@@ -456,6 +485,7 @@ impl App {
                 depth_stencil_attachment: None,
                 occlusion_query_set: None,
                 timestamp_writes: None,
+                multiview_mask: None,
             });
 
             // SAFETY: We drop the render_pass before using encoder again, so this is safe.
@@ -485,6 +515,7 @@ impl App {
                 depth_stencil_attachment: None,
                 occlusion_query_set: None,
                 timestamp_writes: None,
+                multiview_mask: None,
             });
 
             // SAFETY: We drop the render_pass before using encoder again, so this is safe.
@@ -570,7 +601,7 @@ impl App {
 
         // Render UI
         let raw_input = self.egui_state.take_egui_input(self.window.as_ref());
-        let full_output = self.egui_state.egui_ctx().run(raw_input, |ctx| {
+        let full_output = self.egui_state.egui_ctx().run_ui(raw_input, |ctx| {
             #[cfg(not(target_arch = "wasm32"))]
             let is_rec = self.video_recorder.is_recording();
             #[cfg(target_arch = "wasm32")]
@@ -852,6 +883,7 @@ impl App {
                 depth_stencil_attachment: None,
                 occlusion_query_set: None,
                 timestamp_writes: None,
+                multiview_mask: None,
             });
 
             // SAFETY: We drop the render_pass before using encoder again, so this is safe.
@@ -872,7 +904,5 @@ impl App {
             .submit(std::iter::once(encoder.finish()));
 
         output.present();
-
-        Ok(())
     }
 }

@@ -321,15 +321,7 @@ pub async fn main_web() {
                         }
                         WindowEvent::RedrawRequested => {
                             app.update();
-                            match app.render() {
-                                Ok(_) => {}
-                                Err(wgpu::SurfaceError::Lost) => {
-                                    let size = app.size();
-                                    app.resize(size);
-                                }
-                                Err(wgpu::SurfaceError::OutOfMemory) => target.exit(),
-                                Err(e) => log::error!("Render error: {:?}", e),
-                            }
+                            app.render();
                         }
                         _ => {}
                     }

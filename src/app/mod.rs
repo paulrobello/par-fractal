@@ -353,10 +353,6 @@ impl App {
         self.should_exit
     }
 
-    pub fn size(&self) -> PhysicalSize<u32> {
-        self.renderer.size
-    }
-
     pub fn resize(&mut self, new_size: PhysicalSize<u32>) {
         self.renderer.resize(new_size);
         self.camera.resize(new_size.width, new_size.height);

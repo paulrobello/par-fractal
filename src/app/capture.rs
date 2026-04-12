@@ -426,6 +426,7 @@ impl App {
                 depth_stencil_attachment: None,
                 occlusion_query_set: None,
                 timestamp_writes: None,
+                multiview_mask: None,
             });
 
             if use_accumulation {
@@ -467,6 +468,7 @@ impl App {
                 depth_stencil_attachment: None,
                 occlusion_query_set: None,
                 timestamp_writes: None,
+                multiview_mask: None,
             });
             pass.set_pipeline(&self.renderer.bloom_extract_pipeline);
             pass.set_bind_group(0, &scene_bind_group, &[]);
@@ -491,6 +493,7 @@ impl App {
                 depth_stencil_attachment: None,
                 occlusion_query_set: None,
                 timestamp_writes: None,
+                multiview_mask: None,
             });
             pass.set_pipeline(&self.renderer.blur_pipeline);
             pass.set_bind_group(0, &bright_bind_group, &[]);
@@ -531,6 +534,7 @@ impl App {
                 depth_stencil_attachment: None,
                 occlusion_query_set: None,
                 timestamp_writes: None,
+                multiview_mask: None,
             });
             pass.set_pipeline(&self.renderer.blur_pipeline);
             pass.set_bind_group(0, &blur_temp_bind_group, &[]);
@@ -565,6 +569,7 @@ impl App {
                 depth_stencil_attachment: None,
                 occlusion_query_set: None,
                 timestamp_writes: None,
+                multiview_mask: None,
             });
             pass.set_pipeline(&self.renderer.composite_pipeline);
             pass.set_bind_group(0, &composite_bind_group, &[]);
@@ -589,6 +594,7 @@ impl App {
                 depth_stencil_attachment: None,
                 occlusion_query_set: None,
                 timestamp_writes: None,
+                multiview_mask: None,
             });
             pass.set_pipeline(&self.renderer.copy_pipeline);
             pass.set_bind_group(0, &composite_final_bind_group, &[]);

@@ -450,8 +450,8 @@ impl AttractorComputePipeline {
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Attractor Compute Pipeline Layout"),
-            bind_group_layouts: &[&storage_layout, &uniform_layout],
-            push_constant_ranges: &[],
+            bind_group_layouts: &[Some(&storage_layout), Some(&uniform_layout)],
+            immediate_size: 0,
         });
 
         let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
@@ -581,8 +581,8 @@ impl BuddhabrotComputePipeline {
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Buddhabrot Compute Pipeline Layout"),
-            bind_group_layouts: &[&storage_layout, &uniform_layout],
-            push_constant_ranges: &[],
+            bind_group_layouts: &[Some(&storage_layout), Some(&uniform_layout)],
+            immediate_size: 0,
         });
 
         let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {

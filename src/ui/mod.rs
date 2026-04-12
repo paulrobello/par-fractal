@@ -3214,6 +3214,13 @@ impl UI {
                     ui.separator();
                     ui.add_space(4.0);
 
+                    ui.collapsing("What's New in v0.8.2", |ui| {
+                        ui.label("• Upgraded wgpu 27 → 29 (major API migration)");
+                        ui.label("• Upgraded egui 0.33 → 0.34");
+                        ui.label("• Upgraded glam 0.31 → 0.32, rand 0.9 → 0.10");
+                        ui.label("• Updated all web/wasm dependencies");
+                    });
+
                     ui.collapsing("What's New in v0.8.0", |ui| {
                         ui.label("• Quality level CLI parameter (--quality / -q)");
                         ui.label("• URL parameters for web (quality, preset)");
