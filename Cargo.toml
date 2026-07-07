@@ -68,9 +68,9 @@ winit = "0.30.13"
 glam = "0.32.1"
 
 # UI
-egui = { version = "0.34.3", default-features = false, features = ["default_fonts"] }
-egui-wgpu = "0.34.3"
-egui-winit = { version = "0.34.3", default-features = false, features = ["links"] }
+egui = { version = "0.35.0", default-features = false, features = ["default_fonts"] }
+egui-wgpu = "0.35.0"
+egui-winit = { version = "0.35.0", default-features = false, features = ["links"] }
 
 # Utilities
 bytemuck = { version = "1.25.0", features = ["derive"] }
