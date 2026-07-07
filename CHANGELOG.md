@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.3] - 2026-07-07
+
+### Changed
+- Upgraded egui ecosystem to 0.35 (**egui** / **egui-wgpu** / **egui-winit** 0.34 → 0.35)
+- Migrated Rust edition from 2021 to 2024
+- Updated all dependencies to latest compatible versions
+  - **log** → 0.4.33, **rand** → 0.10.2, **serde_json** → 1.0.150
+  - **chrono** → 0.4.45, **env_logger** → 0.11.11, **open** → 5.3.6, **crossbeam-channel** → 0.5.16
+  - Web: **wasm-bindgen** → 0.2.126, **web-sys** / **js-sys** → 0.3.103, **wasm-bindgen-futures** → 0.4.76, **getrandom** → 0.4.3
+- **wgpu** held at 29.0.4 — wgpu 30 not adopted (no released egui-wgpu supports it yet)
+- Added gitleaks secret-scanning pre-commit hook
+- Bumped CI actions/checkout from v4 to v5
+
 ## [0.8.2] - 2026-04-11
 
 ### Changed
