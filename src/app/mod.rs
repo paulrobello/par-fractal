@@ -147,17 +147,16 @@ impl App {
             directories::ProjectDirs::from("com", "fractal", "par-fractal")
                 .map(|dirs| dirs.config_dir().join("settings.yaml"))
                 .unwrap_or_else(|| std::path::PathBuf::from("settings.yaml")),
-        ) {
-            if let Ok(settings) = serde_yaml::from_str::<crate::fractal::Settings>(&content) {
-                camera.position = glam::Vec3::from_array(settings.camera_position);
-                camera.target = glam::Vec3::from_array(settings.camera_target);
-                // Update controller's yaw/pitch to match the loaded camera direction
-                camera_controller.point_at_target(camera.position, camera.target);
-                ui.load_ui_state(settings.ui_state);
-                ui.auto_open_captures = settings.auto_open_captures;
-                ui.custom_width = settings.custom_width;
-                ui.custom_height = settings.custom_height;
-            }
+        ) && let Ok(settings) = serde_yaml::from_str::<crate::fractal::Settings>(&content)
+        {
+            camera.position = glam::Vec3::from_array(settings.camera_position);
+            camera.target = glam::Vec3::from_array(settings.camera_target);
+            // Update controller's yaw/pitch to match the loaded camera direction
+            camera_controller.point_at_target(camera.position, camera.target);
+            ui.load_ui_state(settings.ui_state);
+            ui.auto_open_captures = settings.auto_open_captures;
+            ui.custom_width = settings.custom_width;
+            ui.custom_height = settings.custom_height;
         }
 
         let egui_ctx = egui::Context::default();

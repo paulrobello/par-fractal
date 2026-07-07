@@ -1072,7 +1072,7 @@ impl Renderer {
             let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
             // Create the copy bind group (buffer -> texture)
-            if let (Some(ref buffer), Some(ref copy_pipeline)) = (
+            if let (Some(buffer), Some(copy_pipeline)) = (
                 &self.buddhabrot_accumulation_buffer,
                 &self.buddhabrot_copy_pipeline,
             ) {

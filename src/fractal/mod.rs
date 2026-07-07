@@ -520,11 +520,11 @@ impl FractalParams {
         if let Some(config_dir) = directories::ProjectDirs::from("com", "fractal", "par-fractal") {
             let settings_file = config_dir.config_dir().join("settings.yaml");
 
-            if let Ok(yaml) = std::fs::read_to_string(settings_file) {
-                if let Ok(settings) = serde_yaml::from_str::<Settings>(&yaml) {
-                    println!("Settings loaded");
-                    return Some(Self::from_settings(settings));
-                }
+            if let Ok(yaml) = std::fs::read_to_string(settings_file)
+                && let Ok(settings) = serde_yaml::from_str::<Settings>(&yaml)
+            {
+                println!("Settings loaded");
+                return Some(Self::from_settings(settings));
             }
         }
         None
@@ -792,11 +792,7 @@ impl FractalParams {
 
                 // 0=off, 1=hard, 2=soft
                 self.shadow_mode = if rng.random_bool(0.6) {
-                    if rng.random_bool(0.7) {
-                        2
-                    } else {
-                        1
-                    } // 70% soft, 30% hard
+                    if rng.random_bool(0.7) { 2 } else { 1 } // 70% soft, 30% hard
                 } else {
                     0
                 };

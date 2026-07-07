@@ -3,8 +3,8 @@
 //! Uses localStorage for simple key-value storage. Data is base64 encoded.
 //! For larger datasets, IndexedDB could be used instead.
 
-use crate::platform::{category, PlatformError, Storage};
-use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+use crate::platform::{PlatformError, Storage, category};
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use wasm_bindgen::JsCast;
 
 /// Web storage using localStorage

@@ -1,6 +1,6 @@
 //! Native storage implementation using the filesystem
 
-use crate::platform::{category, PlatformError, Storage};
+use crate::platform::{PlatformError, Storage, category};
 use directories::ProjectDirs;
 use std::fs;
 use std::path::PathBuf;
@@ -79,12 +79,11 @@ impl Storage for NativeStorage {
         for entry in fs::read_dir(&dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.is_file() {
-                if let Some(stem) = path.file_stem() {
-                    if let Some(name) = stem.to_str() {
-                        keys.push(name.to_string());
-                    }
-                }
+            if path.is_file()
+                && let Some(stem) = path.file_stem()
+                && let Some(name) = stem.to_str()
+            {
+                keys.push(name.to_string());
             }
         }
         keys.sort();

@@ -2,8 +2,8 @@
 
 use crate::camera::Camera;
 use crate::fractal::FractalParams;
-use crate::platform::web::WebCapture;
 use crate::platform::Capture;
+use crate::platform::web::WebCapture;
 use crate::renderer::Renderer;
 use std::sync::{Arc, Mutex};
 

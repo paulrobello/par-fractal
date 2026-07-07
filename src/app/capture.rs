@@ -111,10 +111,10 @@ impl App {
                         .unwrap_or_else(|_| std::path::PathBuf::from(&filename));
 
                     // Auto-open if enabled
-                    if self.ui.auto_open_captures {
-                        if let Err(e) = open::that(&abs_path) {
-                            eprintln!("Failed to open screenshot: {}", e);
-                        }
+                    if self.ui.auto_open_captures
+                        && let Err(e) = open::that(&abs_path)
+                    {
+                        eprintln!("Failed to open screenshot: {}", e);
                     }
 
                     self.ui.show_toast_with_file(
@@ -693,10 +693,10 @@ impl App {
                     .unwrap_or_else(|_| std::path::PathBuf::from(&filename));
 
                 // Auto-open if enabled
-                if self.ui.auto_open_captures {
-                    if let Err(e) = open::that(&abs_path) {
-                        eprintln!("Failed to open high-res image: {}", e);
-                    }
+                if self.ui.auto_open_captures
+                    && let Err(e) = open::that(&abs_path)
+                {
+                    eprintln!("Failed to open high-res image: {}", e);
                 }
 
                 self.ui.show_toast_with_file(

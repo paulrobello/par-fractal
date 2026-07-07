@@ -1,7 +1,7 @@
 //! Web/WASM entry point for Par Fractal
 
-use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
+use wasm_bindgen::prelude::*;
 use winit::event::*;
 use winit::event_loop::EventLoop;
 use winit::platform::web::{EventLoopExtWebSys, WindowAttributesExtWebSys};

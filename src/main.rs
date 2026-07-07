@@ -109,18 +109,18 @@ fn list_presets() {
     }
 
     // Get user presets
-    if let Ok(user_presets) = PresetGallery::list_user_presets() {
-        if !user_presets.is_empty() {
-            println!("💾 User Presets:");
-            for preset_name in user_presets {
-                if let Ok(preset) = PresetGallery::load_preset(&preset_name) {
-                    println!("   • {} - {}", preset.name, preset.description);
-                } else {
-                    println!("   • {}", preset_name);
-                }
+    if let Ok(user_presets) = PresetGallery::list_user_presets()
+        && !user_presets.is_empty()
+    {
+        println!("💾 User Presets:");
+        for preset_name in user_presets {
+            if let Ok(preset) = PresetGallery::load_preset(&preset_name) {
+                println!("   • {} - {}", preset.name, preset.description);
+            } else {
+                println!("   • {}", preset_name);
             }
-            println!();
         }
+        println!();
     }
 
     println!("Total: {} built-in presets", builtin_presets.len());

@@ -880,10 +880,11 @@ impl CustomPalette {
                         parts[0].parse::<f32>(),
                         parts[1].parse::<f32>(),
                         parts[2].parse::<f32>(),
-                    ) {
-                        if r <= 1.0 && g <= 1.0 && b <= 1.0 {
-                            rgb_values.push(Vec3::new(r, g, b));
-                        }
+                    ) && r <= 1.0
+                        && g <= 1.0
+                        && b <= 1.0
+                    {
+                        rgb_values.push(Vec3::new(r, g, b));
                     }
                 }
             }
@@ -995,10 +996,10 @@ impl CustomPaletteGallery {
             for entry in fs::read_dir(palettes_dir)? {
                 let entry = entry?;
                 let path = entry.path();
-                if path.extension().and_then(|s| s.to_str()) == Some("yaml") {
-                    if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
-                        palettes.push(name.to_string());
-                    }
+                if path.extension().and_then(|s| s.to_str()) == Some("yaml")
+                    && let Some(name) = path.file_stem().and_then(|s| s.to_str())
+                {
+                    palettes.push(name.to_string());
                 }
             }
             palettes.sort();

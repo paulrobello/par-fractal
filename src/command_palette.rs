@@ -1259,9 +1259,11 @@ mod tests {
         palette.set_query("mandel".to_string());
 
         assert!(!palette.filtered_commands.is_empty());
-        assert!(palette
-            .filtered_commands
-            .iter()
-            .any(|(_, cmd)| cmd.name.contains("Mandel")));
+        assert!(
+            palette
+                .filtered_commands
+                .iter()
+                .any(|(_, cmd)| cmd.name.contains("Mandel"))
+        );
     }
 }

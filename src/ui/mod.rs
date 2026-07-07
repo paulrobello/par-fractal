@@ -441,22 +441,20 @@ impl UI {
                 ui.horizontal(|ui| {
                     if ui.add_enabled(self.can_undo(), egui::Button::new("↶ Undo"))
                         .on_hover_text("Undo last parameter change (Ctrl+Z)")
-                        .clicked() {
-                        if let Some(prev_params) = self.undo() {
+                        .clicked()
+                        && let Some(prev_params) = self.undo() {
                             *params = prev_params;
                             changed = true;
                             from_history = true;  // Don't save to history
                         }
-                    }
                     if ui.add_enabled(self.can_redo(), egui::Button::new("↷ Redo"))
                         .on_hover_text("Redo parameter change (Ctrl+Y)")
-                        .clicked() {
-                        if let Some(next_params) = self.redo() {
+                        .clicked()
+                        && let Some(next_params) = self.redo() {
                             *params = next_params;
                             changed = true;
                             from_history = true;  // Don't save to history
                         }
-                    }
                     if ui.button("🎲 Randomize")
                         .on_hover_text("Generate random fractal settings for creative exploration")
                         .clicked() {
@@ -1423,14 +1421,13 @@ impl UI {
                                                 ui.horizontal(|ui| {
                                                     if ui.button(palette_name)
                                                         .on_hover_text("Click to load this custom palette")
-                                                        .clicked() {
-                                                        if let Ok(custom_palette) = CustomPaletteGallery::load_palette(palette_name) {
+                                                        .clicked()
+                                                        && let Ok(custom_palette) = CustomPaletteGallery::load_palette(palette_name) {
                                                             // Apply the custom palette to the current params
                                                             let (_name, colors) = custom_palette.to_color_palette();
                                                             params.palette.colors = colors;
                                                             changed = true;
                                                         }
-                                                    }
                                                     if ui.small_button("🗑")
                                                         .on_hover_text("Delete this custom palette")
                                                         .clicked() {
@@ -1925,11 +1922,10 @@ impl UI {
                                                 ui.horizontal(|ui| {
                                                     if ui.button(bookmark_name)
                                                         .on_hover_text("Click to restore this camera position")
-                                                        .clicked() {
-                                                        if let Ok(bookmark) = BookmarkGallery::load_bookmark(bookmark_name) {
+                                                        .clicked()
+                                                        && let Ok(bookmark) = BookmarkGallery::load_bookmark(bookmark_name) {
                                                             bookmark_to_load = Some(bookmark);
                                                         }
-                                                    }
                                                     if ui.small_button("🗑")
                                                         .on_hover_text("Delete this bookmark")
                                                         .clicked() {
@@ -2621,11 +2617,10 @@ impl UI {
                         ui.horizontal(|ui| {
                             if ui.button("💾 Save Settings")
                                 .on_hover_text("Manually save current settings to disk")
-                                .clicked() {
-                                if let Err(e) = params.save_to_file() {
+                                .clicked()
+                                && let Err(e) = params.save_to_file() {
                                     eprintln!("Failed to save settings: {}", e);
                                 }
-                            }
                             if ui.button("🔄 Reset to Defaults")
                                 .on_hover_text("Reset all settings to default values")
                                 .clicked() {
@@ -2848,8 +2843,7 @@ impl UI {
                         ui.add_space(4.0);
                         if let Some(monitor) =
                             self.available_monitors.get(self.selected_monitor_index)
-                        {
-                            if ui
+                            && ui
                                 .button(format!(
                                     "📐 Render {}x{} Wallpaper",
                                     monitor.width, monitor.height
@@ -2862,7 +2856,6 @@ impl UI {
                             {
                                 hires_render_resolution = Some((monitor.width, monitor.height));
                             }
-                        }
 
                         ui.horizontal(|ui| {
                             if ui

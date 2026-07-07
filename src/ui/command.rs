@@ -48,11 +48,11 @@ impl UI {
                     self.command_palette.select_previous();
                 }
 
-                if response.ctx.input(|i| i.key_pressed(egui::Key::Enter)) {
-                    if let Some(cmd) = self.command_palette.get_selected_command() {
-                        command_to_execute = Some(cmd.action.clone());
-                        close_palette = true;
-                    }
+                if response.ctx.input(|i| i.key_pressed(egui::Key::Enter))
+                    && let Some(cmd) = self.command_palette.get_selected_command()
+                {
+                    command_to_execute = Some(cmd.action.clone());
+                    close_palette = true;
                 }
 
                 ui.add_space(12.0);

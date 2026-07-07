@@ -1,4 +1,4 @@
-use crossbeam_channel::{bounded, Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender, bounded};
 use std::io::Write;
 use std::process::{Command, Stdio};
 use std::thread;
@@ -124,10 +124,10 @@ impl VideoRecorder {
         self.frame_sender = None;
 
         // Wait for encoder thread to finish
-        if let Some(thread) = self.encoder_thread.take() {
-            if let Err(e) = thread.join() {
-                eprintln!("Encoder thread panicked: {:?}", e);
-            }
+        if let Some(thread) = self.encoder_thread.take()
+            && let Err(e) = thread.join()
+        {
+            eprintln!("Encoder thread panicked: {:?}", e);
         }
 
         self.is_recording = false;

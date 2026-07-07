@@ -77,10 +77,10 @@ impl AppPreferences {
     pub fn load() -> Self {
         if let Some(config_dir) = directories::ProjectDirs::from("com", "fractal", "par-fractal") {
             let prefs_file = config_dir.config_dir().join("preferences.yaml");
-            if let Ok(yaml) = fs::read_to_string(prefs_file) {
-                if let Ok(prefs) = serde_yaml::from_str(&yaml) {
-                    return prefs;
-                }
+            if let Ok(yaml) = fs::read_to_string(prefs_file)
+                && let Ok(prefs) = serde_yaml::from_str(&yaml)
+            {
+                return prefs;
             }
         }
         Self::default()
@@ -226,10 +226,10 @@ impl BookmarkGallery {
             for entry in fs::read_dir(bookmarks_dir)? {
                 let entry = entry?;
                 let path = entry.path();
-                if path.extension().and_then(|s| s.to_str()) == Some("yaml") {
-                    if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
-                        bookmarks.push(name.to_string());
-                    }
+                if path.extension().and_then(|s| s.to_str()) == Some("yaml")
+                    && let Some(name) = path.file_stem().and_then(|s| s.to_str())
+                {
+                    bookmarks.push(name.to_string());
                 }
             }
             bookmarks.sort();
@@ -777,10 +777,10 @@ impl PresetGallery {
             for entry in fs::read_dir(presets_dir)? {
                 let entry = entry?;
                 let path = entry.path();
-                if path.extension().and_then(|s| s.to_str()) == Some("yaml") {
-                    if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
-                        presets.push(name.to_string());
-                    }
+                if path.extension().and_then(|s| s.to_str()) == Some("yaml")
+                    && let Some(name) = path.file_stem().and_then(|s| s.to_str())
+                {
+                    presets.push(name.to_string());
                 }
             }
             Ok(presets)
@@ -952,7 +952,7 @@ impl PresetGallery {
     #[cfg(target_arch = "wasm32")]
     pub fn export_preset_to_json(preset: &Preset) -> Result<(), Box<dyn std::error::Error>> {
         use wasm_bindgen::JsCast;
-        use web_sys::{window, Blob, BlobPropertyBag, HtmlAnchorElement, Url};
+        use web_sys::{Blob, BlobPropertyBag, HtmlAnchorElement, Url, window};
 
         let json = serde_json::to_string_pretty(preset)?;
 
@@ -1000,7 +1000,7 @@ impl PresetGallery {
         camera_target: [f32; 3],
     ) -> Result<(), Box<dyn std::error::Error>> {
         use wasm_bindgen::JsCast;
-        use web_sys::{window, Blob, BlobPropertyBag, HtmlAnchorElement, Url};
+        use web_sys::{Blob, BlobPropertyBag, HtmlAnchorElement, Url, window};
 
         // Create a preset with current settings
         let preset = Preset {

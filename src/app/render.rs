@@ -84,7 +84,7 @@ impl App {
                 self.fractal_params.attractor_pending_clear = true;
                 self.fractal_params.attractor_total_iterations = 0;
                 self.fractal_params.attractor_paused = false; // Resume accumulation on view change
-                                                              // Update last values
+                // Update last values
                 self.fractal_params.attractor_last_center = self.fractal_params.center_2d;
                 self.fractal_params.attractor_last_zoom = self.fractal_params.zoom_2d;
                 self.fractal_params.attractor_last_julia_c = self.fractal_params.julia_c;
@@ -789,10 +789,10 @@ impl App {
                                 .unwrap_or_else(|_| std::path::PathBuf::from(&filename));
 
                             // Auto-open if enabled
-                            if self.ui.auto_open_captures {
-                                if let Err(e) = open::that(&abs_path) {
-                                    eprintln!("Failed to open video: {}", e);
-                                }
+                            if self.ui.auto_open_captures
+                                && let Err(e) = open::that(&abs_path)
+                            {
+                                eprintln!("Failed to open video: {}", e);
                             }
 
                             self.ui.show_toast_with_file(
