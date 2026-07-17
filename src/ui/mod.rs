@@ -874,6 +874,25 @@ impl UI {
                             {
                                 match PresetGallery::import_from_json() {
                                     Ok(preset) => {
+                                        // SEC-006: detect whether from_settings clamped any
+                                        // resource-driving field and warn the user. Reuses
+                                        // SEC-001's clamping path — no duplicated logic, only
+                                        // a pre/post comparison at the import site.
+                                        let raw = preset.settings.clone();
+                                        let clamped = FractalParams::from_settings(raw.clone());
+                                        let was_clamped = raw.max_iterations != clamped.max_iterations
+                                            || raw.max_steps != clamped.max_steps
+                                            || raw.attractor_iterations_per_frame
+                                                != clamped.attractor_iterations_per_frame
+                                            || raw.shadow_samples != clamped.shadow_samples
+                                            || raw.dof_samples != clamped.dof_samples
+                                            || raw.zoom_2d != clamped.zoom_2d;
+                                        if was_clamped {
+                                            self.show_toast(
+                                                "Preset values out of range were clamped"
+                                                    .to_string(),
+                                            );
+                                        }
                                         preset_to_load = Some(preset);
                                     }
                                     Err(e) => {

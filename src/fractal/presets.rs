@@ -3,6 +3,25 @@ use glam::Vec3;
 use serde::{Deserialize, Serialize};
 use std::fs;
 
+/// Sanitize a preset/bookmark filename so it cannot traverse directories.
+///
+/// Matches the UI-side rule at `src/ui/mod.rs`
+/// (`replace(|c: char| !c.is_alphanumeric() && c != '_' && c != '-', "_")`)
+/// so files saved before this defense-in-depth check still resolve. Applied
+/// inside the gallery methods (SEC-007, CWE-22) so the API is safe by contract
+/// even if a future caller forgets to sanitize.
+fn sanitize_name(name: &str) -> String {
+    name.chars()
+        .map(|c| {
+            if c.is_alphanumeric() || c == '_' || c == '-' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect()
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum PresetCategory {
@@ -171,6 +190,7 @@ impl BookmarkGallery {
         bookmark: &CameraBookmark,
         filename: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        let filename = sanitize_name(filename);
         if let Some(config_dir) = directories::ProjectDirs::from("com", "fractal", "par-fractal") {
             let bookmarks_dir = config_dir.config_dir().join("bookmarks");
             fs::create_dir_all(&bookmarks_dir)?;
@@ -187,6 +207,7 @@ impl BookmarkGallery {
     }
 
     pub fn load_bookmark(filename: &str) -> Result<CameraBookmark, Box<dyn std::error::Error>> {
+        let filename = sanitize_name(filename);
         if let Some(config_dir) = directories::ProjectDirs::from("com", "fractal", "par-fractal") {
             let bookmark_file = config_dir
                 .config_dir()
@@ -202,6 +223,7 @@ impl BookmarkGallery {
     }
 
     pub fn delete_bookmark(filename: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let filename = sanitize_name(filename);
         if let Some(config_dir) = directories::ProjectDirs::from("com", "fractal", "par-fractal") {
             let bookmark_file = config_dir
                 .config_dir()
@@ -715,6 +737,7 @@ impl PresetGallery {
 
     #[cfg(not(target_arch = "wasm32"))]
     pub fn save_preset(preset: &Preset, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let filename = sanitize_name(filename);
         if let Some(config_dir) = directories::ProjectDirs::from("com", "fractal", "par-fractal") {
             let presets_dir = config_dir.config_dir().join("presets");
             fs::create_dir_all(&presets_dir)?;
@@ -732,6 +755,7 @@ impl PresetGallery {
 
     #[cfg(not(target_arch = "wasm32"))]
     pub fn load_preset(filename: &str) -> Result<Preset, Box<dyn std::error::Error>> {
+        let filename = sanitize_name(filename);
         if let Some(config_dir) = directories::ProjectDirs::from("com", "fractal", "par-fractal") {
             let preset_file = config_dir
                 .config_dir()
@@ -748,6 +772,7 @@ impl PresetGallery {
 
     #[cfg(not(target_arch = "wasm32"))]
     pub fn delete_preset(filename: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let filename = sanitize_name(filename);
         if let Some(config_dir) = directories::ProjectDirs::from("com", "fractal", "par-fractal") {
             let preset_file = config_dir
                 .config_dir()
@@ -1054,5 +1079,24 @@ impl PresetGallery {
         // This is a synchronous function but file reading is async on web
         // We'll need to handle this through the UI with a callback
         Err("Import should be handled through UI file input".into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sanitize_name;
+
+    // SEC-007: sanitize_name must collapse path-traversal characters so a
+    // caller-supplied name cannot escape the presets/bookmarks directory.
+    #[test]
+    fn sanitize_name_neutralizes_traversal() {
+        // "../x" -> every char outside [A-Za-z0-9_-] becomes '_'
+        assert_eq!(sanitize_name("../x"), "___x");
+        assert_eq!(sanitize_name(".."), "__");
+        assert_eq!(sanitize_name("../../etc/passwd"), "______etc_passwd");
+        // Sanity: already-safe names round-trip unchanged.
+        assert_eq!(sanitize_name("My_Preset-1"), "My_Preset-1");
+        // Spaces and other punctuation collapse to '_'.
+        assert_eq!(sanitize_name("cool preset!"), "cool_preset_");
     }
 }

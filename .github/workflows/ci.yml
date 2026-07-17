@@ -113,3 +113,16 @@ jobs:
 
     - name: Build WASM
       run: trunk build --release
+
+  audit:
+    name: Security audit (cargo audit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - uses: actions/checkout@v5
+
+    # v2.0.0 as of 2026-07-16
+    - uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}

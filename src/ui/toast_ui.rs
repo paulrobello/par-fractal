@@ -82,24 +82,24 @@ impl UI {
             }
 
             if toast_response.clicked() {
-                eprintln!("DEBUG: Toast was clicked!");
+                log::debug!("Toast was clicked");
                 if let Some(path) = &file_path {
-                    eprintln!("DEBUG: Attempting to open file: {}", path);
+                    log::debug!("Attempting to open file: {}", path);
 
                     // Open file (native only)
                     #[cfg(not(target_arch = "wasm32"))]
                     {
                         // Verify file exists before trying to open
                         if std::path::Path::new(path).exists() {
-                            eprintln!("DEBUG: File exists at path");
+                            log::debug!("File exists at path");
                         } else {
-                            eprintln!("DEBUG: WARNING - File does not exist at path!");
+                            log::warn!("File does not exist at path: {}", path);
                         }
 
                         if let Err(e) = open::that(path) {
-                            eprintln!("ERROR: Failed to open file {}: {}", path, e);
+                            log::error!("Failed to open file {}: {}", path, e);
                         } else {
-                            eprintln!("DEBUG: Successfully called open::that()");
+                            log::debug!("Successfully called open::that()");
                         }
                     }
                     #[cfg(target_arch = "wasm32")]
@@ -107,7 +107,7 @@ impl UI {
                         log::info!("Would open file: {}", path);
                     }
                 } else {
-                    eprintln!("DEBUG: No file_path available");
+                    log::debug!("No file_path available");
                 }
             }
 

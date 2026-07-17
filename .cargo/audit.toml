@@ -1,0 +1,24 @@
+# Configuration for `cargo audit` (https://github.com/RustSec/cargo-audit)
+# and the `rustsec/audit-check` GitHub Action used in CI
+# (.github/workflows/ci.yml, `audit` job).
+#
+# Entries below are advisories that cannot be fixed in this crate because the
+# vulnerable crate is pinned by a transitive dependency. Each ignore must carry
+# the reason it is ignored; revisit on every dependency bump.
+
+[advisories]
+# ttf-parser 0.25.1 is unmaintained; transitive via winit -> ab_glyph.
+# Tracking upstream; nothing for par-fractal to do until winit/ab_glyph releases.
+# See https://rustsec.org/advisories/RUSTSEC-2026-0192
+#
+# quick-xml 0.39.4 has two DoS advisories (RUSTSEC-2026-0194, RUSTSEC-2026-0195),
+# both fixed in >=0.41.0. We cannot bump: wayland-scanner 0.31.10 (transitive via
+# winit -> smithay-client-toolkit) pins `quick-xml = "^0.39"`. Build-time /
+# Wayland-only. Revisit when winit releases a smithay-client-toolkit bump.
+ignore = [
+    "RUSTSEC-2026-0192",
+    "RUSTSEC-2026-0194",
+    "RUSTSEC-2026-0195",
+]
+informational_warnings = ["unmaintained"]
+severity_threshold = "low"

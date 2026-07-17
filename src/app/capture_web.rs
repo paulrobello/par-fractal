@@ -163,6 +163,11 @@ pub fn render_high_resolution_web(
     fractal_name: String,
     show_toast: Box<dyn Fn(String) + Send + 'static>,
 ) {
+    // SEC-009: clamp internally so a caller cannot trigger ~1.6 GB of
+    // RGBA16F intermediate allocation. Matches the UI slider bound
+    // (1..=16384) at src/ui/mod.rs.
+    let width = width.clamp(1, 16384);
+    let height = height.clamp(1, 16384);
     log::info!(
         "Starting high-resolution web render at {}x{}...",
         width,

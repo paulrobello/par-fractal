@@ -243,6 +243,11 @@ impl App {
         width: u32,
         height: u32,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        // SEC-009: clamp internally so a caller cannot trigger ~1.6 GB of
+        // RGBA16F intermediate allocation. Matches the UI slider bound
+        // (1..=16384) at src/ui/mod.rs.
+        let width = width.clamp(1, 16384);
+        let height = height.clamp(1, 16384);
         let size = wgpu::Extent3d {
             width,
             height,

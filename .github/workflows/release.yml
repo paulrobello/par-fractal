@@ -191,7 +191,8 @@ jobs:
         if: success()
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-        uses: Ilshidur/action-discord@master
+        # master as of 2026-07-16
+        uses: Ilshidur/action-discord@d2594079a10f1d6739ee50a2471f0ca57418b554
         with:
           args: 'Published {{ EVENT_PAYLOAD.repository.name }} to crates.io successfully!'
         continue-on-error: true
