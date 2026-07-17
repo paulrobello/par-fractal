@@ -364,7 +364,13 @@ pub fn render_high_resolution_web(
             timestamp_writes: None,
             multiview_mask: None,
         });
-        pass.set_pipeline(&renderer.render_pipeline);
+        // ARC-009: select 2D vs 3D pipeline by fractal type.
+        let pipeline = if fractal_params.fractal_type.is_3d() {
+            &renderer.pipeline_3d
+        } else {
+            &renderer.pipeline_2d
+        };
+        pass.set_pipeline(pipeline);
         pass.set_bind_group(0, &renderer.uniform_bind_group, &[]);
         pass.set_vertex_buffer(0, renderer.vertex_buffer.slice(..));
         pass.draw(0..4, 0..1);

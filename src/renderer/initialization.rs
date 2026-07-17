@@ -219,9 +219,18 @@ impl Renderer {
                 immediate_size: 0,
             });
 
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        // ARC-009/ENH-004: build two pipelines that differ only in fragment
+        // entry point — `fs_main_2d` (escape-time + palette path) and
+        // `fs_main_3d` (ray-march + lighting path). They share the shader
+        // module, pipeline layout, vertex stage, and color targets; naga and
+        // the backend dead-code-eliminate the unused dispatch per entry point,
+        // so the cheap 2D path is no longer penalized by the DoF/shadow/AO
+        // register footprint of the 3D ray marcher. Per-frame selection lives
+        // in `app/render.rs`, `app/capture.rs`, and `app/capture_web.rs` via
+        // `FractalType::is_3d()`.
+        let pipeline_2d = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             cache: None,
-            label: Some("Render Pipeline"),
+            label: Some("Render Pipeline (2D)"),
             layout: Some(&render_pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader,
@@ -235,7 +244,49 @@ impl Renderer {
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
-                entry_point: Some("fs_main"),
+                entry_point: Some("fs_main_2d"),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: wgpu::TextureFormat::Rgba16Float, // Render to HDR intermediate texture
+                    blend: Some(wgpu::BlendState::REPLACE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: Default::default(),
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleStrip,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: None,
+                polygon_mode: wgpu::PolygonMode::Fill,
+                unclipped_depth: false,
+                conservative: false,
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState {
+                count: 1,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
+            multiview_mask: None,
+        });
+
+        let pipeline_3d = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            cache: None,
+            label: Some("Render Pipeline (3D)"),
+            layout: Some(&render_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_main"),
+                buffers: &[wgpu::VertexBufferLayout {
+                    array_stride: std::mem::size_of::<[f32; 2]>() as wgpu::BufferAddress,
+                    step_mode: wgpu::VertexStepMode::Vertex,
+                    attributes: &wgpu::vertex_attr_array![0 => Float32x2],
+                }],
+                compilation_options: Default::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some("fs_main_3d"),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: wgpu::TextureFormat::Rgba16Float, // Render to HDR intermediate texture
                     blend: Some(wgpu::BlendState::REPLACE),
@@ -858,7 +909,8 @@ impl Renderer {
             queue,
             config,
             size,
-            render_pipeline,
+            pipeline_2d,
+            pipeline_3d,
             vertex_buffer,
             uniform_buffer,
             uniform_bind_group,

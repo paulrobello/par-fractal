@@ -67,6 +67,35 @@ impl FractalType {
         matches!(self, FractalType::Buddhabrot2D)
     }
 
+    /// Returns true if this is a 3D fractal type (ray-marched or 3D attractor).
+    ///
+    /// Used to select between the 2D and 3D fragment pipelines (ARC-009/ENH-004):
+    /// `fs_main_2d` runs the escape-time + palette path; `fs_main_3d` runs the
+    /// ray-march + lighting path. The set of 3D types must stay in lockstep with
+    /// the `render_mode` uniform written by `Uniforms::update` (3D types set it
+    /// to `1`) so pipeline selection and shader dispatch agree.
+    pub fn is_3d(&self) -> bool {
+        matches!(
+            self,
+            FractalType::Mandelbulb3D
+                | FractalType::MengerSponge3D
+                | FractalType::SierpinskiPyramid3D
+                | FractalType::JuliaSet3D
+                | FractalType::Mandelbox3D
+                | FractalType::OctahedralIFS3D
+                | FractalType::IcosahedralIFS3D
+                | FractalType::ApollonianGasket3D
+                | FractalType::Kleinian3D
+                | FractalType::HybridMandelbulbJulia3D
+                | FractalType::QuaternionCubic3D
+                | FractalType::SierpinskiGasket3D
+                // 3D strange attractors
+                | FractalType::Pickover3D
+                | FractalType::Lorenz3D
+                | FractalType::Rossler3D
+        )
+    }
+
     /// Returns true if this fractal type uses accumulation rendering
     pub fn uses_accumulation(&self) -> bool {
         self.is_2d_attractor() || self.is_buddhabrot()

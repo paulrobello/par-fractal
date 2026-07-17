@@ -2951,200 +2951,201 @@ fn apply_post_processing(color: vec3<f32>, uv: vec2<f32>) -> vec3<f32> {
 // ============================================================================
 
 @fragment
-fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
-    if (uniforms.render_mode == 0u) {
-        // 2D Mode
-        // Use the aspect ratio supplied by the host (window or capture target)
-        let aspect = uniforms.aspect_ratio.x;
+fn fs_main_2d(input: VertexOutput) -> @location(0) vec4<f32> {
+    // 2D Mode
+    // Use the aspect ratio supplied by the host (window or capture target)
+    let aspect = uniforms.aspect_ratio.x;
 
-        var t: f32;
-        var coord: vec2<f32>;
+    var t: f32;
+    var coord: vec2<f32>;
 
-        // Check if high-precision mode is enabled and fractal supports it.
-        // Gate covers types 0..=5 (Mandelbrot, Julia, Sierpinski, SierpinskiTriangle,
-        // BurningShip, Tricorn). Tricorn (type 5) was previously excluded here, which
-        // made tricorn_hp unreachable — the silent dispatch through the final `else`
-        // never fired because the gate short-circuited first. (QA-001)
-        if (uniforms.high_precision == 1u && uniforms.fractal_type <= 5u) {
-            // High-precision coordinate calculation
-            // offset = uv * 2.0 / zoom * aspect (for x) or uv * 2.0 / zoom (for y)
-            let offset_x = input.uv.x * 2.0 / uniforms.zoom * aspect;
-            let offset_y = input.uv.y * 2.0 / uniforms.zoom;
+    // Check if high-precision mode is enabled and fractal supports it.
+    // Gate covers types 0..=5 (Mandelbrot, Julia, Sierpinski, SierpinskiTriangle,
+    // BurningShip, Tricorn). Tricorn (type 5) was previously excluded here, which
+    // made tricorn_hp unreachable — the silent dispatch through the final `else`
+    // never fired because the gate short-circuited first. (QA-001)
+    if (uniforms.high_precision == 1u && uniforms.fractal_type <= 5u) {
+        // High-precision coordinate calculation
+        // offset = uv * 2.0 / zoom * aspect (for x) or uv * 2.0 / zoom (for y)
+        let offset_x = input.uv.x * 2.0 / uniforms.zoom * aspect;
+        let offset_y = input.uv.y * 2.0 / uniforms.zoom;
 
-            // Add offset to high-precision center using double-float arithmetic
-            let coord_x = df_add_full(uniforms.center_hi.x, uniforms.center_lo.x, offset_x, 0.0);
-            let coord_y = df_add_full(uniforms.center_hi.y, uniforms.center_lo.y, offset_y, 0.0);
-            let coord_hi = vec2<f32>(coord_x.x, coord_y.x);
-            let coord_lo = vec2<f32>(coord_x.y, coord_y.y);
-            coord = coord_hi; // Use high part for color modes
+        // Add offset to high-precision center using double-float arithmetic
+        let coord_x = df_add_full(uniforms.center_hi.x, uniforms.center_lo.x, offset_x, 0.0);
+        let coord_y = df_add_full(uniforms.center_hi.y, uniforms.center_lo.y, offset_y, 0.0);
+        let coord_hi = vec2<f32>(coord_x.x, coord_y.x);
+        let coord_lo = vec2<f32>(coord_x.y, coord_y.y);
+        coord = coord_hi; // Use high part for color modes
 
-            // Use high-precision fractal functions
-            if (uniforms.fractal_type == 0u) {
-                t = mandelbrot_hp(coord_hi, coord_lo);
-            } else if (uniforms.fractal_type == 1u) {
-                t = julia_hp(coord_hi, coord_lo);
-            } else if (uniforms.fractal_type == 2u) {
-                t = sierpinski_hp(coord_hi, coord_lo);
-            } else if (uniforms.fractal_type == 3u) {
-                t = sierpinski_triangle_hp(coord_hi, coord_lo);
-            } else if (uniforms.fractal_type == 4u) {
-                t = burning_ship_hp(coord_hi, coord_lo);
-            } else if (uniforms.fractal_type == 5u) {
-                t = tricorn_hp(coord_hi, coord_lo);
-            } else {
-                // Defensive fallback (unreachable: gate ensures type in 0..=5).
-                // Use standard-precision coord + mandelbrot as a safe default —
-                // never silently dispatch through an hp function.
-                coord = vec2<f32>(
-                    uniforms.center.x + (input.uv.x * 2.0 / uniforms.zoom) * aspect,
-                    uniforms.center.y + (input.uv.y * 2.0 / uniforms.zoom)
-                );
-                t = mandelbrot(coord);
-            }
+        // Use high-precision fractal functions
+        if (uniforms.fractal_type == 0u) {
+            t = mandelbrot_hp(coord_hi, coord_lo);
+        } else if (uniforms.fractal_type == 1u) {
+            t = julia_hp(coord_hi, coord_lo);
+        } else if (uniforms.fractal_type == 2u) {
+            t = sierpinski_hp(coord_hi, coord_lo);
+        } else if (uniforms.fractal_type == 3u) {
+            t = sierpinski_triangle_hp(coord_hi, coord_lo);
+        } else if (uniforms.fractal_type == 4u) {
+            t = burning_ship_hp(coord_hi, coord_lo);
+        } else if (uniforms.fractal_type == 5u) {
+            t = tricorn_hp(coord_hi, coord_lo);
         } else {
-            // Standard precision coordinate
+            // Defensive fallback (unreachable: gate ensures type in 0..=5).
+            // Use standard-precision coord + mandelbrot as a safe default —
+            // never silently dispatch through an hp function.
             coord = vec2<f32>(
                 uniforms.center.x + (input.uv.x * 2.0 / uniforms.zoom) * aspect,
                 uniforms.center.y + (input.uv.y * 2.0 / uniforms.zoom)
             );
-
-            if (uniforms.fractal_type == 0u) {
-                t = mandelbrot(coord);
-            } else if (uniforms.fractal_type == 1u) {
-                t = julia(coord);
-            } else if (uniforms.fractal_type == 2u) {
-                t = sierpinski(coord);
-            } else if (uniforms.fractal_type == 3u) {
-                t = sierpinski_triangle(coord);
-            } else if (uniforms.fractal_type == 4u) {
-                t = burning_ship(coord);
-            } else if (uniforms.fractal_type == 5u) {
-                t = tricorn(coord);
-            } else if (uniforms.fractal_type == 6u) {
-                t = phoenix(coord);
-            } else if (uniforms.fractal_type == 7u) {
-                t = celtic(coord);
-            } else if (uniforms.fractal_type == 8u) {
-                t = newton_fractal(coord);
-            } else if (uniforms.fractal_type == 9u) {
-                t = lyapunov_fractal(coord);
-            } else if (uniforms.fractal_type == 10u) {
-                t = nova_fractal(coord);
-            } else if (uniforms.fractal_type == 11u) {
-                t = magnet_fractal(coord);
-            } else if (uniforms.fractal_type == 12u) {
-                t = collatz_fractal(coord);
-            // Strange Attractors (types 26-34, indices after 3D fractals)
-            } else if (uniforms.fractal_type == 26u) {
-                t = hopalong_attractor(coord);
-            } else if (uniforms.fractal_type == 27u) {
-                t = henon_attractor(coord);
-            } else if (uniforms.fractal_type == 28u) {
-                t = martin_attractor(coord);
-            } else if (uniforms.fractal_type == 29u) {
-                t = gingerbreadman_attractor(coord);
-            } else if (uniforms.fractal_type == 30u) {
-                t = latoocarfian_attractor(coord);
-            } else if (uniforms.fractal_type == 31u) {
-                t = chip_attractor(coord);
-            } else if (uniforms.fractal_type == 32u) {
-                t = quadruptwo_attractor(coord);
-            } else if (uniforms.fractal_type == 33u) {
-                t = threeply_attractor(coord);
-            } else if (uniforms.fractal_type == 34u) {
-                t = icon_attractor(coord);
-            } else {
-                t = collatz_fractal(coord);
-            }
+            t = mandelbrot(coord);
         }
-
-        if (t == 0.0) {
-            // No post-processing - render raw fractal (post-FX done in multi-pass pipeline)
-            return vec4<f32>(0.0, 0.0, 0.0, 1.0);
-        }
-
-        var color: vec3<f32>;
-        if (uniforms.color_mode == 1u) {
-            // Iteration visualization (similar to ray steps)
-            color = vec3<f32>(t, t * 0.5, 1.0 - t);
-        } else if (uniforms.color_mode == 2u) {
-            // Grayscale iteration count
-            color = vec3<f32>(t);
-        } else if (uniforms.color_mode == 3u) {
-            // Orbit Trap XYZ - color based on coordinate components using palette
-            let xy_sum = abs(fract(coord.x * uniforms.orbit_trap_scale * 2.0)) + abs(fract(coord.y * uniforms.orbit_trap_scale * 2.0));
-            let trap_t = fract(xy_sum / 2.0);
-            color = get_palette_color(trap_t);
-        } else if (uniforms.color_mode == 4u) {
-            // Orbit Trap Radial - color based on distance from origin using palette
-            let dist = length(coord);
-            let radial_t = fract(dist * uniforms.orbit_trap_scale * 3.0);
-            color = get_palette_color(radial_t);
-        } else if (uniforms.color_mode == 5u || uniforms.color_mode == 6u) {
-            // Position-based coloring for 2D
-            color = vec3<f32>(abs(fract(coord.x)), abs(fract(coord.y)), abs(fract(coord.x + coord.y)));
-        } else {
-            // Palette mode (default)
-            color = get_palette_color(t);
-        }
-
-        // No post-processing - render raw fractal (post-FX done in multi-pass pipeline)
-        return vec4<f32>(color, 1.0);
-
     } else {
-        // 3D Mode
-        // UV coordinates are already in NDC space (-1 to 1)
-        let ndc_x = input.uv.x;
-        let ndc_y = input.uv.y;
+        // Standard precision coordinate
+        coord = vec2<f32>(
+            uniforms.center.x + (input.uv.x * 2.0 / uniforms.zoom) * aspect,
+            uniforms.center.y + (input.uv.y * 2.0 / uniforms.zoom)
+        );
 
-        // Unproject a point on the far plane to get initial ray direction
-        let far_point = vec4<f32>(ndc_x, ndc_y, 1.0, 1.0);
-        var far_world = uniforms.inv_view_proj * far_point;
-        far_world = far_world / far_world.w;
-
-        // Initial ray from camera
-        let base_ray_origin = uniforms.camera_pos;
-        let base_ray_dir = normalize(far_world.xyz - base_ray_origin);
-
-        var final_color: vec3<f32>;
-
-        // Apply depth of field if enabled with multi-sampling
-        if (uniforms.depth_of_field == 1u) {
-            // Multi-sample DOF - configurable quality vs performance
-            let num_samples = uniforms.dof_samples;
-            var accumulated_color = vec3<f32>(0.0);
-
-            // Calculate focal point
-            let focal_point = base_ray_origin + base_ray_dir * uniforms.dof_focal_length;
-
-            // Calculate camera right and up vectors
-            let camera_forward = base_ray_dir;
-            let world_up = vec3<f32>(0.0, 1.0, 0.0);
-            let camera_right = normalize(cross(camera_forward, world_up));
-            let camera_up = cross(camera_right, camera_forward);
-
-            // Take multiple samples
-            for (var i = 0u; i < num_samples; i = i + 1u) {
-                // Sample aperture with indexed pattern
-                let aperture_sample = sample_disk_indexed(input.clip_position.xy, i, num_samples);
-                let aperture_offset = (camera_right * aperture_sample.x + camera_up * aperture_sample.y) * uniforms.dof_aperture;
-
-                // Offset ray origin and recalculate direction to focal point
-                let ray_origin = base_ray_origin + aperture_offset;
-                let ray_dir = normalize(focal_point - ray_origin);
-
-                // Render this ray and accumulate
-                accumulated_color = accumulated_color + render_ray(ray_origin, ray_dir, input.uv);
-            }
-
-            // Average the samples
-            final_color = accumulated_color / f32(num_samples);
+        if (uniforms.fractal_type == 0u) {
+            t = mandelbrot(coord);
+        } else if (uniforms.fractal_type == 1u) {
+            t = julia(coord);
+        } else if (uniforms.fractal_type == 2u) {
+            t = sierpinski(coord);
+        } else if (uniforms.fractal_type == 3u) {
+            t = sierpinski_triangle(coord);
+        } else if (uniforms.fractal_type == 4u) {
+            t = burning_ship(coord);
+        } else if (uniforms.fractal_type == 5u) {
+            t = tricorn(coord);
+        } else if (uniforms.fractal_type == 6u) {
+            t = phoenix(coord);
+        } else if (uniforms.fractal_type == 7u) {
+            t = celtic(coord);
+        } else if (uniforms.fractal_type == 8u) {
+            t = newton_fractal(coord);
+        } else if (uniforms.fractal_type == 9u) {
+            t = lyapunov_fractal(coord);
+        } else if (uniforms.fractal_type == 10u) {
+            t = nova_fractal(coord);
+        } else if (uniforms.fractal_type == 11u) {
+            t = magnet_fractal(coord);
+        } else if (uniforms.fractal_type == 12u) {
+            t = collatz_fractal(coord);
+        // Strange Attractors (types 26-34, indices after 3D fractals)
+        } else if (uniforms.fractal_type == 26u) {
+            t = hopalong_attractor(coord);
+        } else if (uniforms.fractal_type == 27u) {
+            t = henon_attractor(coord);
+        } else if (uniforms.fractal_type == 28u) {
+            t = martin_attractor(coord);
+        } else if (uniforms.fractal_type == 29u) {
+            t = gingerbreadman_attractor(coord);
+        } else if (uniforms.fractal_type == 30u) {
+            t = latoocarfian_attractor(coord);
+        } else if (uniforms.fractal_type == 31u) {
+            t = chip_attractor(coord);
+        } else if (uniforms.fractal_type == 32u) {
+            t = quadruptwo_attractor(coord);
+        } else if (uniforms.fractal_type == 33u) {
+            t = threeply_attractor(coord);
+        } else if (uniforms.fractal_type == 34u) {
+            t = icon_attractor(coord);
         } else {
-            // No DOF - single sample
-            final_color = render_ray(base_ray_origin, base_ray_dir, input.uv);
+            t = collatz_fractal(coord);
+        }
+    }
+
+    if (t == 0.0) {
+        // No post-processing - render raw fractal (post-FX done in multi-pass pipeline)
+        return vec4<f32>(0.0, 0.0, 0.0, 1.0);
+    }
+
+    var color: vec3<f32>;
+    if (uniforms.color_mode == 1u) {
+        // Iteration visualization (similar to ray steps)
+        color = vec3<f32>(t, t * 0.5, 1.0 - t);
+    } else if (uniforms.color_mode == 2u) {
+        // Grayscale iteration count
+        color = vec3<f32>(t);
+    } else if (uniforms.color_mode == 3u) {
+        // Orbit Trap XYZ - color based on coordinate components using palette
+        let xy_sum = abs(fract(coord.x * uniforms.orbit_trap_scale * 2.0)) + abs(fract(coord.y * uniforms.orbit_trap_scale * 2.0));
+        let trap_t = fract(xy_sum / 2.0);
+        color = get_palette_color(trap_t);
+    } else if (uniforms.color_mode == 4u) {
+        // Orbit Trap Radial - color based on distance from origin using palette
+        let dist = length(coord);
+        let radial_t = fract(dist * uniforms.orbit_trap_scale * 3.0);
+        color = get_palette_color(radial_t);
+    } else if (uniforms.color_mode == 5u || uniforms.color_mode == 6u) {
+        // Position-based coloring for 2D
+        color = vec3<f32>(abs(fract(coord.x)), abs(fract(coord.y)), abs(fract(coord.x + coord.y)));
+    } else {
+        // Palette mode (default)
+        color = get_palette_color(t);
+    }
+
+    // No post-processing - render raw fractal (post-FX done in multi-pass pipeline)
+    return vec4<f32>(color, 1.0);
+
+}
+
+@fragment
+fn fs_main_3d(input: VertexOutput) -> @location(0) vec4<f32> {
+    // 3D Mode
+    // UV coordinates are already in NDC space (-1 to 1)
+    let ndc_x = input.uv.x;
+    let ndc_y = input.uv.y;
+
+    // Unproject a point on the far plane to get initial ray direction
+    let far_point = vec4<f32>(ndc_x, ndc_y, 1.0, 1.0);
+    var far_world = uniforms.inv_view_proj * far_point;
+    far_world = far_world / far_world.w;
+
+    // Initial ray from camera
+    let base_ray_origin = uniforms.camera_pos;
+    let base_ray_dir = normalize(far_world.xyz - base_ray_origin);
+
+    var final_color: vec3<f32>;
+
+    // Apply depth of field if enabled with multi-sampling
+    if (uniforms.depth_of_field == 1u) {
+        // Multi-sample DOF - configurable quality vs performance
+        let num_samples = uniforms.dof_samples;
+        var accumulated_color = vec3<f32>(0.0);
+
+        // Calculate focal point
+        let focal_point = base_ray_origin + base_ray_dir * uniforms.dof_focal_length;
+
+        // Calculate camera right and up vectors
+        let camera_forward = base_ray_dir;
+        let world_up = vec3<f32>(0.0, 1.0, 0.0);
+        let camera_right = normalize(cross(camera_forward, world_up));
+        let camera_up = cross(camera_right, camera_forward);
+
+        // Take multiple samples
+        for (var i = 0u; i < num_samples; i = i + 1u) {
+            // Sample aperture with indexed pattern
+            let aperture_sample = sample_disk_indexed(input.clip_position.xy, i, num_samples);
+            let aperture_offset = (camera_right * aperture_sample.x + camera_up * aperture_sample.y) * uniforms.dof_aperture;
+
+            // Offset ray origin and recalculate direction to focal point
+            let ray_origin = base_ray_origin + aperture_offset;
+            let ray_dir = normalize(focal_point - ray_origin);
+
+            // Render this ray and accumulate
+            accumulated_color = accumulated_color + render_ray(ray_origin, ray_dir, input.uv);
         }
 
-        // No post-processing - render raw fractal (post-FX done in multi-pass pipeline)
-        return vec4<f32>(final_color, 1.0);
+        // Average the samples
+        final_color = accumulated_color / f32(num_samples);
+    } else {
+        // No DOF - single sample
+        final_color = render_ray(base_ray_origin, base_ray_dir, input.uv);
     }
+
+    // No post-processing - render raw fractal (post-FX done in multi-pass pipeline)
+    return vec4<f32>(final_color, 1.0);
 }

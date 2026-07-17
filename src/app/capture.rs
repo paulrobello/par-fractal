@@ -458,7 +458,13 @@ impl App {
                 }
             } else {
                 // Standard fractal rendering
-                pass.set_pipeline(&self.renderer.render_pipeline);
+                // ARC-009: select 2D vs 3D pipeline by fractal type.
+                let pipeline = if self.fractal_params.fractal_type.is_3d() {
+                    &self.renderer.pipeline_3d
+                } else {
+                    &self.renderer.pipeline_2d
+                };
+                pass.set_pipeline(pipeline);
                 pass.set_bind_group(0, &self.renderer.uniform_bind_group, &[]);
                 pass.set_vertex_buffer(0, self.renderer.vertex_buffer.slice(..));
                 pass.draw(0..4, 0..1);

@@ -44,7 +44,13 @@ pub struct Renderer {
     pub size: winit::dpi::PhysicalSize<u32>,
 
     // Main fractal rendering
-    pub render_pipeline: wgpu::RenderPipeline,
+    // ARC-009/ENH-004: two pipelines sharing one layout/module — `fs_main_2d`
+    // holds only the escape-time + palette path, `fs_main_3d` only the
+    // ray-march + lighting path. Selected per frame via
+    // `FractalType::is_3d()`; the unused path is dead-code-eliminated per
+    // entry point by naga/the backend.
+    pub pipeline_2d: wgpu::RenderPipeline,
+    pub pipeline_3d: wgpu::RenderPipeline,
     pub vertex_buffer: wgpu::Buffer,
     pub uniform_buffer: wgpu::Buffer,
     pub uniform_bind_group: wgpu::BindGroup,
