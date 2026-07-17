@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Par Fractal is a cross-platform GPU-accelerated fractal renderer built with Rust and WebGPU. It supports both 2D escape-time fractals (Mandelbrot, Julia, etc.) and 3D ray-marched fractals (Mandelbulb, Menger Sponge, etc.) with advanced rendering features including PBR shading, ambient occlusion, soft shadows, and depth of field.
 
 **Tech Stack:**
-- Rust 1.70+ (Edition 2021)
+- Rust 1.85+ (Edition 2024)
 - wgpu (WebGPU/wgpu-rs) - Cross-platform GPU API
 - winit - Window creation and event handling
 - egui - Immediate mode GUI
@@ -74,9 +74,11 @@ make run-windows-vulkan  # Force Vulkan (Windows)
 ```bash
 par-fractal --clear-settings              # Reset all saved preferences
 par-fractal --preset "preset-name"        # Load specific preset
-par-fractal --list-presets                # List available presets
+par-fractal --quality high                # Set quality: low|medium|high|ultra (-q short form)
+par-fractal --list-presets                # List available presets and exit
 par-fractal --screenshot-delay 5.0        # Screenshot after 5 seconds
 par-fractal --exit-delay 10.0             # Exit after 10 seconds
+par-fractal --help                        # Show help (-h)
 ```
 
 ## Architecture
@@ -108,6 +110,8 @@ par-fractal --exit-delay 10.0             # Exit after 10 seconds
   - `renderer/update.rs` - Render pipeline execution
 - `shaders/fractal.wgsl` - Main fractal computation shader
 - `shaders/postprocess.wgsl` - Post-processing effects (bloom, blur, FXAA)
+- `shaders/attractor_compute.wgsl`, `shaders/attractor_display.wgsl` - Strange-attractor GPU compute + display
+- `shaders/buddhabrot_compute.wgsl`, `shaders/buddhabrot_copy.wgsl` - Buddhabrot accumulation compute + copy
 
 **Supporting Systems:**
 - `camera.rs` - Camera and camera controller (3D movement)
@@ -157,11 +161,16 @@ GPU Buffer Upload → WGSL Shader → Fractal Computation → Frame Output
 
 ## Supported Fractals
 
-**2D Fractals (13 types):**
-Mandelbrot2D, Julia2D, Sierpinski2D, SierpinskiTriangle2D, BurningShip2D, Tricorn2D, Phoenix2D, Celtic2D, Newton2D, Lyapunov2D, Nova2D, Magnet2D, Collatz2D
+**2D Fractals (20 types):**
+- Escape-time (13): Mandelbrot2D, Julia2D, Sierpinski2D, SierpinskiTriangle2D, BurningShip2D, Tricorn2D, Phoenix2D, Celtic2D, Newton2D, Lyapunov2D, Nova2D, Magnet2D, Collatz2D
+- Density visualization (1): Buddhabrot2D (compute-rendered, GPU index 25)
+- Strange attractors (6): Hopalong2D, Martin2D, Gingerbreadman2D, Chip2D, Quadruptwo2D, Threeply2D
 
 **3D Fractals (15 types):**
-Mandelbulb3D, MengerSponge3D, SierpinskiPyramid3D, SierpinskiGasket3D, JuliaSet3D, Mandelbox3D, OctahedralIFS3D, IcosahedralIFS3D, ApollonianGasket3D, Kleinian3D, HybridMandelbulbJulia3D, QuaternionCubic3D, Pickover3D, Lorenz3D, Rossler3D
+- Ray-marched (12): Mandelbulb3D, MengerSponge3D, SierpinskiPyramid3D, SierpinskiGasket3D, JuliaSet3D, Mandelbox3D, OctahedralIFS3D, IcosahedralIFS3D, ApollonianGasket3D, Kleinian3D, HybridMandelbulbJulia3D, QuaternionCubic3D
+- Strange attractors (3): Pickover3D, Lorenz3D, Rossler3D
+
+Total: 35 fractal types.
 
 ## Testing Guidelines
 
@@ -275,7 +284,7 @@ preferred_gpu_index: 0
 ## Known Constraints
 
 **Uniform Buffer Size:**
-Current size is 784 bytes. WGPU has platform-dependent limits (typically 64KB minimum). If adding fields, maintain 16-byte alignment.
+Current size is 864 bytes (compile-asserted via `size_of::<Uniforms>() == 864` in `renderer/uniforms.rs`, with `offset_of!` layout tests in its `layout_tests` module guarding field placement). WGPU has platform-dependent limits (typically 64KB minimum). If adding fields, maintain 16-byte alignment and update both the Rust struct, the WGSL `Uniforms` struct, the size assert, and the sentinel offsets.
 
 **WGSL Limitations:**
 - No recursion
@@ -316,4 +325,4 @@ Full documentation in `docs/` directory:
 - Update Rust: `rustup update`
 - Clear build cache: `make clean && make build`
 - Check Linux dependencies: `make install-deps`
-- make sure to keep the about page in the app up to date with readme whats new
+- keep the in-app About page in sync with `CHANGELOG.md` (the changelog is the source of truth for release notes)

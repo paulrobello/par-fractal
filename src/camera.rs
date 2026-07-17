@@ -2,18 +2,32 @@ use glam::{Mat4, Vec3};
 use winit::event::*;
 use winit::keyboard::{KeyCode, PhysicalKey};
 
+/// Right-handed 3D view camera described by look-at parameters plus a
+/// perspective projection.
+///
+/// `position`, `target`, and `up` are in world space. This is the camera used
+/// by the 3D ray-marched fractals; 2D fractals bypass it.
 #[derive(Clone)]
 pub struct Camera {
+    /// Camera eye position in world space.
     pub position: Vec3,
+    /// World-space point the camera looks at.
     pub target: Vec3,
+    /// World-space up direction (unit length expected).
     pub up: Vec3,
+    /// Projection aspect ratio, `width / height`.
     pub aspect: f32,
+    /// Vertical field of view, in degrees.
     pub fovy: f32,
+    /// Near plane distance (must be positive).
     pub znear: f32,
+    /// Far plane distance (must satisfy `zfar > znear`).
     pub zfar: f32,
 }
 
 impl Camera {
+    /// Create a camera at the default position `(0, 0, 5)` looking at the
+    /// origin, with the aspect ratio derived from `width` and `height`.
     pub fn new(width: u32, height: u32) -> Self {
         Self {
             position: Vec3::new(0.0, 0.0, 5.0),
@@ -26,23 +40,36 @@ impl Camera {
         }
     }
 
+    /// Reset `position`, `target`, and `up` to the default view (preserving
+    /// projection parameters such as `fovy` and `aspect`).
     pub fn reset_to_default(&mut self) {
         self.position = Vec3::new(0.0, 0.0, 5.0);
         self.target = Vec3::ZERO;
         self.up = Vec3::Y;
     }
 
+    /// Build the combined view-projection matrix (`proj * view`) using a
+    /// right-handed look-at view and a right-handed perspective projection.
+    ///
+    /// `fovy` is taken in degrees (converted internally via `to_radians()`).
     pub fn build_view_projection_matrix(&self) -> Mat4 {
         let view = Mat4::look_at_rh(self.position, self.target, self.up);
         let proj = Mat4::perspective_rh(self.fovy.to_radians(), self.aspect, self.znear, self.zfar);
         proj * view
     }
 
+    /// Recompute `aspect` from the new window `width` and `height`.
     pub fn resize(&mut self, width: u32, height: u32) {
         self.aspect = width as f32 / height as f32;
     }
 }
 
+/// Keyboard / mouse / touch controller that drives a [`Camera`] from yaw and
+/// pitch, updating `camera.position` and `camera.target` each frame.
+///
+/// Yaw and pitch are tracked internally; `yaw = 0` looks along `-Z` and
+/// `pitch = 0` is level. Pitch is clamped to just under +/-89 degrees to avoid
+/// gimbal lock.
 pub struct CameraController {
     speed: f32,
     rotate_speed: f32,
@@ -59,9 +86,9 @@ pub struct CameraController {
 }
 
 impl CameraController {
+    /// Create a controller with the given movement `speed` (world units per
+    /// second). Rotation sensitivity is fixed internally.
     pub fn new(speed: f32) -> Self {
-        // Initialize yaw to point forward (along -Z axis)
-        // Initialize pitch to 0 (looking straight ahead)
         Self {
             speed,
             rotate_speed: 0.003,
@@ -78,6 +105,12 @@ impl CameraController {
         }
     }
 
+    /// Process one winit window event.
+    ///
+    /// Returns `true` if the event was consumed (a bound key, mouse drag, or
+    /// touch used for camera control), and `false` if it should be handled
+    /// elsewhere. Consumed events update internal key/touch/yaw/pitch state
+    /// that [`update_camera`](Self::update_camera) applies to the camera.
     pub fn process_events(&mut self, event: &WindowEvent) -> bool {
         match event {
             WindowEvent::KeyboardInput {
@@ -189,6 +222,12 @@ impl CameraController {
         }
     }
 
+    /// Apply accumulated input to `camera`, advancing `position` by
+    /// `speed * dt` along each pressed direction and recomputing `target`
+    /// from the current yaw/pitch.
+    ///
+    /// `dt` is the frame delta-time in seconds; movement is frame-rate
+    /// independent because it scales linearly with `dt`.
     pub fn update_camera(&self, camera: &mut Camera, dt: f32) {
         // Calculate orientation from yaw/pitch first
         let yaw_quat = glam::Quat::from_axis_angle(Vec3::Y, self.yaw);
@@ -224,15 +263,20 @@ impl CameraController {
 
     // Public testing interface
     // These methods are intended for testing and simulation purposes
+    /// Current movement speed (world units per second).
     #[allow(dead_code)]
     pub fn speed(&self) -> f32 {
         self.speed
     }
 
+    /// Set the movement speed (world units per second).
     pub fn set_speed(&mut self, speed: f32) {
         self.speed = speed;
     }
 
+    /// Orient the controller's yaw and pitch so the camera at `camera_pos`
+    /// looks toward `target`, recomputing both angles from the direction
+    /// vector and clamping pitch to avoid gimbal lock.
     pub fn point_at_target(&mut self, camera_pos: Vec3, target: Vec3) {
         // Calculate direction from camera to target
         let direction = (target - camera_pos).normalize();
@@ -252,6 +296,7 @@ impl CameraController {
             .clamp(-89.0f32.to_radians(), 89.0f32.to_radians());
     }
 
+    /// Returns `true` if any movement key is currently held.
     #[allow(dead_code)]
     pub fn is_any_key_pressed(&self) -> bool {
         self.is_forward_pressed

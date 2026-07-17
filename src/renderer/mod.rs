@@ -1,6 +1,10 @@
 // Module declarations
+/// Compute pipelines for accumulation-based fractals (strange attractors,
+/// Buddhabrot) and their GPU buffers/textures.
 pub mod compute;
 mod initialization;
+/// GPU uniform buffer definitions. The `Uniforms` struct here must stay
+/// byte-identical to the `Uniforms` struct in `shaders/fractal.wgsl`.
 pub mod uniforms;
 mod update;
 
@@ -10,13 +14,28 @@ use compute::{
 };
 use uniforms::*;
 
+/// User-facing description of the selected physical GPU.
+///
+/// Returned by renderer initialization so the UI can show which adapter was
+/// chosen. Strings are formatted for display (not stable identifiers).
 #[derive(Debug, Clone)]
 pub struct GpuInfo {
+    /// Human-readable adapter name reported by wgpu.
     pub name: String,
+    /// Backend in use (e.g. `"Metal"`, `"Vulkan"`, `"DX12"`, `"BrowserWebGpu"`).
     pub backend: String,
+    /// Device type, e.g. `"DiscreteGpu"`, `"IntegratedGpu"`, `"Cpu"`.
     pub device_type: String,
 }
 
+/// Owns the wgpu surface, device, and queue, plus all render and
+/// post-processing pipelines, textures, bind groups, and uniform buffers
+/// needed to draw a frame.
+///
+/// The `uniforms` field holds the CPU-side mirror of the GPU uniform buffer;
+/// it is kept in sync with `shaders/fractal.wgsl`'s `Uniforms` struct. Most
+/// fields are public so other modules can resize buffers, rebind, or read GPU
+/// state during frame updates.
 pub struct Renderer {
     pub surface: wgpu::Surface<'static>,
     pub device: wgpu::Device,

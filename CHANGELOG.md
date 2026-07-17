@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added gitleaks secret-scanning pre-commit hook
 - Bumped CI actions/checkout from v4 to v5
 
+## [0.8.1] - 2025-12-26
+
+### Fixed
+- **Quality level CLI/URL parameters now apply** - `--quality`/`-q` and `?quality=` URL parameters were parsed but not actually wired into the initial quality level; they now take effect on startup
+- Added missing `web-sys` `Location` feature required for URL parameter parsing on the web build
+
 ## [0.8.2] - 2026-04-11
 
 ### Changed
@@ -278,6 +284,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Settings persistence (YAML)
 - Cross-platform support: Windows (DX12/Vulkan), macOS (Metal), Linux (Vulkan)
 
+<!-- v0.8.2 has no git tag; compare anchors use v0.8.1 as the base. -->
+[0.8.3]: https://github.com/paulrobello/par-fractal/compare/v0.8.1...v0.8.3
+[0.8.2]: https://github.com/paulrobello/par-fractal/compare/v0.8.1...v0.8.2
+[0.8.1]: https://github.com/paulrobello/par-fractal/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/paulrobello/par-fractal/compare/v0.7.2...v0.8.0
 [0.7.2]: https://github.com/paulrobello/par-fractal/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/paulrobello/par-fractal/compare/v0.7.0...v0.7.1

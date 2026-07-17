@@ -2,6 +2,7 @@
 name = "par-fractal"
 version = "0.8.3"
 edition = "2024"
+rust-version = "1.85"
 authors = ["Paul Robello <probello@gmail.com>"]
 description = "Cross-platform GPU-accelerated fractal renderer with 2D and 3D support"
 readme = "README.md"

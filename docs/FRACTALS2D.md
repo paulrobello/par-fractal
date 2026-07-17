@@ -67,7 +67,7 @@ Complete guide to all 20 2D fractals available in Par Fractal, including mathema
 - Real-time GPU computation
 - High-precision zoom mode (emulated double-float precision on GPU)
 - Smooth continuous coloring (eliminates banding)
-- 54 built-in color palettes plus custom palette support
+- 48 built-in static color palettes (21 specialty + 27 Xfractint) plus custom palette support
 - Multiple coloring modes (palette, orbit traps, position-based, etc.)
 - Interactive parameter adjustment with instant preview
 - Screenshot and video capture support
@@ -88,19 +88,23 @@ Par Fractal implements emulated double-precision arithmetic on the GPU to enable
 - Sierpinski Carpet (fractal_type 2)
 - Sierpinski Triangle (fractal_type 3)
 - Burning Ship (fractal_type 4)
+- Tricorn (fractal_type 5)
 
 **How It Works:**
 - Each coordinate is stored as a pair of floats (hi, lo) representing value = hi + lo
 - Provides approximately 14 decimal digits of precision vs 7 for standard f32
 - Uses double-float arithmetic operations for addition, multiplication, and squaring
-- Automatically enabled for deep zooms on supported fractals
+- Automatically enabled when zoom exceeds 1e4 (named HP_ZOOM_THRESHOLD in src/renderer/uniforms.rs)
+
+**Iteration Auto-Scaling:**
+High-precision and deep-zoom rendering automatically raises the iteration count as `max_iterations + log2(zoom) × 15`, so you do not need to increase iterations manually as you zoom — doing both double-counts.
 
 **Performance:**
 High-precision mode is more computationally intensive than standard mode, but the GPU parallelization keeps frame rates interactive even at extreme zoom levels.
 
 **Zoom Limits:**
-- Standard precision: ~10⁷ zoom (visual artifacts beyond this)
-- High precision: ~10¹⁴ zoom (tested successfully)
+- Standard f32 precision: visible quantization artifacts begin around zoom 1e4–1e5
+- High precision (double-float center + auto-scaling iterations): practical ceiling ~1e11, set by the f32 GPU zoom uniform; the center itself remains accurate well beyond this
 
 ## Common Controls
 
@@ -139,8 +143,8 @@ High-precision mode is more computationally intensive than standard mode, but th
 **Common to All 2D Fractals:**
 - **Max Iterations** - Maximum iteration count before considering a point in the set (range: 50-2000, default: 80)
 - **Center X/Y** - Complex plane coordinates (high precision for deep zooms)
-- **Zoom** - Magnification level (can reach 10¹⁴ with high-precision mode)
-- **Color Palette** - Choose from 54 built-in palettes or load custom palettes
+- **Zoom** - Magnification level (practical ceiling ~1e11 in high-precision mode, set by the f32 GPU zoom uniform)
+- **Color Palette** - Choose from 48 built-in static palettes or load custom palettes
 - **Palette Offset** - Animate or shift color mapping (0.0-1.0, wraps around)
 - **Orbit Trap Scale** - Scale factor for orbit trap coloring modes
 
@@ -248,8 +252,8 @@ Where c is the complex coordinate of the pixel.
 
 3. **Mini-Mandelbrot Deep Zoom**
    - Center: (-0.7435, 0.1314)
-   - Zoom: 10000+
-   - Max Iterations: 500-1000+
+   - Zoom: 10000+ (high-precision mode engages automatically past 1e4)
+   - Max Iterations: 500-1000+ (note: iterations auto-scale with zoom, so set the base value only)
    - Complete Mandelbrot replica at miniature scale
 
 **UI Parameters:**
@@ -1012,7 +1016,7 @@ yₙ₊₁ = c - xₙ
 
 **Available Palettes:**
 
-Par Fractal includes 54 built-in color palettes organized into several categories:
+Par Fractal includes 48 built-in static color palettes organized into several categories (canonical list: FEATURES.md):
 
 *Classic Palettes (6):*
 - Fire - Black → Purple → Red → Orange → Yellow
@@ -1132,6 +1136,7 @@ The importer automatically samples 8 evenly-spaced colors from palettes with mor
 ### Deep Zoom Guidelines
 
 **Zoom Level vs Iterations:**
+> **Note:** Iterations auto-scale with zoom (`max_iterations + log2(zoom) × 15`). The manual values below are for the base `max_iterations` before auto-scaling — do not raise both.
 - Zoom < 100: 100-200 iterations
 - Zoom 100-1000: 200-500 iterations
 - Zoom 1000-10000: 500-1000 iterations

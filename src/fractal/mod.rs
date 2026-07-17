@@ -1,3 +1,20 @@
+//! Fractal parameter model and supporting catalogs.
+//!
+//! The central type is `FractalParams` — the single source of truth for every
+//! rendering parameter across both 2D escape-time and 3D ray-marched fractals.
+//! Its values are uploaded to the GPU uniform buffer by the renderer each frame
+//! (see `crate::renderer::uniforms`), and it serializes to and from `Settings`
+//! for YAML persistence and JSON import/export.
+//!
+//! This module re-exports the fractal-type enum, render/shading/color models,
+//! color palettes, presets, and serializable settings from its private
+//! submodules (`types`, `palettes`, `presets`, `settings`, `ui_state`).
+//!
+//! Note on precision: `center_2d` and `zoom_2d` are held in `f64` so that deep
+//! zooms accumulate without f32 rounding (the GPU receives an f32 cast plus a
+//! double-float center decomposition, extending the usable zoom ceiling). See
+//! the ARC-001 notes on the individual fields.
+
 // Module declarations
 mod palettes;
 mod presets;
@@ -38,9 +55,27 @@ fn clamp_finite_f64(v: f64, min: f64, max: f64, default: f64) -> f64 {
     }
 }
 
+/// The CPU-side source of truth for every fractal rendering parameter.
+///
+/// One `FractalParams` drives the whole pipeline: the renderer reads its
+/// fields each frame to build the GPU uniform buffer (via
+/// `crate::renderer::uniforms::Uniforms`), the UI mutates it through sliders
+/// and the command palette, and it round-trips to disk through [`to_settings`]
+/// / [`from_settings`] as YAML. `center_2d` and `zoom_2d` are `f64` to preserve
+/// precision on deep zoom (see the module-level ARC-001 note).
+///
+/// Fields are grouped by subsystem with inline section comments. Only the
+/// fields carrying non-obvious contracts (encodings, units, precision) get
+/// individual doc comments; the rest are self-describing slider values.
+///
+/// [`to_settings`]: FractalParams::to_settings
+/// [`from_settings`]: FractalParams::from_settings
 #[derive(Clone)]
 pub struct FractalParams {
+    /// Which fractal is rendered; determines whether 2D or 3D shaders run.
     pub fractal_type: FractalType,
+    /// 2D vs 3D pipeline. Derived from `fractal_type` — do not set manually;
+    /// `switch_fractal` keeps the two in sync.
     pub render_mode: RenderMode,
     pub shading_model: ShadingModel,
     pub color_mode: ColorMode,
@@ -76,12 +111,15 @@ pub struct FractalParams {
     pub max_iterations: u32,
 
     // 3D specific
+    /// Fractal power exponent (e.g. `2.0` for the classic `z^2 + c` 2D
+    /// fractals, `8.0` for the classic Mandelbulb).
     pub power: f32,
     pub max_steps: u32,
     pub min_distance: f32,
     pub ambient_occlusion: bool,
     pub ao_intensity: f32,
     pub ao_step_size: f32,
+    /// Shadow mode: `0` = off, `1` = hard, `2` = soft.
     pub shadow_mode: u32, // 0=off, 1=hard, 2=soft
     pub shadow_softness: f32,
     pub shadow_max_distance: f32,
@@ -321,6 +359,11 @@ impl FractalParams {
         self.zoom_2d = new_zoom;
     }
 
+    /// Serialize to the on-disk [`Settings`] representation.
+    ///
+    /// Camera position/target and UI state are written by the caller (the
+    /// `App`), not captured here — they default to placeholders and are
+    /// overwritten before serialization.
     pub fn to_settings(&self) -> Settings {
         Settings {
             fractal_type: self.fractal_type,
@@ -408,6 +451,14 @@ impl FractalParams {
         }
     }
 
+    /// Reconstruct from untrusted [`Settings`].
+    ///
+    /// This is the trust boundary for preset/loading (SEC-001): `Settings`
+    /// arrives from YAML, JSON import, and web `localStorage`, so every
+    /// resource-driving integer is clamped to a safe maximum and every float
+    /// reaching a GPU uniform is run through `clamp_finite_f32` / `_f64` to
+    /// reject NaN/Inf. Hostile or corrupt presets cannot smuggle bad values
+    /// past this constructor. `render_mode` is re-derived from `fractal_type`.
     pub fn from_settings(settings: Settings) -> Self {
         let palette_index = settings.palette_index.min(ColorPalette::ALL.len() - 1);
         let palette = ColorPalette::ALL[palette_index];
@@ -641,6 +692,10 @@ impl FractalParams {
         }
     }
 
+    /// Save to `settings.yaml` under the OS config dir (native).
+    ///
+    /// Errors if the config directory cannot be determined or writing the
+    /// YAML fails.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn save_to_file(&self) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(config_dir) = directories::ProjectDirs::from("com", "fractal", "par-fractal") {
@@ -659,12 +714,18 @@ impl FractalParams {
         }
     }
 
+    /// Save to file (web stub — persistence is not yet implemented for WASM).
     #[cfg(target_arch = "wasm32")]
     pub fn save_to_file(&self) -> Result<(), Box<dyn std::error::Error>> {
         // Settings persistence not yet implemented for web
         Ok(())
     }
 
+    /// Load from `settings.yaml` under the OS config dir (native).
+    ///
+    /// Returns `None` if the config dir cannot be determined, the file is
+    /// missing, or the YAML fails to parse. Values are trust-boundary clamped
+    /// via [`from_settings`](Self::from_settings).
     #[cfg(not(target_arch = "wasm32"))]
     pub fn load_from_file() -> Option<Self> {
         if let Some(config_dir) = directories::ProjectDirs::from("com", "fractal", "par-fractal") {
@@ -680,12 +741,20 @@ impl FractalParams {
         None
     }
 
+    /// Load from file (web stub — always returns `None` on WASM).
     #[cfg(target_arch = "wasm32")]
     pub fn load_from_file() -> Option<Self> {
         // Settings persistence not yet implemented for web
         None
     }
 
+    /// Switch to a different fractal type.
+    ///
+    /// Sets `fractal_type`, re-derives `render_mode` (2D vs 3D) to match, and
+    /// applies fractal-specific defaults (e.g. `power = 8.0` for the classic
+    /// Mandelbulb, tuned view bounds and iteration counts for strange
+    /// attractors). Use this instead of assigning `fractal_type` directly so
+    /// the two fields never disagree.
     pub fn switch_fractal(&mut self, fractal_type: FractalType) {
         self.fractal_type = fractal_type;
         self.render_mode = match fractal_type {
@@ -856,11 +925,13 @@ impl FractalParams {
         }
     }
 
+    /// Advance to the next color palette, wrapping around at the end.
     pub fn next_palette(&mut self) {
         self.palette_index = (self.palette_index + 1) % ColorPalette::ALL.len();
         self.palette = ColorPalette::ALL[self.palette_index];
     }
 
+    /// Go to the previous color palette, wrapping around at the start.
     pub fn prev_palette(&mut self) {
         if self.palette_index == 0 {
             self.palette_index = ColorPalette::ALL.len() - 1;

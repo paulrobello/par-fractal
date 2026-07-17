@@ -190,10 +190,10 @@ Par Fractal supports 15 different 3D fractals organized into two categories:
 
 **Movement:**
 - WASD - Forward/back, left/right
-- Space/Shift - Up/down
+- E/Q - Up/down (world Y axis)
 - Smooth camera interpolation
-- Adjustable movement speed (default 2.0)
-- Mouse wheel for speed adjustment
+- Adjustable movement speed via the UI slider in the Camera section (default 2.0)
+- Mouse drag to rotate the camera
 
 **View Control:**
 - Mouse drag for camera rotation
@@ -452,6 +452,8 @@ Mathematically-generated palettes using cosine-based formulas for smooth, contin
 - **Medium** - 175 ray steps, 32 shadow samples, 0.0015 precision, 2 DoF samples, 0.7 render scale
 - **Low** - 100 ray steps, 16 shadow samples, 0.003 precision, 1 DoF sample, 0.5 render scale
 
+> **Note:** `render_scale` is defined on each quality level but not currently applied by the renderer; it is reserved for a future dynamic-resolution enhancement.
+
 **LOD Strategies:**
 - **Distance** - Reduce quality based on camera distance from fractal
 - **Motion** - Lower quality during camera movement
@@ -522,7 +524,7 @@ Custom channel sources for R/G/B:
 
 **Smooth Gradients:**
 - Linear interpolation between palette colors
-- 5-point color gradient system
+- 8-color gradient system
 - Smooth anti-banding
 - Real-time palette offset animation
 

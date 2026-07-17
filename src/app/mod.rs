@@ -24,6 +24,13 @@ use winit::window::Window;
 #[cfg(feature = "native")]
 use crate::video_recorder::{VideoFormat, VideoRecorder};
 
+/// Top-level application state and event-loop owner.
+///
+/// Holds the window, renderer, cameras, fractal parameters, egui UI, and (on
+/// native targets) the video recorder. The per-frame work is split across the
+/// private submodules `input`, `update`, `render`, `capture`/`capture_web`,
+/// `persistence`, and `camera_transition`; `App` is the shared state those
+/// modules operate on. Construct with `new` (native) or `new_async` (web).
 pub struct App {
     window: Arc<Window>,
     renderer: Renderer,
@@ -344,14 +351,18 @@ impl App {
         })
     }
 
+    /// Borrow the application's window.
     pub fn window(&self) -> &Window {
         &self.window
     }
 
+    /// Whether the app has requested to exit (e.g. after a CLI `--exit-delay`).
     pub fn should_exit(&self) -> bool {
         self.should_exit
     }
 
+    /// Handle a window resize: reconfigure the renderer surface, update the
+    /// camera aspect ratio, and (on native) persist the new window size.
     pub fn resize(&mut self, new_size: PhysicalSize<u32>) {
         self.renderer.resize(new_size);
         self.camera.resize(new_size.width, new_size.height);

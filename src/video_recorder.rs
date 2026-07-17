@@ -3,15 +3,23 @@ use std::io::Write;
 use std::process::{Command, Stdio};
 use std::thread;
 
+/// Output container/codec chosen for a [`VideoRecorder`] session.
+///
+/// Each variant maps to an ffmpeg encoder and pixel format; recording requires
+/// a working `ffmpeg` on the system `PATH`.
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum VideoFormat {
+    /// H.264 MP4 (`libx264`, `yuv420p`).
     MP4,
+    /// VP9 WebM (`libvpx-vp9`, `yuv420p`).
     WebM,
+    /// Animated GIF (palette-optimized, looping forever).
     GIF,
 }
 
 impl VideoFormat {
+    /// File extension without the leading dot (e.g. `"mp4"`, `"webm"`, `"gif"`).
     pub fn extension(&self) -> &str {
         match self {
             VideoFormat::MP4 => "mp4",
@@ -20,6 +28,7 @@ impl VideoFormat {
         }
     }
 
+    /// ffmpeg codec name used for this format.
     #[allow(dead_code)]
     pub fn codec(&self) -> &str {
         match self {
@@ -29,6 +38,7 @@ impl VideoFormat {
         }
     }
 
+    /// ffmpeg pixel format used for the encoded output.
     #[allow(dead_code)]
     pub fn pixel_format(&self) -> &str {
         match self {
@@ -38,12 +48,19 @@ impl VideoFormat {
         }
     }
 
+    /// Returns `true` if this format is [`VideoFormat::GIF`].
     #[allow(dead_code)]
     pub fn is_gif(&self) -> bool {
         matches!(self, VideoFormat::GIF)
     }
 }
 
+/// ffmpeg-backed video recorder that encodes raw RGBA frames off-thread.
+///
+/// Frames are sent to a dedicated encoder thread over a bounded channel, so
+/// [`add_frame`](Self::add_frame) is non-blocking and drops frames (with a
+/// warning) if the encoder falls behind. The native build owns one of these;
+/// it is not compiled for `wasm32`.
 pub struct VideoRecorder {
     width: u32,
     height: u32,
@@ -57,6 +74,9 @@ pub struct VideoRecorder {
 }
 
 impl VideoRecorder {
+    /// Configure a recorder for `width` x `height` frames at `fps`, encoded to
+    /// `format`. Does not start recording or check for ffmpeg; call
+    /// [`start_recording`](Self::start_recording) to begin.
     pub fn new(width: u32, height: u32, fps: u32, format: VideoFormat) -> Self {
         Self {
             width,
@@ -71,6 +91,11 @@ impl VideoRecorder {
         }
     }
 
+    /// Spawn the encoder thread and begin accepting frames.
+    ///
+    /// Returns `Err` if already recording or if `ffmpeg` is not on the system
+    /// `PATH`. `filename` selects the output file and (via its container) the
+    /// codec.
     pub fn start_recording(&mut self, filename: String) -> Result<(), String> {
         if self.is_recording {
             return Err("Already recording".to_string());
@@ -113,6 +138,12 @@ impl VideoRecorder {
         Ok(())
     }
 
+    /// Stop recording, flush the encoder, and block until the ffmpeg pipeline
+    /// finishes writing the file.
+    ///
+    /// Returns the output filename on success, or `Err` if not currently
+    /// recording. The encoder thread is joined here, so this call may block
+    /// while the final frames encode.
     pub fn stop_recording(&mut self) -> Result<String, String> {
         if !self.is_recording {
             return Err("Not recording".to_string());
@@ -136,6 +167,12 @@ impl VideoRecorder {
         Ok(self.filename.clone())
     }
 
+    /// Submit one frame of raw RGBA pixel data (the configured `width` x
+    /// `height`).
+    ///
+    /// Non-blocking: if the internal frame buffer is full the frame is silently
+    /// dropped (a warning is logged) and `frame_count` is not incremented.
+    /// Returns `Err("Not recording")` if not currently recording.
     pub fn add_frame(&mut self, frame_data: Vec<u8>) -> Result<(), String> {
         if !self.is_recording {
             return Err("Not recording".to_string());
@@ -153,14 +190,18 @@ impl VideoRecorder {
         Ok(())
     }
 
+    /// Whether a recording is currently in progress.
     pub fn is_recording(&self) -> bool {
         self.is_recording
     }
 
+    /// Number of frames successfully handed to the encoder so far.
     pub fn frame_count(&self) -> u32 {
         self.frame_count
     }
 
+    /// Output filename of the active or most-recent recording (empty before
+    /// the first [`start_recording`](Self::start_recording)).
     pub fn filename(&self) -> &str {
         &self.filename
     }
@@ -282,6 +323,9 @@ impl VideoRecorder {
     }
 }
 
+/// Finalizes an in-progress recording on drop so the encoder thread is joined
+/// and the output file is flushed even if the caller forgets to call
+/// [`VideoRecorder::stop_recording`].
 impl Drop for VideoRecorder {
     fn drop(&mut self) {
         if self.is_recording {

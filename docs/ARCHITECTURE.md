@@ -291,7 +291,7 @@ pub struct App {
 **Submodules:**
 
 **`fractal/types.rs`** - Fractal Type Definitions
-- `FractalType` enum (34 fractal types: 13 2D escape-time + 6 2D strange attractors + 12 3D ray-marched + 3 3D strange attractors)
+- `FractalType` enum (35 fractal types: 13 2D escape-time + 1 2D density (Buddhabrot) + 6 2D strange attractors + 12 3D ray-marched + 3 3D strange attractors)
 - `RenderMode` enum (TwoD, ThreeD)
 - `ShadingModel` enum (BlinnPhong, PBR)
 - `ColorMode` enum (16 visualization modes: Palette, RaySteps, Normals, OrbitTrapXYZ, OrbitTrapRadial, WorldPosition, LocalPosition, AmbientOcclusion, PerChannel, DistanceField, Depth, Convergence, LightingOnly, ShadowMap, CameraDistanceLOD, DistanceGrayscale)
@@ -299,7 +299,7 @@ pub struct App {
 - `FogMode` enum (Linear, Exponential, Quadratic)
 
 **`fractal/palettes.rs`** - Color Palette System
-- `ColorPalette` struct with 46 predefined static palettes
+- `ColorPalette` struct with 48 predefined static palettes (21 specialty + 27 Xfractint)
 - 12 procedural palettes using cosine-based GPU computation (Fire Storm, Rainbow, Electric, Sunset, Forest, Ocean, Grayscale, Hot, Cool, Plasma, Viridis, Custom)
 - Custom palette creation and management
 - `CustomPalette` and `CustomPaletteGallery` for user palettes
@@ -382,7 +382,7 @@ pub struct App {
 - `BloomUniforms`, `BlurUniforms`, `PostProcessUniforms`
 - Conversion from `FractalParams` to GPU format via `update()` method
 - Compile-time size assertions to ensure Rust/WGSL synchronization
-- High-precision double-float emulation for deep zoom (zoom > 1,000,000)
+- High-precision double-float emulation for deep zoom (auto-enabled when zoom_2d > 1e4, the HP_ZOOM_THRESHOLD constant)
 - Procedural palette parameters for GPU-computed color gradients
 
 **`renderer/update.rs`** - Pipeline Execution
@@ -396,11 +396,10 @@ pub struct App {
   6. FXAA or copy to surface
 - Surface presentation
 
-**`renderer/compute.rs`** - Compute Shader Infrastructure (Not Yet Integrated)
-- Accumulation texture system for iterative effects
-- Designed for strange attractor density accumulation
-- Compute pipeline creation utilities
-- Currently infrastructure-only; integration with render loop is pending
+**`renderer/compute.rs`** - Compute Shader Infrastructure (Integrated)
+- Accumulation texture/buffer system for iterative density effects (strange attractors, Buddhabrot)
+- `AttractorCompute` and `BuddhabrotAccumulationBuffer` pipelines, held by `Renderer` and dispatched each accumulation frame from `app/render.rs`
+- Backed by `src/shaders/attractor_compute.wgsl`, `src/shaders/attractor_display.wgsl`, `src/shaders/buddhabrot_compute.wgsl`, `src/shaders/buddhabrot_copy.wgsl`
 
 **Pipeline Configuration:**
 - **Main Pipeline:** Full-screen quad → Fractal shader
@@ -433,7 +432,6 @@ pub struct App {
 - A/D: Strafe Left/Right
 - E/Q: Up/Down
 - Mouse Drag: Look around
-- Mouse Wheel: Adjust speed
 
 ### Command Palette
 
@@ -818,6 +816,7 @@ The LOD system provides adaptive quality management through multiple strategies:
 pub struct LODConfig {
     pub enabled: bool,                    // Master enable/disable
     pub strategy: LODStrategy,            // Which strategy to use
+    pub profile: LODProfile,              // Active LOD profile
     pub quality_presets: [Quality; 4],    // Quality levels 0-3
     pub distance_zones: [f32; 3],         // Distance thresholds
     pub motion_threshold: f32,            // Movement threshold for motion detection
@@ -841,8 +840,9 @@ pub struct LODState {
     pub active_quality: Quality,          // Currently active quality (possibly interpolated)
     pub is_moving: bool,                  // Is camera currently moving?
     pub time_since_stopped: f32,          // Time since camera stopped moving
-    pub last_camera_pos: Vec3,            // Last camera position for motion detection
-    pub last_camera_forward: Vec3,        // Last camera forward vector
+    pub prev_camera_pos: Vec3,            // Previous camera position for motion detection
+    pub prev_camera_forward: Vec3,        // Previous camera forward vector
+    pub camera_velocity: Vec3,            // EMA of camera motion magnitude
     pub current_fps: f32,                 // Current framerate
     pub fps_samples: VecDeque<f32>,       // FPS samples for smoothing
     pub last_performance_level: usize,    // Last performance-based LOD level
@@ -851,10 +851,10 @@ pub struct LODState {
 ```
 
 **Quality Levels:**
-- **Level 0 (Ultra):** Maximum quality - 512 ray steps, smallest min_distance, high shadow/AO samples
-- **Level 1 (High):** High quality - 256 ray steps, good detail
-- **Level 2 (Medium):** Balanced - 128 ray steps, reduced effects
-- **Level 3 (Low):** Performance - 64 ray steps, minimal effects
+- **Level 0 (Ultra):** 325 ray steps, 128 shadow samples, 0.00035 min_distance, 8 DoF samples
+- **Level 1 (High):** 250 ray steps, 64 shadow samples, 0.0007 min_distance, 4 DoF samples
+- **Level 2 (Medium):** 175 ray steps, 32 shadow samples, 0.0015 min_distance, 2 DoF samples
+- **Level 3 (Low):** 100 ray steps, 16 shadow samples, 0.003 min_distance, 1 DoF sample
 
 **Parameters Adjusted per Quality Level:**
 - `max_steps`: Ray marching steps (64-512)
@@ -863,10 +863,10 @@ pub struct LODState {
 - `shadow_step_factor`: Shadow ray step size
 - `ao_step_size`: Ambient occlusion sample step
 - `dof_samples`: Depth of field samples
-- (Future) `render_scale`: Render resolution scaling
+- `render_scale`: defined on each quality level (1.0/0.85/0.7/0.5) but not currently applied by the renderer; reserved for a future dynamic-resolution enhancement.
 
 **Integration with FractalParams:**
-The LOD system updates `FractalParams` fields directly via `apply_lod_quality()`, which is called during the update cycle. Parameters are smoothly interpolated when `smooth_transitions` is enabled.
+LOD computes an effective quality each frame (merging the active QualityLevel with the user's authored values at uniform-build time); it no longer mutates the user's FractalParams, so sliders always show authored values and settings persist authored values.
 
 **Performance-Based LOD with Hysteresis:**
 To prevent thrashing (rapid quality switching), the performance-based strategy uses:
@@ -927,8 +927,7 @@ When enabled, LOD zones are visualized in 3D space as colored distance rings aro
    self.fractal_type = match params.fractal_type {
        // 2D escape-time: 0-12
        // 3D ray-marched: 13-24
-       // 2D attractors: 26-31 (25 reserved)
-       // 3D attractors: 35-37 (32-34 reserved)
+       // 25: Buddhabrot2D (compute-rendered); 2D attractors: 26-31; 3D attractors: 35-37 (32-34 reserved)
        crate::fractal::FractalType::MyNewFractal2D => 38,  // Next available index
    };
    ```

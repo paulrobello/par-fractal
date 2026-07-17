@@ -93,7 +93,7 @@ Par Fractal provides intuitive controls for exploring both 2D and 3D fractals. C
 |-----|--------|-------------|
 | **F12** | Quick Screenshot | Capture current view as PNG (saved to current directory) |
 
-**Note:** High-resolution screenshots and video recording controls are available via the UI panel and command palette. The README shows **F9** for screenshots, but the actual implementation uses **F12**.
+**Note:** High-resolution screenshots and video recording controls are available via the UI panel and command palette.
 
 ### Color and Appearance
 
@@ -325,16 +325,16 @@ Par Fractal provides intuitive controls for exploring both 2D and 3D fractals. C
 
 ### Advanced Settings
 
-**Rendering:**
-- **Render Resolution** - Internal resolution multiplier
-- **Anti-Aliasing** - Sample count
-- **Precision Mode** - Float vs Double precision
+**Debug Visualization (via Color Mode):**
+- **Normals** - Visualize surface normals
+- **Ray Steps** - Color by ray-marching iteration count
+- **Distance Field** - Visualize distance estimator values
+- **LOD Zones** - Show LOD zone colors (enable via **Shift+D**)
 
-**Debug Visualization:**
-- **Show Normals** - Visualize surface normals
-- **Show Ray Steps** - Color by iteration count
-- **Distance Field** - Visualize distance estimator
-- **LOD Zones** - Show LOD zone colors
+**Quality (LOD System panel + command palette):**
+- Quality profile selection (Low / Medium / High / Ultra)
+- LOD enable/disable and profile selection (Balanced, Quality First, Performance First, Distance Only, Motion Only)
+- Precision is automatic: high-precision double-float mode engages in 2D deep zoom without any user toggle.
 
 ## Command Palette
 
@@ -357,7 +357,7 @@ Par Fractal provides intuitive controls for exploring both 2D and 3D fractals. C
 The command palette provides access to all application features through fuzzy search:
 
 **Fractal Commands:**
-- All 34 fractal types (19 2D and 15 3D)
+- All 35 fractal types (20 2D and 15 3D)
 - Quick switching with aliases (e.g., "mb" for Mandelbrot)
 
 **Effect Commands:**
@@ -476,14 +476,15 @@ graph LR
     ScrollDown[Scroll Down] --> ZoomOut[Zoom Out at Cursor]
     ShiftDrag[Shift + Drag] --> ContZoom[Continuous Zoom]
 
-    style Drag fill:#1b5e20,stroke:#4caf50,stroke-width:2px,color:#ffffff
-    style ScrollUp fill:#0d47a1,stroke:#2196f3,stroke-width:2px,color:#ffffff
-    style ScrollDown fill:#0d47a1,stroke:#2196f3,stroke-width:2px,color:#ffffff
-    style ShiftDrag fill:#4a148c,stroke:#9c27b0,stroke-width:2px,color:#ffffff
-    style Pan fill:#e65100,stroke:#ff9800,stroke-width:2px,color:#ffffff
-    style ZoomIn fill:#e65100,stroke:#ff9800,stroke-width:2px,color:#ffffff
-    style ZoomOut fill:#e65100,stroke:#ff9800,stroke-width:2px,color:#ffffff
-    style ContZoom fill:#e65100,stroke:#ff9800,stroke-width:2px,color:#ffffff
+    class Drag active
+    class ScrollUp,ScrollDown data
+    class ShiftDrag external
+    class Pan,ZoomIn,ZoomOut,ContZoom primary
+
+    classDef primary fill:#e65100,stroke:#ff9800,stroke-width:2px,color:#ffffff
+    classDef active fill:#1b5e20,stroke:#4caf50,stroke-width:2px,color:#ffffff
+    classDef data fill:#0d47a1,stroke:#2196f3,stroke-width:2px,color:#ffffff
+    classDef external fill:#4a148c,stroke:#9c27b0,stroke-width:2px,color:#ffffff
 ```
 
 ### 3D Mode Mouse
@@ -492,8 +493,11 @@ graph LR
 graph LR
     Drag[Click + Drag] --> Look[Rotate Camera]
 
-    style Drag fill:#1b5e20,stroke:#4caf50,stroke-width:2px,color:#ffffff
-    style Look fill:#e65100,stroke:#ff9800,stroke-width:2px,color:#ffffff
+    class Drag active
+    class Look primary
+
+    classDef primary fill:#e65100,stroke:#ff9800,stroke-width:2px,color:#ffffff
+    classDef active fill:#1b5e20,stroke:#4caf50,stroke-width:2px,color:#ffffff
 ```
 
 **Note:** In 3D mode, the mouse wheel does not control camera speed. Camera speed is adjusted via the UI slider in the Camera section.

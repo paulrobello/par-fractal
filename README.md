@@ -3,7 +3,7 @@
 [![Crates.io](https://img.shields.io/crates/v/par-fractal)](https://crates.io/crates/par-fractal)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Runs on Linux | MacOS | Windows | Web](https://img.shields.io/badge/runs%20on-Linux%20%7C%20MacOS%20%7C%20Windows%20%7C%20Web-blue)
-![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)
+![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)
 
 A high-performance, cross-platform GPU-accelerated fractal renderer built with Rust and WebGPU. Features stunning 2D and immersive 3D fractal visualization with advanced rendering techniques.
 
@@ -25,7 +25,7 @@ make r
 # Or try it in your browser (WebGPU required)
 ```
 
-**[Try Par Fractal in your browser](https://par-fractal.pardev.net)** - No installation required! ([Low quality mode](https://par-fractal.pardev.net/?quality=low&preset=Mandelbulb) for slower devices) - See [URL parameters](docs/FEATURES.md#command-line-interface) for more options.
+**[Try Par Fractal in your browser](https://par-fractal.pardev.net)** - No installation required! ([Low quality mode](https://par-fractal.pardev.net/?quality=low&preset=Mandelbulb) for slower devices) - See [URL parameters](docs/FEATURES.md#cli-options) for more options.
 
 See the [Quick Start Guide](docs/QUICKSTART.md) for detailed instructions.
 
@@ -146,7 +146,7 @@ See [Features](docs/FEATURES.md) for complete feature documentation.
 
 ## Command Palette
 
-Press **Ctrl/Cmd+P** to open the command palette for quick access to all features:
+Press **/** or **Ctrl/Cmd+K** to open the command palette for quick access to all features:
 
 - **Fractal Selection** - Switch between all 35 fractal types
 - **Effects** - Toggle AO, shadows, DoF, fog, bloom, FXAA
@@ -182,7 +182,7 @@ cargo install par-fractal
 par-fractal
 ```
 
-Requires Rust 1.70+. Install from [rustup.rs](https://rustup.rs/).
+Requires Rust 1.85+ (Edition 2024). Install from [rustup.rs](https://rustup.rs/).
 
 ### Pre-built Binaries
 
@@ -242,10 +242,11 @@ make checkall       # Run all checks
 |----------|--------|
 | **H** | Toggle UI panel |
 | **R** | Reset view to default |
-| **F9** | Take screenshot |
-| **Ctrl/Cmd+P** | Open command palette |
+| **F12** | Take screenshot |
+| **/** or **Ctrl/Cmd+K** | Open command palette |
 | **Ctrl/Cmd+Z** | Undo |
-| **1-4** | Quick switch fractals |
+| **1-0** | Quick switch 2D fractals (Mandelbrot, Julia, ..., Nova) |
+| **F1-F10** | Quick switch 3D fractals (Mandelbulb, Menger, ..., Hybrid) |
 | **P** | Cycle static palettes |
 | **Shift+P** | Cycle procedural palettes |
 
@@ -253,15 +254,15 @@ make checkall       # Run all checks
 | Shortcut | Action |
 |----------|--------|
 | **Mouse Drag** | Pan around |
-| **Mouse Wheel** | Zoom in/out |
+| **Mouse Wheel** | Zoom in/out (at cursor) |
 
 #### 3D Mode
 | Shortcut | Action |
 |----------|--------|
 | **W/A/S/D** | Move forward/left/back/right |
-| **Space/Shift** | Move up/down |
+| **E** | Move up (world Y axis) |
+| **Q** | Move down (world Y axis) |
 | **Mouse Drag** | Look around |
-| **Mouse Wheel** | Adjust movement speed |
 
 See [Controls Reference](docs/CONTROLS.md) for complete keyboard and mouse documentation.
 
@@ -282,7 +283,7 @@ Cross-platform compatibility through WebGPU (wgpu-rs).
 
 ## Technology
 
-- **Rust** 1.70+ - Core implementation
+- **Rust** 1.85+ (Edition 2024) - Core implementation
 - **wgpu** - Cross-platform GPU API (WebGPU)
 - **winit** - Window creation and event handling
 - **egui** - Immediate mode GUI
@@ -311,6 +312,8 @@ The web version is automatically deployed to [par-fractal.pardev.net](https://pa
 **Note:** The web version has most features of the desktop app except video recording and file system access (presets/bookmarks use browser localStorage).
 
 ## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed setup, testing, and pull-request guidelines.
 
 Contributions are welcome! Please read the contribution guidelines:
 

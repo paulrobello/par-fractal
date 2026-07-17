@@ -18,7 +18,7 @@ Get up and running with Par Fractal in minutes and start exploring beautiful mat
 ## Prerequisites
 
 **Required:**
-- Rust 1.70+
+- Rust 1.85+ (Edition 2024)
 - Modern GPU with driver support for Vulkan, Metal, or DirectX 12
 
 **Platform-Specific:**
@@ -28,13 +28,16 @@ Get up and running with Par Fractal in minutes and start exploring beautiful mat
 
 **Check Rust Installation:**
 ```bash
-$ rustc --version
-rustc 1.70.0 (or higher)
+rustc --version
+```
+
+```text
+rustc 1.85.0 (or higher)
 ```
 
 **Install Rust (if needed):**
 ```bash
-$ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
 ## Installation
@@ -45,25 +48,25 @@ Install directly from crates.io:
 
 ```bash
 # Install the latest version
-$ cargo install par-fractal
+cargo install par-fractal
 
 # Run from anywhere
-$ par-fractal
+par-fractal
 ```
 
-Requires Rust 1.70+ and Cargo. Install from [rustup.rs](https://rustup.rs/).
+Requires Rust 1.85+ (Edition 2024) and Cargo. Install from [rustup.rs](https://rustup.rs/).
 
 ### Option 2: Build from Source
 
 ```bash
 # Clone the repository
-$ git clone https://github.com/paulrobello/par-fractal.git
-$ cd par-fractal
+git clone https://github.com/paulrobello/par-fractal.git
+cd par-fractal
 
 # Build in release mode for best performance
-$ make build-release
+make build-release
 # or
-$ cargo build --release
+cargo build --release
 ```
 
 **Build time:** Approximately 2-5 minutes on first build
@@ -72,22 +75,22 @@ $ cargo build --release
 
 ```bash
 # View all available commands
-$ make help
+make help
 
 # Build and run in one step
-$ make r
+make r
 # or full command
-$ make run-release
+make run-release
 ```
 
 ### Option 4: Install to System from Source
 
 ```bash
 # Install to ~/.cargo/bin
-$ make install
+make install
 
 # Run from anywhere
-$ par-fractal
+par-fractal
 ```
 
 ### Option 5: Install with Homebrew (macOS)
@@ -96,10 +99,10 @@ For macOS users, `par-fractal` can be easily installed using Homebrew:
 
 ```bash
 # Tap the official Homebrew tap
-$ brew tap paulrobello/par-fractal
+brew tap paulrobello/par-fractal
 
 # Install the application
-$ brew install --cask par-fractal
+brew install --cask par-fractal
 ```
 
 ## First Launch
@@ -108,17 +111,17 @@ $ brew install --cask par-fractal
 
 **Using Makefile (recommended):**
 ```bash
-$ make r
+make r
 ```
 
 **Using Cargo:**
 ```bash
-$ cargo run --release
+cargo run --release
 ```
 
 **If installed:**
 ```bash
-$ par-fractal
+par-fractal
 ```
 
 ### What You'll See
@@ -142,10 +145,15 @@ graph TD
     Window --> UI
     Window --> FPS
 
-    style Window fill:#e65100,stroke:#ff9800,stroke-width:3px,color:#ffffff
-    style Fractal fill:#1b5e20,stroke:#4caf50,stroke-width:2px,color:#ffffff
-    style UI fill:#4a148c,stroke:#9c27b0,stroke-width:2px,color:#ffffff
-    style FPS fill:#37474f,stroke:#78909c,stroke-width:2px,color:#ffffff
+    class Window primary
+    class Fractal active
+    class UI external
+    class FPS neutral
+
+    classDef primary fill:#e65100,stroke:#ff9800,stroke-width:3px,color:#ffffff
+    classDef active fill:#1b5e20,stroke:#4caf50,stroke-width:2px,color:#ffffff
+    classDef external fill:#4a148c,stroke:#9c27b0,stroke-width:2px,color:#ffffff
+    classDef neutral fill:#37474f,stroke:#78909c,stroke-width:2px,color:#ffffff
 ```
 
 ## Basic Controls
@@ -184,10 +192,11 @@ graph TD
 | **F4** | Julia Set 3D | **F9** | Kleinian |
 | **F5** | Mandelbox | **F10** | Hybrid Mandelbulb-Julia |
 
-**Note:** The following fractals are accessible via UI or command palette only (34 total fractal types):
-- **2D Escape-Time (13):** Magnet and Collatz (no hotkeys), plus Sierpinski Triangle
+**Note:** The following fractals are accessible via UI or command palette only (35 total fractal types: 20 2D + 15 3D):
+- **2D Escape-Time (3 no hotkey):** Magnet, Collatz, Sierpinski Triangle (the 10 digit-key fractals also exist)
+- **2D Density (1):** Buddhabrot (no hotkey)
 - **2D Strange Attractors (6):** Hopalong, Martin, Gingerbreadman, Chip, Quadruptwo, Threeply
-- **3D Fractals (15):** Quaternion Cubic and Sierpinski Gasket (no hotkeys), plus 3D attractors: Pickover, Lorenz, Rossler
+- **3D Fractals (5 no hotkey):** Quaternion Cubic, Sierpinski Gasket, Pickover, Lorenz, Rossler
 
 ### Color Palette Cycling
 
@@ -203,14 +212,14 @@ graph TD
 The Mandelbrot set is loaded by default. Let's explore it:
 
 **Zoom In:**
-```bash
+```text
 # Using mouse wheel
 Scroll Up → Zoom In
 Scroll Down → Zoom Out
 ```
 
 **Pan Around:**
-```bash
+```text
 # Using mouse drag
 Click and Drag → Move view
 ```
@@ -223,7 +232,7 @@ Click and Drag → Move view
 
 ### Step 2: Switch to Julia Set
 
-```bash
+```text
 # Press the '2' key
 ```
 
@@ -237,14 +246,14 @@ The Julia set will appear with beautiful symmetric patterns.
 
 ### Step 3: Try a 3D Fractal
 
-```bash
+```text
 # Press the 'F1' key for Mandelbulb
 ```
 
 You're now in 3D mode with full camera controls!
 
 **Move Around:**
-```bash
+```text
 W → Forward
 S → Backward
 A → Strafe Left
@@ -252,15 +261,16 @@ D → Strafe Right
 E → Move Up (world Y-axis)
 Q → Move Down (world Y-axis)
 Mouse Drag → Look around
-Mouse Wheel → Adjust camera speed
 ```
+
+Camera speed is set via the **Camera** slider in the UI panel.
 
 ## Exploring 2D Fractals
 
 ### Navigation Techniques
 
 **Zoom to Cursor:**
-```bash
+```text
 # Position mouse over interesting area
 # Scroll wheel to zoom
 # The fractal zooms centered on your cursor!
@@ -307,7 +317,7 @@ Mouse Wheel → Adjust camera speed
 ### Camera Movement
 
 **WASD Controls:**
-```bash
+```text
 W → Move forward (into the fractal)
 S → Move backward (away from fractal)
 A → Strafe left
@@ -315,16 +325,17 @@ D → Strafe right
 ```
 
 **Vertical Movement:**
-```bash
+```text
 E → Move up (world Y-axis)
 Q → Move down (world Y-axis)
 ```
 
 **Looking Around:**
-```bash
+```text
 Mouse Drag → Rotate camera view (yaw and pitch)
-Mouse Wheel → Adjust camera movement speed
 ```
+
+Camera movement speed is set via the **Camera** slider in the UI panel.
 
 ### Finding Good Views
 
@@ -361,7 +372,7 @@ Save favorite views:
 
 ### Quick Screenshot
 
-```bash
+```text
 # Press F12
 ```
 
@@ -410,10 +421,10 @@ Save favorite views:
 2. Try different graphics backend:
    ```bash
    # Linux - force Vulkan
-   $ WGPU_BACKEND=vulkan cargo run --release
+   WGPU_BACKEND=vulkan cargo run --release
 
    # macOS - force Metal (default)
-   $ cargo run --release
+   cargo run --release
    ```
 3. Reduce quality settings in UI
 4. Check system meets GPU requirements
@@ -444,7 +455,7 @@ Save favorite views:
 **Symptom:** No controls visible
 
 **Solution:**
-```bash
+```text
 # Press H to toggle UI
 ```
 
@@ -454,11 +465,11 @@ Save favorite views:
 
 **Solutions:**
 1. Build in release mode: `cargo build --release`
-2. Check Rust version: `rustc --version` (need 1.70+)
+2. Check Rust version: `rustc --version` (need 1.85+)
 3. Update GPU drivers
 4. Check console for error messages:
    ```bash
-   $ RUST_LOG=debug cargo run --release
+   RUST_LOG=debug cargo run --release
    ```
 
 ### Issue: macOS "App is damaged" or Won't Open (Quarantine)
@@ -473,8 +484,8 @@ Save favorite views:
 
 Homebrew automatically handles quarantine removal:
 ```bash
-$ brew tap paulrobello/par-fractal
-$ brew install --cask par-fractal
+brew tap paulrobello/par-fractal
+brew install --cask par-fractal
 ```
 
 **Option 2: Remove Quarantine Manually**
@@ -482,7 +493,7 @@ $ brew install --cask par-fractal
 If you downloaded the `.zip` from GitHub Releases:
 ```bash
 # Remove quarantine attribute from the app
-$ sudo xattr -r -d com.apple.quarantine /Applications/par-fractal.app
+sudo xattr -r -d com.apple.quarantine /Applications/par-fractal.app
 ```
 
 **Option 3: Right-click to Open**
@@ -508,8 +519,8 @@ $ sudo xattr -r -d com.apple.quarantine /Applications/par-fractal.app
 
 **Try These:**
 1. **Command Palette** (`/` or `Ctrl/Cmd+K`)
-   - Quick access to all 34 fractal types (19 2D + 15 3D)
-   - 19 2D Fractals: 13 escape-time + 6 strange attractors
+   - Quick access to all 35 fractal types (20 2D + 15 3D)
+   - 20 2D Fractals: 13 escape-time + 1 density (Buddhabrot) + 6 strange attractors
    - 15 3D Fractals: 12 ray-marched + 3 strange attractors
    - Toggle effects (AO, shadows, DoF, fog, bloom, FXAA)
    - Switch color modes and LOD profiles

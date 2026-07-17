@@ -21,6 +21,7 @@ graph TD
     Index[📚 Documentation Index<br/>YOU ARE HERE]
     Quick[🚀 Quick Start<br/>Installation & Basics]
     Arch[🏗️ Architecture<br/>System Design]
+    Features[✨ Features<br/>Rendering & Tools]
     Fractals2D[🎨 2D Fractals<br/>Mandelbrot, Julia, etc.]
     Fractals3D[🌌 3D Fractals<br/>Mandelbulb, Menger, etc.]
     Controls[🎮 Controls<br/>Keyboard & Mouse]
@@ -28,6 +29,7 @@ graph TD
 
     Index --> Quick
     Index --> Arch
+    Index --> Features
     Index --> Fractals2D
     Index --> Fractals3D
     Index --> Controls
@@ -43,13 +45,21 @@ graph TD
     Arch -.-> Fractals2D
     Arch -.-> Fractals3D
 
-    style Index fill:#e65100,stroke:#ff9800,stroke-width:3px,color:#ffffff
-    style Quick fill:#1b5e20,stroke:#4caf50,stroke-width:2px,color:#ffffff
-    style Arch fill:#0d47a1,stroke:#2196f3,stroke-width:2px,color:#ffffff
-    style Fractals2D fill:#4a148c,stroke:#9c27b0,stroke-width:2px,color:#ffffff
-    style Fractals3D fill:#880e4f,stroke:#c2185b,stroke-width:2px,color:#ffffff
-    style Controls fill:#ff6f00,stroke:#ffa726,stroke-width:2px,color:#ffffff
-    style Style fill:#37474f,stroke:#78909c,stroke-width:2px,color:#ffffff
+    class Index primary
+    class Quick active
+    class Arch data
+    class Features,Fractals2D external
+    class Fractals3D accent
+    class Controls warning
+    class Style neutral
+
+    classDef primary fill:#e65100,stroke:#ff9800,stroke-width:3px,color:#ffffff
+    classDef active fill:#1b5e20,stroke:#4caf50,stroke-width:2px,color:#ffffff
+    classDef data fill:#0d47a1,stroke:#2196f3,stroke-width:2px,color:#ffffff
+    classDef external fill:#4a148c,stroke:#9c27b0,stroke-width:2px,color:#ffffff
+    classDef accent fill:#880e4f,stroke:#c2185b,stroke-width:2px,color:#ffffff
+    classDef warning fill:#ff6f00,stroke:#ffa726,stroke-width:2px,color:#ffffff
+    classDef neutral fill:#37474f,stroke:#78909c,stroke-width:2px,color:#ffffff
 ```
 
 ## Getting Started
@@ -198,7 +208,7 @@ User Input → UI → FractalParams → Uniforms → GPU → Rendered Frame
 **Critical Synchronization:**
 - Rust `FractalUniforms` ↔ WGSL `Uniforms`
 - Both must maintain identical memory layout
-- Currently 784 bytes (49 × 16-byte alignment)
+- Currently 864 bytes (compile-asserted and offset-tested in src/renderer/uniforms.rs)
 
 ## Reference Materials
 
@@ -220,9 +230,9 @@ User Input → UI → FractalParams → Uniforms → GPU → Rendered Frame
 
 ### Color Palettes
 
-**Built-in Palettes (47 static + 12 procedural):**
+**Built-in Palettes (48 static + 12 procedural):**
 
-Par Fractal includes 47 professionally-designed static color palettes and 12 procedural palettes optimized for fractal visualization:
+Par Fractal includes 48 professionally-designed static color palettes and 12 procedural palettes optimized for fractal visualization:
 
 **Classic Palettes (6):**
 - **Fire** - Black → Purple → Red → Orange → Yellow (High contrast, classic look)
@@ -256,13 +266,16 @@ Par Fractal includes 47 professionally-designed static color palettes and 12 pro
 
 ### Fractal Type Reference
 
-**2D Fractals (19 types):**
+**2D Fractals (20 types):**
 
 *Escape-Time Fractals (13):*
 - Mandelbrot2D, Julia2D, Sierpinski2D, SierpinskiTriangle2D
 - BurningShip2D, Tricorn2D, Phoenix2D
 - Celtic2D, Newton2D, Lyapunov2D
 - Nova2D, Magnet2D, Collatz2D
+
+*Density Visualization (1):*
+- Buddhabrot2D
 
 *Strange Attractors (6):*
 - Hopalong2D, Martin2D, Gingerbreadman2D
@@ -280,7 +293,7 @@ Par Fractal includes 47 professionally-designed static color palettes and 12 pro
 *Strange Attractors (3):*
 - Pickover3D, Lorenz3D, Rossler3D
 
-**Total:** 34 fractal types (19 2D + 15 3D)
+**Total:** 35 fractal types (20 2D + 15 3D)
 
 ### Command-Line Interface
 
@@ -374,10 +387,11 @@ https://par-fractal.pardev.net/#quality=low&p=Mandelbulb
 
 **Beginner Path:**
 1. [Quick Start Guide](QUICKSTART.md) - Installation and basics
-2. [2D Fractals](FRACTALS2D.md) - Explore Mandelbrot and Julia
-3. [Controls Reference](CONTROLS.md) - Learn keyboard shortcuts
-4. Experiment with color palettes
-5. Save your favorite views as presets
+2. [Features](FEATURES.md) - Browse the full feature set
+3. [2D Fractals](FRACTALS2D.md) - Explore Mandelbrot and Julia
+4. [Controls Reference](CONTROLS.md) - Learn keyboard shortcuts
+5. Experiment with color palettes
+6. Save your favorite views as presets
 
 **Intermediate Path:**
 1. [3D Fractals](FRACTALS3D.md) - Master 3D navigation
@@ -402,6 +416,7 @@ https://par-fractal.pardev.net/#quality=low&p=Mandelbulb
 |----------|---------|----------|
 | [QUICKSTART.md](QUICKSTART.md) | Get started fast | New users |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System design | Developers |
+| [FEATURES.md](FEATURES.md) | Complete feature reference | All users |
 | [FRACTALS2D.md](FRACTALS2D.md) | 2D fractal guide | All users |
 | [FRACTALS3D.md](FRACTALS3D.md) | 3D fractal guide | All users |
 | [CONTROLS.md](CONTROLS.md) | Control reference | All users |
@@ -417,9 +432,7 @@ https://par-fractal.pardev.net/#quality=low&p=Mandelbulb
 
 ### Version Information
 
-**Documentation Version:** 1.2.0
-**Project Version:** 0.6.0
-**Last Updated:** 2025-11-26
+**Project Version:** see [CHANGELOG.md](../CHANGELOG.md) for the current version and release history.
 
 ### Contributing to Documentation
 

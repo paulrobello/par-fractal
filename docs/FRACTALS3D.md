@@ -105,7 +105,7 @@ normal.y = DE(p + (0, ε, 0)) - DE(p - (0, ε, 0))
 normal.z = DE(p + (0, 0, ε)) - DE(p - (0, 0, ε))
 ```
 
-Where ε is a small epsilon value (typically 0.001).
+Where ε is a small epsilon value (typically 0.00035).
 
 ## Camera Controls
 
@@ -125,17 +125,16 @@ Where ε is a small epsilon value (typically 0.001).
 | Action | Effect |
 |--------|--------|
 | **Mouse Drag** | Look around (rotate view) |
-| **Mouse Wheel Up** | Increase movement speed |
-| **Mouse Wheel Down** | Decrease movement speed |
 
 ### Camera Speed
 
 **Default Speed:** 2.0 units/second
 
 **Adjusting Speed:**
-- Scroll wheel while in 3D mode
 - UI slider: "Camera Speed"
 - Speed range: 0.1 to 10.0
+
+Camera speed is adjusted via the UI slider in the Camera section (there is no keyboard or mouse-wheel shortcut for speed).
 
 **Speed Guidelines:**
 - Slow (0.5-1.0): Close-up detail exploration
@@ -1344,7 +1343,7 @@ Some shading modes support multiple light sources:
 - Larger epsilon: Faster, potential artifacts
 
 **Typical Values:**
-- Default: 0.001
+- Default: 0.00035
 - High quality: 0.0001
 - Performance: 0.01
 
@@ -1359,10 +1358,14 @@ Some shading modes support multiple light sources:
 - **Fast Movement**: Low quality
 
 **Parameters Adjusted:**
-- Ray marching steps
-- Shadow quality
-- AO samples
-- Effect toggles
+- Ray marching steps (`max_steps`)
+- Surface precision (`min_distance`)
+- Shadow samples and shadow step factor
+- Ambient occlusion step size
+- Depth-of-field sample count
+- Iteration scale (a per-level multiplier on the iteration count)
+
+LOD adjusts only these numeric knobs; it never toggles effects or changes the shading model.
 
 **Manual Override:**
 - Disable LOD for consistent quality
@@ -1370,29 +1373,16 @@ Some shading modes support multiple light sources:
 
 ### Quality Profiles
 
-**Low Profile:**
-- 64 ray steps
-- Basic shading
-- No AO or shadows
-- Target: 60+ FPS
+LOD quality levels set numeric rendering knobs only (ray steps, shadow samples, precision, DoF samples, and an iteration scale). They do not toggle effects or change the shading model — those stay at whatever you set.
 
-**Medium Profile:**
-- 128 ray steps
-- Blinn-Phong shading
-- AO enabled
-- Target: 30-60 FPS
+| Profile | Max Ray Steps | Shadow Samples | Min Distance (precision) | DoF Samples |
+|---------|---------------|----------------|--------------------------|-------------|
+| **Ultra** | 325 | 128 | 0.00035 | 8 |
+| **High** | 250 | 64 | 0.0007 | 4 |
+| **Medium** | 175 | 32 | 0.0015 | 2 |
+| **Low** | 100 | 16 | 0.003 | 1 |
 
-**High Profile:**
-- 256 ray steps
-- PBR shading
-- AO + soft shadows
-- Target: 20-30 FPS
-
-**Ultra Profile:**
-- 512 ray steps
-- PBR shading
-- All effects enabled
-- Target: Screenshot quality
+> **Note:** `render_scale` is also defined on each level (1.0 / 0.85 / 0.7 / 0.5) but is not currently applied by the renderer; it is reserved for a future dynamic-resolution enhancement.
 
 ## Exploration Techniques
 
@@ -1430,7 +1420,6 @@ Some shading modes support multiple light sources:
 
 **Smooth Movement:**
 - Hold movement keys continuously
-- Adjust speed with mouse wheel
 - Use mouse for gradual rotation
 - Avoid sudden changes
 
