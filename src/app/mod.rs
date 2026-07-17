@@ -415,6 +415,16 @@ impl App {
         self.should_exit
     }
 
+    /// Whether a CLI timer (`--screenshot-delay` / `--exit-delay`) is still
+    /// pending. These timers are evaluated inside `update()`, which only runs
+    /// on `RedrawRequested`, so the event loop must keep ticking until they
+    /// fire — otherwise ARC-006's `ControlFlow::Wait` parks the loop and the
+    /// timer never gets checked. Normal interactive use sets no CLI timer and
+    /// stays parked for power savings.
+    pub fn has_pending_cli_timer(&self) -> bool {
+        self.screenshot_delay.is_some() || self.exit_delay.is_some()
+    }
+
     /// ARC-006: mark the scene as needing a re-render. Called from every
     /// image-affecting state change (input handlers, UI actions, camera moves,
     /// palette animation, etc.). Cheap (one bool write); the gating happens in

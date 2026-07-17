@@ -361,7 +361,12 @@ impl ApplicationHandler for AppHandler {
         // (`Wait` + `request_redraw` is the render-on-demand idiom:
         // winit schedules exactly one RedrawRequested, then sleeps.)
         event_loop.set_control_flow(ControlFlow::Wait);
-        if app.should_render_next_frame() {
+        // ARC-006: render-on-demand. Only request a redraw when the scene
+        // changed, an animation source is active, or egui wants another frame.
+        // A pending CLI timer (--screenshot-delay/--exit-delay) also keeps the
+        // loop ticking: that timer is evaluated inside update() on the redraw
+        // path, so without a redraw it would never fire under ControlFlow::Wait.
+        if app.should_render_next_frame() || app.has_pending_cli_timer() {
             app.window().request_redraw();
         }
     }
