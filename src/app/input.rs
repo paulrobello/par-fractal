@@ -233,14 +233,14 @@ impl App {
                 KeyCode::F12 => {
                     self.save_screenshot = true;
                     self.mark_scene_dirty();
-                    println!("Screenshot queued...");
+                    log::info!("Screenshot queued...");
                     return true;
                 }
                 KeyCode::KeyO => {
                     self.fractal_params.settings.auto_orbit =
                         !self.fractal_params.settings.auto_orbit;
                     self.mark_scene_dirty();
-                    println!(
+                    log::info!(
                         "Auto-orbit: {}",
                         if self.fractal_params.settings.auto_orbit {
                             "ON"
@@ -254,7 +254,7 @@ impl App {
                     self.fractal_params.settings.orbit_speed =
                         (self.fractal_params.settings.orbit_speed - 0.1).max(0.1);
                     self.mark_scene_dirty();
-                    println!(
+                    log::info!(
                         "Orbit speed: {:.2}",
                         self.fractal_params.settings.orbit_speed
                     );
@@ -264,7 +264,7 @@ impl App {
                     self.fractal_params.settings.orbit_speed =
                         (self.fractal_params.settings.orbit_speed + 0.1).min(5.0);
                     self.mark_scene_dirty();
-                    println!(
+                    log::info!(
                         "Orbit speed: {:.2}",
                         self.fractal_params.settings.orbit_speed
                     );
@@ -279,7 +279,7 @@ impl App {
                                 .max_iterations
                                 .saturating_sub(32)
                                 .max(32);
-                            println!(
+                            log::info!(
                                 "Max iterations: {}",
                                 self.fractal_params.settings.max_iterations
                             );
@@ -291,7 +291,7 @@ impl App {
                                 .max_steps
                                 .saturating_sub(10)
                                 .max(30);
-                            println!("Max steps: {}", self.fractal_params.settings.max_steps);
+                            log::info!("Max steps: {}", self.fractal_params.settings.max_steps);
                         }
                     }
                     self.mark_scene_dirty();
@@ -302,7 +302,7 @@ impl App {
                         RenderMode::TwoD => {
                             self.fractal_params.settings.max_iterations =
                                 (self.fractal_params.settings.max_iterations + 32).min(2048);
-                            println!(
+                            log::info!(
                                 "Max iterations: {}",
                                 self.fractal_params.settings.max_iterations
                             );
@@ -310,7 +310,7 @@ impl App {
                         RenderMode::ThreeD => {
                             self.fractal_params.settings.max_steps =
                                 (self.fractal_params.settings.max_steps + 10).min(500);
-                            println!("Max steps: {}", self.fractal_params.settings.max_steps);
+                            log::info!("Max steps: {}", self.fractal_params.settings.max_steps);
                         }
                     }
                     self.mark_scene_dirty();
@@ -320,21 +320,21 @@ impl App {
                     self.fractal_params.settings.power =
                         (self.fractal_params.settings.power - 0.5).max(2.0);
                     self.mark_scene_dirty();
-                    println!("Power: {:.1}", self.fractal_params.settings.power);
+                    log::info!("Power: {:.1}", self.fractal_params.settings.power);
                     return true;
                 }
                 KeyCode::Period => {
                     self.fractal_params.settings.power =
                         (self.fractal_params.settings.power + 0.5).min(16.0);
                     self.mark_scene_dirty();
-                    println!("Power: {:.1}", self.fractal_params.settings.power);
+                    log::info!("Power: {:.1}", self.fractal_params.settings.power);
                     return true;
                 }
                 KeyCode::KeyL => {
                     self.fractal_params.settings.ambient_occlusion =
                         !self.fractal_params.settings.ambient_occlusion;
                     self.mark_scene_dirty();
-                    println!(
+                    log::info!(
                         "Ambient Occlusion: {}",
                         if self.fractal_params.settings.ambient_occlusion {
                             "ON"
@@ -348,7 +348,7 @@ impl App {
                     self.fractal_params.settings.depth_of_field =
                         !self.fractal_params.settings.depth_of_field;
                     self.mark_scene_dirty();
-                    println!(
+                    log::info!(
                         "Depth of Field: {}",
                         if self.fractal_params.settings.depth_of_field {
                             "ON"
@@ -362,7 +362,7 @@ impl App {
                     self.fractal_params.settings.show_floor =
                         !self.fractal_params.settings.show_floor;
                     self.mark_scene_dirty();
-                    println!(
+                    log::info!(
                         "Floor: {}",
                         if self.fractal_params.settings.show_floor {
                             "ON"
@@ -382,7 +382,7 @@ impl App {
                         _ => "SOFT",
                     };
                     self.mark_scene_dirty();
-                    println!("Shadow Mode: {}", mode_name);
+                    log::info!("Shadow Mode: {}", mode_name);
                     return true;
                 }
                 KeyCode::KeyI => {
@@ -390,7 +390,7 @@ impl App {
                     self.fractal_params.lod.lod_config.enabled =
                         !self.fractal_params.lod.lod_config.enabled;
                     self.mark_scene_dirty();
-                    println!(
+                    log::info!(
                         "LOD System: {}",
                         if self.fractal_params.lod.lod_config.enabled {
                             "ON"
@@ -406,7 +406,7 @@ impl App {
                         self.fractal_params.lod.lod_config.debug_visualization =
                             !self.fractal_params.lod.lod_config.debug_visualization;
                         self.mark_scene_dirty();
-                        println!(
+                        log::info!(
                             "LOD Debug Visualization: {}",
                             if self.fractal_params.lod.lod_config.debug_visualization {
                                 "ON"
@@ -420,7 +420,7 @@ impl App {
                 KeyCode::Slash => {
                     // Open command palette with '/'
                     self.ui.command_palette.open();
-                    println!("Command Palette opened");
+                    log::info!("Command Palette opened");
                     return true;
                 }
                 KeyCode::KeyK => {
@@ -433,7 +433,7 @@ impl App {
 
                     if modifier_pressed {
                         self.ui.command_palette.open();
-                        println!("Command Palette opened");
+                        log::info!("Command Palette opened");
                         return true;
                     }
                 }

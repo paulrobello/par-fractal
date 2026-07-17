@@ -234,7 +234,7 @@ impl App {
             {
                 let prefs = crate::fractal::AppPreferences::load();
                 if let Some(gpu_index) = prefs.preferred_gpu_index {
-                    println!("Using preferred GPU index: {}", gpu_index);
+                    log::info!("Using preferred GPU index: {}", gpu_index);
                     Renderer::new_with_gpu_preference(window.clone(), size, Some(gpu_index)).await
                 } else {
                     Renderer::new(window.clone(), size).await
@@ -256,7 +256,7 @@ impl App {
             // Built-in presets are in-memory and available on every target.
             if let Some(preset_data) = crate::fractal::PresetGallery::get_builtin_preset(preset) {
                 #[cfg(not(target_arch = "wasm32"))]
-                println!("Loaded built-in preset: {}", preset);
+                log::info!("Loaded built-in preset: {}", preset);
                 #[cfg(target_arch = "wasm32")]
                 log::info!("Loaded preset: {}", preset);
                 FractalParams::from_settings(preset_data.settings.clone())
@@ -267,12 +267,12 @@ impl App {
                 {
                     match crate::fractal::PresetGallery::load_preset(preset) {
                         Ok(preset_data) => {
-                            println!("Loaded user preset: {}", preset);
+                            log::info!("Loaded user preset: {}", preset);
                             FractalParams::from_settings(preset_data.settings)
                         }
                         Err(e) => {
-                            eprintln!("Failed to load preset '{}': {}", preset, e);
-                            eprintln!("Falling back to saved settings or defaults");
+                            log::error!("Failed to load preset '{}': {}", preset, e);
+                            log::error!("Falling back to saved settings or defaults");
                             saved_settings
                                 .as_ref()
                                 .map(|s| FractalParams::from_settings(s.clone()))
@@ -303,7 +303,7 @@ impl App {
                 _ => "Low",
             };
             #[cfg(not(target_arch = "wasm32"))]
-            println!("Setting quality level: {}", quality_name);
+            log::info!("Setting quality level: {}", quality_name);
             #[cfg(target_arch = "wasm32")]
             log::info!("Setting quality level: {}", quality_name);
 
@@ -561,7 +561,7 @@ impl App {
             let mut prefs = crate::fractal::AppPreferences::load();
             prefs.set_window_size(new_size.width, new_size.height);
             if let Err(e) = prefs.save() {
-                eprintln!("Failed to save window size: {}", e);
+                log::error!("Failed to save window size: {}", e);
             }
         }
     }

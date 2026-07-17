@@ -622,6 +622,66 @@ mod tests {
         assert!(mid.max_steps < ultra.max_steps);
     }
 
+    /// QA-019 / ARC-007: extend the lerp test to the new `iteration_scale`
+    /// field. The contract is the same as every other f32 field in
+    /// `QualityLevel`: at t=0 the result equals `self`; across the sweep the
+    /// value moves monotonically toward `other`; at t=1 it reaches `other`
+    /// within 1 ulp (the `lerp_f32` form `a + (b - a) * t` can round 1-ulp
+    /// high/low at t=1.0). Pinned as a regression because `iteration_scale`
+    /// is the 2D LOD lever most likely to be silently dropped from the lerp
+    /// when a future field is added.
+    #[test]
+    fn quality_lerp_iteration_scale_monotonic() {
+        let ultra = QualityLevel::ultra();
+        let low = QualityLevel::low();
+        // Sanity: ultra keeps authored (1.0), low degrades (0.35) — so the
+        // direction of the interpolation is well-defined.
+        assert!(ultra.iteration_scale > low.iteration_scale);
+
+        // t=0 endpoint is exact (a + (b-a)*0 == a, no rounding).
+        let at_zero = ultra.lerp(&low, 0.0);
+        assert_eq!(at_zero.iteration_scale, ultra.iteration_scale);
+
+        // t=1 endpoint: `lerp_f32(a, b, 1.0)` = a + (b - a), which can round
+        // 1 ulp away from b for some a/b pairs. Allow ±1 ulp tolerance — same
+        // contract every other f32 lerp field already has implicitly.
+        let at_one = ultra.lerp(&low, 1.0);
+        let one_ulp = (low.iteration_scale * f32::EPSILON).max(f32::MIN_POSITIVE);
+        assert!(
+            (at_one.iteration_scale - low.iteration_scale).abs() <= one_ulp,
+            "iteration_scale at t=1 ({}) not within 1 ulp of low ({})",
+            at_one.iteration_scale,
+            low.iteration_scale,
+        );
+
+        // Midpoint is strictly between the two — monotonicity check.
+        let mid = ultra.lerp(&low, 0.5);
+        assert!(
+            mid.iteration_scale > low.iteration_scale
+                && mid.iteration_scale < ultra.iteration_scale,
+            "iteration_scale lerp is not monotonic at t=0.5: got {} for [{}, {}]",
+            mid.iteration_scale,
+            low.iteration_scale,
+            ultra.iteration_scale,
+        );
+
+        // Sweep: monotonically non-increasing from ultra→low as t goes 0→1.
+        let mut prev = ultra.iteration_scale;
+        let mut any_strict = false;
+        for step in 1..=10 {
+            let t = step as f32 / 10.0;
+            let q = ultra.lerp(&low, t);
+            assert!(
+                q.iteration_scale <= prev,
+                "iteration_scale increased at t={t}: {} > {prev}",
+                q.iteration_scale,
+            );
+            any_strict |= q.iteration_scale < prev;
+            prev = q.iteration_scale;
+        }
+        assert!(any_strict, "iteration_scale lerp is flat across the sweep");
+    }
+
     #[test]
     fn test_motion_detection() {
         let mut state = LODState::new();

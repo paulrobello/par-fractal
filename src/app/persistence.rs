@@ -14,7 +14,7 @@ impl App {
         if let Some(proj_dirs) = directories::ProjectDirs::from("com", "fractal", "par-fractal") {
             let config_dir = proj_dirs.config_dir();
             if let Err(e) = std::fs::create_dir_all(config_dir) {
-                eprintln!("Failed to create config directory: {}", e);
+                log::error!("Failed to create config directory: {}", e);
                 return;
             }
 
@@ -22,12 +22,12 @@ impl App {
             match serde_yaml::to_string(&settings) {
                 Ok(yaml) => {
                     if let Err(e) = std::fs::write(&settings_path, yaml) {
-                        eprintln!("Failed to save settings: {}", e);
+                        log::error!("Failed to save settings: {}", e);
                     } else {
-                        println!("Settings auto-saved to {:?}", settings_path);
+                        log::debug!("Settings auto-saved to {:?}", settings_path);
                     }
                 }
-                Err(e) => eprintln!("Failed to serialize settings: {}", e),
+                Err(e) => log::error!("Failed to serialize settings: {}", e),
             }
         }
     }

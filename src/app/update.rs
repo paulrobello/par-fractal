@@ -30,7 +30,7 @@ impl App {
         if let Some(delay) = self.screenshot_delay {
             let elapsed = (now - self.start_time).as_secs_f32();
             if !self.screenshot_taken && elapsed >= delay {
-                println!("Taking screenshot after {:.1}s delay", delay);
+                log::info!("Taking screenshot after {:.1}s delay", delay);
                 self.save_screenshot = true;
                 self.screenshot_taken = true;
             }
@@ -40,7 +40,7 @@ impl App {
         if let Some(delay) = self.exit_delay {
             let elapsed = (now - self.start_time).as_secs_f32();
             if elapsed >= delay {
-                println!("Exiting after {:.1}s delay", delay);
+                log::info!("Exiting after {:.1}s delay", delay);
                 self.should_exit = true;
             }
         }
@@ -145,11 +145,11 @@ impl App {
         // Handle high-resolution render request (native only)
         #[cfg(not(target_arch = "wasm32"))]
         if let Some((width, height)) = self.save_hires_render.take() {
-            println!("Starting high-resolution render at {}x{}...", width, height);
+            log::info!("Starting high-resolution render at {}x{}...", width, height);
             if let Err(e) = self.render_high_resolution(width, height) {
-                eprintln!("Failed to render high-resolution image: {}", e);
+                log::error!("Failed to render high-resolution image: {}", e);
             } else {
-                println!("High-resolution render completed!");
+                log::info!("High-resolution render completed!");
             }
         }
         #[cfg(target_arch = "wasm32")]

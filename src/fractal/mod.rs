@@ -473,7 +473,7 @@ impl FractalParams {
             let yaml = serde_yaml::to_string(&settings)?;
             std::fs::write(settings_file, yaml)?;
 
-            println!("Settings saved");
+            log::info!("Settings saved");
             Ok(())
         } else {
             Err("Could not determine config directory".into())

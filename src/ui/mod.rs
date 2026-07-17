@@ -328,13 +328,13 @@ impl UI {
 
     /// Scan for available monitors and populate the list
     pub fn scan_monitors(&mut self, window: &winit::window::Window) {
-        eprintln!("DEBUG: Scanning for monitors...");
+        log::debug!("Scanning for monitors...");
         self.available_monitors.clear();
 
         // Get primary monitor
         let primary_monitor = window.primary_monitor();
-        eprintln!(
-            "DEBUG: Primary monitor: {:?}",
+        log::debug!(
+            "Primary monitor: {:?}",
             primary_monitor.as_ref().and_then(|m| m.name())
         );
 
@@ -342,7 +342,7 @@ impl UI {
         let mut count = 0;
         for (index, monitor) in window.available_monitors().enumerate() {
             count += 1;
-            eprintln!("DEBUG: Found monitor {}: {:?}", index, monitor.name());
+            log::debug!("Found monitor {}: {:?}", index, monitor.name());
             let is_primary = if let Some(ref primary) = primary_monitor {
                 monitor::monitors_equal(&monitor, primary)
             } else {
@@ -389,8 +389,8 @@ impl UI {
                 _ => std::cmp::Ordering::Equal,
             });
 
-        eprintln!("DEBUG: Total monitors found: {}", count);
-        eprintln!("DEBUG: Monitors in list: {}", self.available_monitors.len());
+        log::debug!("Total monitors found: {}", count);
+        log::debug!("Monitors in list: {}", self.available_monitors.len());
 
         // Update scan time
         self.last_monitor_scan = web_time::Instant::now();
@@ -724,7 +724,7 @@ impl UI {
                                             // Add export button
                                             if ui.small_button("💾").on_hover_text("Export this preset to JSON").clicked() {
                                                 if let Err(e) = PresetGallery::export_preset_to_json(preset) {
-                                                    eprintln!("Failed to export preset: {}", e);
+                                                    log::error!("Failed to export preset: {}", e);
                                                 } else {
                                                     log::info!("Preset '{}' exported successfully", preset.name);
                                                 }
@@ -778,7 +778,7 @@ impl UI {
                             let filename = self.preset_name.replace(|c: char| !c.is_alphanumeric() && c != '_' && c != '-', "_");
 
                             if let Err(e) = PresetGallery::save_preset(&preset, &filename) {
-                                eprintln!("Failed to save preset: {}", e);
+                                log::error!("Failed to save preset: {}", e);
                             } else {
                                 // Refresh user presets list
                                 self.user_presets = PresetGallery::list_user_presets().unwrap_or_default();
@@ -818,14 +818,24 @@ impl UI {
                                         for preset_name in filtered_user.iter() {
                                             ui.horizontal(|ui| {
                                                 if ui.button(*preset_name).clicked() {
-                                                    println!("User preset button clicked: {}", preset_name);
+                                                    log::debug!(
+                                                        "User preset button clicked: {}",
+                                                        preset_name
+                                                    );
                                                     match PresetGallery::load_preset(preset_name) {
                                                         Ok(preset) => {
-                                                            println!("Preset loaded successfully: {}", preset.name);
+                                                            log::info!(
+                                                                "Preset loaded successfully: {}",
+                                                                preset.name
+                                                            );
                                                             preset_to_load = Some(preset);
                                                         }
                                                         Err(e) => {
-                                                            eprintln!("Failed to load preset '{}': {}", preset_name, e);
+                                                            log::error!(
+                                                                "Failed to load preset '{}': {}",
+                                                                preset_name,
+                                                                e
+                                                            );
                                                         }
                                                     }
                                                 }
@@ -835,13 +845,17 @@ impl UI {
                                                     match PresetGallery::load_preset(preset_name) {
                                                         Ok(preset) => {
                                                             if let Err(e) = PresetGallery::export_preset_to_json(&preset) {
-                                                                eprintln!("Failed to export preset: {}", e);
+                                                                log::error!("Failed to export preset: {}", e);
                                                             } else {
                                                                 log::info!("Preset '{}' exported successfully", preset.name);
                                                             }
                                                         }
                                                         Err(e) => {
-                                                            eprintln!("Failed to load preset '{}' for export: {}", preset_name, e);
+                                                            log::error!(
+                                                                "Failed to load preset '{}' for export: {}",
+                                                                preset_name,
+                                                                e
+                                                            );
                                                         }
                                                     }
                                                 }
@@ -849,7 +863,7 @@ impl UI {
                                                 // Add delete button
                                                 if ui.small_button("🗑").on_hover_text("Delete preset").clicked() {
                                                     if let Err(e) = PresetGallery::delete_preset(preset_name) {
-                                                        eprintln!("Failed to delete preset: {}", e);
+                                                        log::error!("Failed to delete preset: {}", e);
                                                     } else {
                                                         refresh_presets = true;
                                                     }
@@ -872,9 +886,9 @@ impl UI {
                             {
                                 let settings = params.to_settings();
                                 if let Err(e) = PresetGallery::export_to_json(&settings, camera_pos.to_array(), camera_target.to_array()) {
-                                    eprintln!("Failed to export settings: {}", e);
+                                    log::error!("Failed to export settings: {}", e);
                                 } else {
-                                    println!("Settings exported successfully");
+                                    log::info!("Settings exported successfully");
                                 }
                             }
 
@@ -906,7 +920,7 @@ impl UI {
                                         preset_to_load = Some(preset);
                                     }
                                     Err(e) => {
-                                        eprintln!("Failed to import settings: {}", e);
+                                        log::error!("Failed to import settings: {}", e);
                                     }
                                 }
                             }
@@ -1376,7 +1390,7 @@ impl UI {
                                         let filename = self.custom_palette_name.replace(|c: char| !c.is_alphanumeric() && c != '_' && c != '-', "_");
 
                                         if let Err(e) = CustomPaletteGallery::save_palette(&custom_palette, &filename) {
-                                            eprintln!("Failed to save custom palette: {}", e);
+                                            log::error!("Failed to save custom palette: {}", e);
                                         } else {
                                             // Refresh custom palette list
                                             self.custom_palettes = CustomPaletteGallery::list_palettes().unwrap_or_default();
@@ -1487,7 +1501,7 @@ impl UI {
                                 // Handle custom palette deletion
                                 if let Some(ref palette_name) = self.custom_palette_to_delete {
                                     if let Err(e) = CustomPaletteGallery::delete_palette(palette_name) {
-                                        eprintln!("Failed to delete custom palette: {}", e);
+                                        log::error!("Failed to delete custom palette: {}", e);
                                     }
                                     self.custom_palettes = CustomPaletteGallery::list_palettes().unwrap_or_default();
                                     self.custom_palette_to_delete = None;
@@ -1940,7 +1954,7 @@ impl UI {
                                     let filename = self.bookmark_name.replace(|c: char| !c.is_alphanumeric() && c != '_' && c != '-', "_");
 
                                     if let Err(e) = BookmarkGallery::save_bookmark(&bookmark, &filename) {
-                                        eprintln!("Failed to save bookmark: {}", e);
+                                        log::error!("Failed to save bookmark: {}", e);
                                     } else {
                                         // Refresh bookmark list
                                         self.bookmarks = BookmarkGallery::list_bookmarks().unwrap_or_default();
@@ -1985,7 +1999,7 @@ impl UI {
                                 // Handle bookmark deletion
                                 if let Some(ref bookmark_name) = self.bookmark_to_delete {
                                     if let Err(e) = BookmarkGallery::delete_bookmark(bookmark_name) {
-                                        eprintln!("Failed to delete bookmark: {}", e);
+                                        log::error!("Failed to delete bookmark: {}", e);
                                     }
                                     self.bookmarks = BookmarkGallery::list_bookmarks().unwrap_or_default();
                                     self.bookmark_to_delete = None;
@@ -2666,7 +2680,7 @@ impl UI {
                                 .on_hover_text("Manually save current settings to disk")
                                 .clicked()
                                 && let Err(e) = params.save_to_file() {
-                                    eprintln!("Failed to save settings: {}", e);
+                                    log::error!("Failed to save settings: {}", e);
                                 }
                             if ui.button("🔄 Reset to Defaults")
                                 .on_hover_text("Reset all settings to default values")
@@ -3092,13 +3106,14 @@ impl UI {
                                     hires_render_resolution = Some((width, height));
                                 } else {
                                     // Show error toast for invalid dimensions
-                                    eprintln!(
+                                    log::error!(
                                         "Invalid resolution: {}x{} (must be 1-16384)",
-                                        width, height
+                                        width,
+                                        height
                                     );
                                 }
                             } else {
-                                eprintln!("Failed to parse resolution");
+                                log::error!("Failed to parse resolution");
                             }
                         }
                     });

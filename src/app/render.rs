@@ -928,7 +928,7 @@ impl App {
 
         // Handle preset loading
         if let Some(preset) = preset_to_load {
-            println!("Loading preset: {}", preset.name);
+            log::info!("Loading preset: {}", preset.name);
             self.fractal_params = FractalParams::from_settings(preset.settings.clone());
 
             // Apply camera settings from preset
@@ -949,7 +949,7 @@ impl App {
 
         // Handle camera bookmark loading
         if let Some(bookmark) = bookmark_to_load {
-            println!("Loading camera bookmark: {}", bookmark.name);
+            log::info!("Loading camera bookmark: {}", bookmark.name);
             if self.smooth_transitions_enabled {
                 // Start smooth transition
                 self.camera_transition.start(
@@ -982,7 +982,7 @@ impl App {
             // Sync controller with reset camera position
             self.camera_controller
                 .point_at_target(self.camera.position, self.camera.target);
-            println!("Settings and camera reset to defaults");
+            log::info!("Settings and camera reset to defaults");
         }
 
         if reset_camera_requested {
@@ -991,13 +991,13 @@ impl App {
             // Sync controller with reset camera position
             self.camera_controller
                 .point_at_target(self.camera.position, self.camera.target);
-            println!("Camera reset to default position");
+            log::info!("Camera reset to default position");
         }
 
         if point_at_fractal_requested {
             self.camera_controller
                 .point_at_target(self.camera.position, glam::Vec3::ZERO);
-            println!("Camera pointed at fractal");
+            log::info!("Camera pointed at fractal");
         }
 
         if screenshot_requested {
@@ -1006,9 +1006,10 @@ impl App {
 
         if let Some(resolution) = hires_render_resolution {
             self.save_hires_render = Some(resolution);
-            println!(
+            log::info!(
                 "High-resolution render requested: {}x{}",
-                resolution.0, resolution.1
+                resolution.0,
+                resolution.1
             );
         }
 
@@ -1039,9 +1040,9 @@ impl App {
                 );
 
                 if let Err(e) = self.video_recorder.start_recording(filename.clone()) {
-                    eprintln!("Failed to start recording: {}", e);
+                    log::error!("Failed to start recording: {}", e);
                 } else {
-                    println!("Started recording to {}", filename);
+                    log::info!("Started recording to {}", filename);
                 }
             }
 
@@ -1057,7 +1058,7 @@ impl App {
                         if self.ui.auto_open_captures
                             && let Err(e) = open::that(&abs_path)
                         {
-                            eprintln!("Failed to open video: {}", e);
+                            log::error!("Failed to open video: {}", e);
                         }
 
                         self.ui.show_toast_with_file(
@@ -1066,7 +1067,7 @@ impl App {
                         );
                     }
                     Err(e) => {
-                        eprintln!("Failed to stop recording: {}", e);
+                        log::error!("Failed to stop recording: {}", e);
                     }
                 }
             }

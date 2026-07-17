@@ -3,6 +3,29 @@ use crate::fractal::FractalParams;
 use bytemuck::{Pod, Zeroable};
 use glam::Mat4;
 
+/// Split an f64 into a (hi, lo) f32 pair for double-float arithmetic on the
+/// GPU. `hi` is the value rounded to f32; `lo` is the residual
+/// `(value - hi as f64)` re-cast to f32. Together they represent the original
+/// f64 with ~48 bits of significand precision across the two f32s.
+///
+/// Extracted from `Uniforms::update` (QA-019) so the deep-zoom foundation can
+/// be unit-tested directly; ENH-001's perturbation work builds on this split.
+pub(crate) fn split_f64(v: f64) -> (f32, f32) {
+    let hi = v as f32;
+    let lo = (v - hi as f64) as f32;
+    (hi, lo)
+}
+
+/// 2D iteration bonus as a function of zoom. Matches the inline computation
+/// that used to live in `Uniforms::update`: `floor(log2(zoom.max(1.0)) * 15)`
+/// as a u32. Clamped at `zoom >= 1.0` so deep zoom-out does not subtract
+/// iterations. Used by the 2D escape-time path only.
+///
+/// Extracted (QA-019) so the bonus is unit-testable in isolation.
+pub(crate) fn zoom_iteration_bonus(zoom_2d: f64) -> u32 {
+    (zoom_2d.max(1.0).log2() * 15.0) as u32
+}
+
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct Uniforms {
@@ -305,15 +328,16 @@ impl Uniforms {
         let use_high_precision = params.settings.zoom_2d > HP_ZOOM_THRESHOLD;
         self.high_precision = if use_high_precision { 1 } else { 0 };
 
-        // Split center coordinates into double-float pairs
-        // hi = value as f32, lo = (value - hi as f64) as f32
+        // Split center coordinates into double-float pairs via the testable
+        // helper. `split_f64` is exact-in-f32 by construction: `hi` is the
+        // rounded f32 cast, `lo` captures the residual in f32 precision. This
+        // is the correctness foundation for the ENH-001 perturbation work.
         let center_x = params.settings.center_2d[0];
         let center_y = params.settings.center_2d[1];
-        self.center_hi = [center_x as f32, center_y as f32];
-        self.center_lo = [
-            (center_x - self.center_hi[0] as f64) as f32,
-            (center_y - self.center_hi[1] as f64) as f32,
-        ];
+        let (hi_x, lo_x) = split_f64(center_x);
+        let (hi_y, lo_y) = split_f64(center_y);
+        self.center_hi = [hi_x, hi_y];
+        self.center_lo = [lo_x, lo_y];
 
         // Auto-scale iterations with zoom for 2D fractals, combined with user
         // slider. ARC-007: also fold in the LOD `iteration_scale`, applied
@@ -322,7 +346,7 @@ impl Uniforms {
         // 2D-only: 3D ray-march cost is dominated by `max_steps`, not iters.
         let q = params.effective_quality();
         if params.settings.render_mode == crate::fractal::RenderMode::TwoD {
-            let zoom_bonus = (params.settings.zoom_2d.max(1.0).log2() * 15.0) as u32;
+            let zoom_bonus = zoom_iteration_bonus(params.settings.zoom_2d);
             let scaled =
                 ((params.settings.max_iterations + zoom_bonus) as f32 * q.iteration_scale) as u32;
             self.max_iterations = scaled.max(16);
@@ -586,5 +610,123 @@ mod layout_tests {
         // procedural_phase: last vec4 in the procedural-palette block, just
         // before the trailing 32B _padding_end.
         assert_eq!(offset_of!(Uniforms, procedural_phase), 816);
+    }
+}
+
+/// Numeric-core tests for the deep-zoom / iteration helpers extracted out of
+/// `Uniforms::update` (QA-019). These are the correctness foundation for
+/// ENH-001's perturbation work — keep them strict.
+#[cfg(test)]
+mod numeric_tests {
+    use super::*;
+
+    /// Reference implementation of the f32 unit-in-the-last-place at `x`,
+    /// used to bound `lo`'s magnitude in the DF split.
+    fn f32_ulp(x: f32) -> f32 {
+        // ulp(x) = 2^(floor(log2(|x|)) - 23) for normal numbers; fall back to
+        // the smallest positive subnormal for 0.0/ subnormals.
+        if x == 0.0 || !x.is_normal() {
+            return f32::MIN_POSITIVE; // smallest positive normal as a safe upper bound
+        }
+        let abs_x = x.abs();
+        // f32::EPSILON == 2^-23; spacing at x is approximately x * EPSILON for
+        // values in [1, 2). For arbitrary magnitude, multiply by the power of
+        // two bracketing x via raw bit manipulation.
+        let bits = abs_x.to_bits();
+        // Exponent mask: bits 23..30. ulp = 2^(exp - 23). For abs_x in
+        // [2^exp, 2^(exp+1)), spacing is 2^(exp - 23).
+        let exp = ((bits >> 23) & 0xFF) as i32 - 127; // unbiased exponent
+        2f32.powi(exp - 23)
+    }
+
+    /// DF split roundtrip: across a sweep of f64 magnitudes spanning zero,
+    /// unit, π, deep zoom, and large values, `hi + lo` must reconstruct the
+    /// original to within f64 relative error 1e-14, and `|lo|` must not exceed
+    /// half an ulp of `hi`. The ulp bound is the defining property of a
+    /// correctly-rounded two-sum split.
+    ///
+    /// The sweep is bounded to the range that casts losslessly into f32
+    /// (~[1.2e-38, 3.4e38]); outside that range `hi` becomes inf/0 and the
+    /// split is meaningless (not a bug — `split_f64` is only called on
+    /// center coordinates in deep-zoom range).
+    #[test]
+    fn df_split_roundtrip_strict() {
+        let values: &[f64] = &[
+            0.0,
+            1.0,
+            -1.0,
+            std::f64::consts::PI,
+            -std::f64::consts::PI,
+            1e-15,
+            -1e-15,
+            0.1318259042, // canonical Mandelbrot seahorse valley y-coordinate
+            -0.1318259042,
+            1e10,
+            1e-10,
+            -1e10,
+            1e30, // SEC-001 upper clamp on zoom-derived coords
+            1e-30,
+        ];
+        for &v in values {
+            let (hi, lo) = split_f64(v);
+            let reconstructed = (hi as f64) + (lo as f64);
+            let abs_err = (reconstructed - v).abs();
+            // Strict relative bound; for v == 0.0 the absolute error is exactly
+            // 0.0 (split_f64(0.0) == (0.0, 0.0)), so the relative check is
+            // trivially satisfied — no division-by-zero special case needed.
+            let rel_err = if v == 0.0 { abs_err } else { abs_err / v.abs() };
+            assert!(
+                rel_err < 1e-14,
+                "split_f64({v:e}): reconstructed={reconstructed:e}, rel_err={rel_err:e}",
+            );
+
+            // |lo| must be ≤ ulp(hi)/2. ulp(hi)/2 is the maximum rounding
+            // error of an f32 cast; lo is precisely that residual.
+            let ulp = f32_ulp(hi);
+            assert!(
+                lo.abs() <= ulp / 2.0,
+                "split_f64({v:e}): |lo|={lo:e} exceeds ulp(hi)/2 = {}",
+                ulp / 2.0,
+            );
+        }
+    }
+
+    /// Zoom→iteration bonus: across the 2D zoom range (no zoom, moderate,
+    /// deep), the bonus matches `floor(log2(zoom) * 15)` exactly and the total
+    /// (`max_iterations + bonus`) never overflows u32 even at extreme values.
+    #[test]
+    fn zoom_iteration_bonus_matches_formula_and_no_overflow() {
+        // (zoom, expected_bonus) pairs. expected_bonus = floor(log2(zoom) * 15).
+        let cases: &[(f64, u32)] = &[
+            (1.0, 0),                               // log2(1)=0
+            (1e6, (1e6f64.log2() * 15.0) as u32),   // ~299
+            (1e12, (1e12f64.log2() * 15.0) as u32), // ~597
+            (2.0, 15),                              // exactly one octave
+            (4.0, 30),                              // two octaves
+        ];
+        for &(zoom, expected) in cases {
+            let got = zoom_iteration_bonus(zoom);
+            assert_eq!(
+                got, expected,
+                "zoom_iteration_bonus({zoom:e}) = {got}, expected {expected}",
+            );
+        }
+
+        // zoom < 1.0 must clamp to 0 bonus (no negative iteration counts).
+        assert_eq!(zoom_iteration_bonus(0.5), 0);
+        assert_eq!(zoom_iteration_bonus(1e-6), 0);
+
+        // No u32 overflow at the realistic maximum user-facing zoom (SEC-001
+        // clamps `zoom_2d` to ≤ 1e30). log2(1e30)*15 ≈ 1495, far below u32::MAX.
+        let extreme = zoom_iteration_bonus(1e30);
+        assert!(
+            extreme < u32::MAX / 2,
+            "extreme bonus near overflow: {extreme}"
+        );
+
+        // Combined with a high user iteration count, the total still fits u32.
+        let max_user_iters: u32 = 100_000; // SEC-001 upper bound
+        let total = max_user_iters + extreme;
+        assert!(total < u32::MAX, "iteration total overflows u32: {total}",);
     }
 }

@@ -111,9 +111,12 @@ impl VideoRecorder {
             return Err("ffmpeg not found. Please install ffmpeg to record videos.".to_string());
         }
 
-        println!(
+        log::info!(
             "Starting video recording: {}x{} @ {}fps, format: {:?}",
-            self.width, self.height, self.fps, self.format
+            self.width,
+            self.height,
+            self.fps,
+            self.format
         );
 
         self.filename = filename.clone();
@@ -133,7 +136,7 @@ impl VideoRecorder {
             if let Err(e) =
                 Self::encoder_thread_main(width, height, fps, format, receiver, &filename)
             {
-                eprintln!("Video encoder error: {}", e);
+                log::error!("Video encoder error: {}", e);
             }
         });
 
@@ -154,7 +157,7 @@ impl VideoRecorder {
             return Err("Not recording".to_string());
         }
 
-        println!("Stopping video recording ({} frames)...", self.frame_count);
+        log::info!("Stopping video recording ({} frames)...", self.frame_count);
 
         // Drop sender to signal encoder thread to finish
         self.frame_sender = None;
@@ -163,11 +166,11 @@ impl VideoRecorder {
         if let Some(thread) = self.encoder_thread.take()
             && let Err(e) = thread.join()
         {
-            eprintln!("Encoder thread panicked: {:?}", e);
+            log::error!("Encoder thread panicked: {:?}", e);
         }
 
         self.is_recording = false;
-        println!("Video saved to {}", self.filename);
+        log::info!("Video saved to {}", self.filename);
 
         Ok(self.filename.clone())
     }
@@ -188,7 +191,7 @@ impl VideoRecorder {
             if sender.try_send(frame_data).is_ok() {
                 self.frame_count += 1;
             } else {
-                println!("Warning: Frame buffer full, skipping frame");
+                log::warn!("Frame buffer full, skipping frame");
             }
         }
 
@@ -293,7 +296,7 @@ impl VideoRecorder {
         let mut frame_count = 0;
         while let Ok(frame_data) = receiver.recv() {
             if let Err(e) = stdin.write_all(&frame_data) {
-                eprintln!("Failed to write frame to ffmpeg: {}", e);
+                log::error!("Failed to write frame to ffmpeg: {}", e);
                 break;
             }
             frame_count += 1;
@@ -309,7 +312,7 @@ impl VideoRecorder {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            eprintln!("ffmpeg stderr: {}", stderr);
+            log::error!("ffmpeg stderr: {}", stderr);
             return Err(format!("ffmpeg failed with status: {}", output.status));
         }
 
@@ -319,9 +322,11 @@ impl VideoRecorder {
             VideoFormat::GIF => "GIF animation",
         };
 
-        println!(
+        log::info!(
             "{} encoding complete: {} frames written to {}",
-            format_name, frame_count, filename
+            format_name,
+            frame_count,
+            filename
         );
 
         Ok(())

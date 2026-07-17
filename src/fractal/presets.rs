@@ -199,7 +199,7 @@ impl BookmarkGallery {
             let yaml = serde_yaml::to_string(bookmark)?;
             fs::write(bookmark_file, yaml)?;
 
-            println!("Bookmark '{}' saved", bookmark.name);
+            log::info!("Bookmark '{}' saved", bookmark.name);
             Ok(())
         } else {
             Err("Could not determine config directory".into())
@@ -215,7 +215,7 @@ impl BookmarkGallery {
                 .join(format!("{}.yaml", filename));
             let yaml = fs::read_to_string(bookmark_file)?;
             let bookmark: CameraBookmark = serde_yaml::from_str(&yaml)?;
-            println!("Bookmark '{}' loaded", bookmark.name);
+            log::info!("Bookmark '{}' loaded", bookmark.name);
             Ok(bookmark)
         } else {
             Err("Could not determine config directory".into())
@@ -230,7 +230,7 @@ impl BookmarkGallery {
                 .join("bookmarks")
                 .join(format!("{}.yaml", filename));
             fs::remove_file(bookmark_file)?;
-            println!("Bookmark '{}' deleted", filename);
+            log::info!("Bookmark '{}' deleted", filename);
             Ok(())
         } else {
             Err("Could not determine config directory".into())
@@ -745,7 +745,7 @@ impl PresetGallery {
             let yaml = serde_yaml::to_string(preset)?;
             fs::write(preset_file, yaml)?;
 
-            println!("Preset '{}' saved", preset.name);
+            log::info!("Preset '{}' saved", preset.name);
             Ok(())
         } else {
             Err("Could not determine config directory".into())
@@ -762,7 +762,7 @@ impl PresetGallery {
                 .join(format!("{}.yaml", filename));
             let yaml = fs::read_to_string(preset_file)?;
             let preset: Preset = serde_yaml::from_str(&yaml)?;
-            println!("Preset '{}' loaded", preset.name);
+            log::info!("Preset '{}' loaded", preset.name);
             Ok(preset)
         } else {
             Err("Could not determine config directory".into())
@@ -779,7 +779,7 @@ impl PresetGallery {
                 .join(format!("{}.yaml", filename));
             if preset_file.exists() {
                 fs::remove_file(&preset_file)?;
-                println!("Preset '{}' deleted", filename);
+                log::info!("Preset '{}' deleted", filename);
                 Ok(())
             } else {
                 Err(format!("Preset '{}' not found", filename).into())
@@ -827,7 +827,7 @@ impl PresetGallery {
         if let Some(path) = file_dialog.save_file() {
             let json = serde_json::to_string_pretty(preset)?;
             fs::write(&path, json)?;
-            println!("Preset '{}' exported to {}", preset.name, path.display());
+            log::info!("Preset '{}' exported to {}", preset.name, path.display());
             Ok(())
         } else {
             Err("Export cancelled by user".into())
@@ -860,7 +860,7 @@ impl PresetGallery {
 
             let json = serde_json::to_string_pretty(&preset)?;
             fs::write(&path, json)?;
-            println!("Settings exported to {}", path.display());
+            log::info!("Settings exported to {}", path.display());
             Ok(())
         } else {
             Err("Export cancelled by user".into())
@@ -877,7 +877,7 @@ impl PresetGallery {
         if let Some(path) = file_dialog.pick_file() {
             let json = fs::read_to_string(&path)?;
             let preset: Preset = serde_json::from_str(&json)?;
-            println!("Settings imported from {}", path.display());
+            log::info!("Settings imported from {}", path.display());
             Ok(preset)
         } else {
             Err("Import cancelled by user".into())
@@ -1084,6 +1084,8 @@ impl PresetGallery {
 #[cfg(test)]
 mod tests {
     use super::sanitize_name;
+    use super::{Preset, PresetCategory};
+    use crate::fractal::{FractalParams, FractalType, RenderMode, ShadingModel};
 
     // SEC-007: sanitize_name must collapse path-traversal characters so a
     // caller-supplied name cannot escape the presets/bookmarks directory.
@@ -1097,5 +1099,76 @@ mod tests {
         assert_eq!(sanitize_name("My_Preset-1"), "My_Preset-1");
         // Spaces and other punctuation collapse to '_'.
         assert_eq!(sanitize_name("cool preset!"), "cool_preset_");
+    }
+
+    /// QA-019: Preset YAML round-trip gate.
+    ///
+    /// Mirrors the `Settings` round-trip gate in `fractal/tests.rs`, but for
+    /// the `Preset` envelope (name + description + category + embedded
+    /// Settings). Built-in presets are read from disk by users and shared
+    /// across versions; a field rename, type change, or nesting drift under
+    /// a future refactor silently breaks every saved preset. This test pins
+    /// the wire format.
+    ///
+    /// Strategy: construct a `Preset` with non-default values everywhere
+    /// (so any dropped/renamed field shows up as a diff after round-trip),
+    /// serialize to YAML, parse it back, re-serialize, and assert byte-for-byte
+    /// stability. Then assert key reconstructed fields match the originals.
+    #[test]
+    fn preset_yaml_roundtrip_stable() {
+        // Start from `FractalParams::default()` and override a representative
+        // spread of fields across every Settings section — fractal, camera,
+        // material, post, capture. The point is to make every field non-default
+        // so a silent drop is detected as a value mismatch.
+        let mut params = FractalParams::default();
+        params.settings.fractal_type = FractalType::Julia2D;
+        params.settings.render_mode = RenderMode::TwoD;
+        params.settings.shading_model = ShadingModel::PBR;
+        params.settings.center_2d = [-0.7436438870, 0.1318259042];
+        params.settings.zoom_2d = 1e6;
+        params.settings.julia_c = [0.355, 0.355];
+        params.settings.max_iterations = 1500;
+        params.settings.power = 8.0;
+        params.settings.max_steps = 400;
+        params.settings.min_distance = 1e-5;
+        params.settings.bloom_enabled = true;
+        params.settings.bloom_intensity = 0.45;
+        params.settings.fxaa_enabled = true;
+        params.settings.attractor_accumulation_enabled = true;
+        params.settings.attractor_iterations_per_frame = 50_000;
+
+        let preset = Preset::from_current(
+            "Test Round-trip Preset".into(),
+            "QA-019: do not rename or retype any field".into(),
+            PresetCategory::TwoDFractals,
+            &params,
+            glam::Vec3::new(1.5, 1.0, -2.0),
+            glam::Vec3::new(0.0, 0.0, 0.0),
+        );
+
+        let yaml = serde_yaml::to_string(&preset).expect("serialize preset to yaml");
+        let parsed: Preset = serde_yaml::from_str(&yaml).expect("parse preset yaml round-trip");
+        let reserialized = serde_yaml::to_string(&parsed).expect("reserialize preset yaml");
+
+        // Byte-stable: serialization must be idempotent. A non-idempotent
+        // round-trip is the symptom of a serialization asymmetry (e.g. a
+        // serde default masking a renamed field).
+        assert_eq!(
+            yaml, reserialized,
+            "Preset YAML round-trip is not byte-stable"
+        );
+
+        // Spot-check the envelope + a representative spread of embedded fields.
+        assert_eq!(parsed.name, preset.name);
+        assert_eq!(parsed.description, preset.description);
+        assert_eq!(parsed.category, preset.category);
+        assert_eq!(parsed.settings.fractal_type, FractalType::Julia2D);
+        assert_eq!(parsed.settings.center_2d, [-0.7436438870, 0.1318259042]);
+        assert_eq!(parsed.settings.zoom_2d, 1e6);
+        assert_eq!(parsed.settings.max_iterations, 1500);
+        assert!(parsed.settings.bloom_enabled);
+        assert_eq!(parsed.settings.attractor_iterations_per_frame, 50_000);
+        assert_eq!(parsed.settings.camera_position, [1.5, 1.0, -2.0]);
+        assert_eq!(parsed.settings.camera_target, [0.0, 0.0, 0.0]);
     }
 }

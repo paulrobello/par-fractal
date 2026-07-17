@@ -79,7 +79,7 @@ impl App {
             .ok();
 
         let Ok(recv_result) = receiver.recv() else {
-            eprintln!("GPU readback channel closed (device lost?)");
+            log::error!("GPU readback channel closed (device lost?)");
             return;
         };
         if recv_result.is_ok() {
@@ -119,9 +119,9 @@ impl App {
             // Save as PNG
             if let Some(img) = image::RgbaImage::from_raw(width, height, image_data) {
                 if let Err(e) = img.save(&filename) {
-                    eprintln!("Failed to save screenshot: {}", e);
+                    log::error!("Failed to save screenshot: {}", e);
                 } else {
-                    println!("Screenshot saved to {}", filename);
+                    log::info!("Screenshot saved to {}", filename);
                     // Convert to absolute path and show in toast
                     let abs_path = std::path::Path::new(&filename)
                         .canonicalize()
@@ -131,7 +131,7 @@ impl App {
                     if self.ui.auto_open_captures
                         && let Err(e) = open::that(&abs_path)
                     {
-                        eprintln!("Failed to open screenshot: {}", e);
+                        log::error!("Failed to open screenshot: {}", e);
                     }
 
                     self.ui.show_toast_with_file(
@@ -140,10 +140,10 @@ impl App {
                     );
                 }
             } else {
-                eprintln!("Failed to create image from buffer");
+                log::error!("Failed to create image from buffer");
             }
         } else {
-            eprintln!("Failed to map screenshot buffer");
+            log::error!("Failed to map screenshot buffer");
         }
     }
 
@@ -215,7 +215,7 @@ impl App {
             .ok();
 
         let Ok(recv_result) = receiver.recv() else {
-            eprintln!("GPU readback channel closed (device lost?)");
+            log::error!("GPU readback channel closed (device lost?)");
             return;
         };
         if recv_result.is_ok() {
@@ -244,10 +244,10 @@ impl App {
 
             // Add frame to video recorder
             if let Err(e) = self.video_recorder.add_frame(frame_data) {
-                eprintln!("Failed to add frame to video: {}", e);
+                log::error!("Failed to add frame to video: {}", e);
             }
         } else {
-            eprintln!("Failed to map video frame buffer");
+            log::error!("Failed to map video frame buffer");
         }
     }
 
@@ -726,7 +726,7 @@ impl App {
             // Save as PNG
             if let Some(img) = image::RgbaImage::from_raw(width, height, image_data) {
                 img.save(&filename)?;
-                println!("High-resolution image saved to {}", filename);
+                log::info!("High-resolution image saved to {}", filename);
                 // Convert to absolute path and show in toast
                 let abs_path = std::path::Path::new(&filename)
                     .canonicalize()
@@ -736,7 +736,7 @@ impl App {
                 if self.ui.auto_open_captures
                     && let Err(e) = open::that(&abs_path)
                 {
-                    eprintln!("Failed to open high-res image: {}", e);
+                    log::error!("Failed to open high-res image: {}", e);
                 }
 
                 self.ui.show_toast_with_file(

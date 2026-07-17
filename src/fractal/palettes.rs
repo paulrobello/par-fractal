@@ -957,7 +957,7 @@ impl CustomPaletteGallery {
             let yaml = serde_yaml::to_string(palette)?;
             fs::write(palette_file, yaml)?;
 
-            println!("Custom palette '{}' saved", palette.name);
+            log::info!("Custom palette '{}' saved", palette.name);
             Ok(())
         } else {
             Err("Could not determine config directory".into())
@@ -972,7 +972,7 @@ impl CustomPaletteGallery {
                 .join(format!("{}.yaml", filename));
             let yaml = fs::read_to_string(palette_file)?;
             let palette: CustomPalette = serde_yaml::from_str(&yaml)?;
-            println!("Custom palette '{}' loaded", palette.name);
+            log::info!("Custom palette '{}' loaded", palette.name);
             Ok(palette)
         } else {
             Err("Could not determine config directory".into())
@@ -986,7 +986,7 @@ impl CustomPaletteGallery {
                 .join("palettes")
                 .join(format!("{}.yaml", filename));
             fs::remove_file(palette_file)?;
-            println!("Custom palette '{}' deleted", filename);
+            log::info!("Custom palette '{}' deleted", filename);
             Ok(())
         } else {
             Err("Could not determine config directory".into())
