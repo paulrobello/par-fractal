@@ -15,6 +15,7 @@ use camera_transition::CameraTransition;
 
 use crate::camera::{Camera, CameraController};
 use crate::fractal::{FractalParams, RenderMode};
+use crate::platform::{PlatformContext, category};
 use crate::renderer::{GpuInfo, Renderer};
 use crate::ui::UI;
 use std::sync::Arc;
@@ -94,9 +95,108 @@ pub struct App {
 }
 
 impl App {
-    /// Create a new App instance (native version)
+    /// Create a new App instance (native version).
+    ///
+    /// Thin async wrapper around [`init_common`](Self::init_common); `main.rs`
+    /// blocks on it via `pollster::block_on(App::new(...))`. Keeping the body
+    /// in a shared `init_common` is the ARC-014 dedup: native and web share
+    /// one construction path, including camera-position / UI-state restore.
     #[cfg(feature = "native")]
     pub async fn new(
+        window: Window,
+        screenshot_delay: Option<f32>,
+        exit_delay: Option<f32>,
+        preset_name: Option<String>,
+        quality_level: Option<usize>,
+    ) -> Self {
+        Self::init_common(
+            window,
+            screenshot_delay,
+            exit_delay,
+            preset_name,
+            quality_level,
+        )
+        .await
+    }
+
+    /// Create a new App instance (web version).
+    ///
+    /// Thin async wrapper around [`init_common`](Self::init_common). Returns
+    /// `Result` for symmetry with the previous signature; `init_common` itself
+    /// is infallible (errors were only ever raised by wgpu during renderer
+    /// construction, which now panics inside `Renderer::new` like native).
+    #[cfg(target_arch = "wasm32")]
+    pub async fn new_async(
+        window: Window,
+        screenshot_delay: Option<f32>,
+        exit_delay: Option<f32>,
+        preset_name: Option<String>,
+        quality_level: Option<usize>,
+    ) -> Result<Self, String> {
+        Ok(Self::init_common(
+            window,
+            screenshot_delay,
+            exit_delay,
+            preset_name,
+            quality_level,
+        )
+        .await)
+    }
+
+    /// Load the user's [`crate::fractal::Settings`] via the platform storage
+    /// abstraction (ARC-014).
+    ///
+    /// Goes through [`PlatformContext`] / [`Storage`] so the same code path
+    /// works on native (filesystem) and web (localStorage). Native first
+    /// queries the platform-storage location (`<config_dir>/settings/settings.yaml`);
+    /// if that is empty it falls back to the pre-ARC-014 location
+    /// (`<config_dir>/settings.yaml`) so existing user files keep loading
+    /// non-destructively while the save path migrates over.
+    fn load_settings_via_platform() -> Option<crate::fractal::Settings> {
+        let storage = PlatformContext::new().storage;
+        if let Ok(Some(bytes)) = storage.load(category::SETTINGS, "settings") {
+            if let Ok(yaml) = std::str::from_utf8(&bytes) {
+                if let Ok(settings) = serde_yaml::from_str::<crate::fractal::Settings>(yaml) {
+                    return Some(settings);
+                }
+            }
+        }
+
+        // Legacy native fallback: pre-ARC-014 settings lived at
+        // `<config_dir>/settings.yaml` (no category subdir). Keep loading
+        // these so the migration to platform-storage is non-destructive
+        // until the save path is also fully migrated.
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(config_dir) = directories::ProjectDirs::from("com", "fractal", "par-fractal") {
+            let legacy = config_dir.config_dir().join("settings.yaml");
+            if let Ok(yaml) = std::fs::read_to_string(legacy)
+                && let Ok(settings) = serde_yaml::from_str::<crate::fractal::Settings>(&yaml)
+            {
+                return Some(settings);
+            }
+        }
+
+        None
+    }
+
+    /// Shared constructor body for both native and web (ARC-014).
+    ///
+    /// The two public constructors ([`new`](Self::new) on native,
+    /// [`new_async`](Self::new_async) on web) are thin wrappers around this;
+    /// all the per-target divergence lives here behind narrow `cfg` gates:
+    ///
+    /// - GPU-index preference runs on native only (the browser handles
+    ///   adapter selection on web).
+    /// - The 0×0 window-size fallback runs on web only.
+    /// - User preset files are loaded from disk on native only; web has no
+    ///   file access and falls back to defaults.
+    /// - The `video_recorder` field exists on native only.
+    ///
+    /// **ARC-014 drift fix:** camera position and UI state are restored on
+    /// every target via [`load_settings_via_platform`](Self::load_settings_via_platform).
+    /// Previously the web constructor skipped this entire block; now it runs
+    /// identically, reading from `localStorage` there.
+    async fn init_common(
         window: Window,
         screenshot_delay: Option<f32>,
         exit_delay: Option<f32>,
@@ -106,41 +206,94 @@ impl App {
         let window = Arc::new(window);
         let size = window.inner_size();
 
-        // Load GPU preferences
-        let prefs = crate::fractal::AppPreferences::load();
-        let renderer = if let Some(gpu_index) = prefs.preferred_gpu_index {
-            println!("Using preferred GPU index: {}", gpu_index);
-            Renderer::new_with_gpu_preference(window.clone(), size, Some(gpu_index)).await
+        // Web canvases sometimes start at 0×0 before layout settles; fall
+        // back so wgpu surface creation doesn't fail. Native windows are
+        // always sized at construction.
+        #[cfg(target_arch = "wasm32")]
+        let size = if size.width == 0 || size.height == 0 {
+            log::warn!(
+                "Window size is {}x{}, using fallback 800x600",
+                size.width,
+                size.height
+            );
+            winit::dpi::PhysicalSize::new(800, 600)
         } else {
-            Renderer::new(window.clone(), size).await
+            size
+        };
+        #[cfg(target_arch = "wasm32")]
+        log::info!(
+            "Initializing renderer with size {}x{}",
+            size.width,
+            size.height
+        );
+
+        // Renderer. Native honours the saved GPU preference; web leaves it
+        // to the browser.
+        let renderer = {
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                let prefs = crate::fractal::AppPreferences::load();
+                if let Some(gpu_index) = prefs.preferred_gpu_index {
+                    println!("Using preferred GPU index: {}", gpu_index);
+                    Renderer::new_with_gpu_preference(window.clone(), size, Some(gpu_index)).await
+                } else {
+                    Renderer::new(window.clone(), size).await
+                }
+            }
+            #[cfg(target_arch = "wasm32")]
+            {
+                Renderer::new(window.clone(), size).await
+            }
         };
 
-        // Load fractal params from preset if specified, otherwise from saved settings
-        let fractal_params = if let Some(preset) = preset_name {
-            // First try built-in presets
-            if let Some(preset_data) = crate::fractal::PresetGallery::get_builtin_preset(&preset) {
+        // Load saved Settings once via the platform trait (camera/UI state
+        // restore runs on every target — ARC-014 drift fix). The preset
+        // path below overrides fractal parameters but not camera position,
+        // preserving the prior native semantics.
+        let saved_settings = Self::load_settings_via_platform();
+
+        let mut fractal_params = if let Some(preset) = preset_name.as_deref() {
+            // Built-in presets are in-memory and available on every target.
+            if let Some(preset_data) = crate::fractal::PresetGallery::get_builtin_preset(preset) {
+                #[cfg(not(target_arch = "wasm32"))]
                 println!("Loaded built-in preset: {}", preset);
+                #[cfg(target_arch = "wasm32")]
+                log::info!("Loaded preset: {}", preset);
                 FractalParams::from_settings(preset_data.settings.clone())
             } else {
-                // Try to load user preset from file
-                match crate::fractal::PresetGallery::load_preset(&preset) {
-                    Ok(preset_data) => {
-                        println!("Loaded user preset: {}", preset);
-                        FractalParams::from_settings(preset_data.settings)
+                // User preset files: native loads from disk; web has no
+                // file access and falls back to saved settings / defaults.
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    match crate::fractal::PresetGallery::load_preset(preset) {
+                        Ok(preset_data) => {
+                            println!("Loaded user preset: {}", preset);
+                            FractalParams::from_settings(preset_data.settings)
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to load preset '{}': {}", preset, e);
+                            eprintln!("Falling back to saved settings or defaults");
+                            saved_settings
+                                .as_ref()
+                                .map(|s| FractalParams::from_settings(s.clone()))
+                                .unwrap_or_default()
+                        }
                     }
-                    Err(e) => {
-                        eprintln!("Failed to load preset '{}': {}", preset, e);
-                        eprintln!("Falling back to saved settings or defaults");
-                        FractalParams::load_from_file().unwrap_or_default()
-                    }
+                }
+                #[cfg(target_arch = "wasm32")]
+                {
+                    log::warn!("Preset '{}' not found, using defaults", preset);
+                    FractalParams::default()
                 }
             }
         } else {
-            FractalParams::load_from_file().unwrap_or_default()
+            saved_settings
+                .as_ref()
+                .map(|s| FractalParams::from_settings(s.clone()))
+                .unwrap_or_default()
         };
 
-        // Apply quality level from CLI if specified
-        let mut fractal_params = fractal_params;
+        // Apply quality level from CLI (native) or URL param (web).
         if let Some(level) = quality_level {
             let level = level.min(3); // Clamp to valid range 0-3
             let quality_name = match level {
@@ -149,7 +302,10 @@ impl App {
                 2 => "Medium",
                 _ => "Low",
             };
+            #[cfg(not(target_arch = "wasm32"))]
             println!("Setting quality level: {}", quality_name);
+            #[cfg(target_arch = "wasm32")]
+            log::info!("Setting quality level: {}", quality_name);
 
             // Enable LOD system and set to use the specified quality level
             fractal_params.lod_config.enabled = true;
@@ -171,14 +327,13 @@ impl App {
         camera.fovy = fractal_params.camera_fov;
         let mut camera_controller = CameraController::new(fractal_params.camera_speed);
 
-        // Load camera position and UI state from settings if available
+        // ARC-014 drift fix: restore camera position + UI state on EVERY
+        // target via the platform storage trait. Web previously skipped this
+        // block entirely; now it runs identically, reading from localStorage
+        // there (and from the legacy `settings.yaml` path on native until the
+        // save side fully migrates).
         let mut ui = UI::new();
-        if let Ok(content) = std::fs::read_to_string(
-            directories::ProjectDirs::from("com", "fractal", "par-fractal")
-                .map(|dirs| dirs.config_dir().join("settings.yaml"))
-                .unwrap_or_else(|| std::path::PathBuf::from("settings.yaml")),
-        ) && let Ok(settings) = serde_yaml::from_str::<crate::fractal::Settings>(&content)
-        {
+        if let Some(settings) = saved_settings {
             camera.position = glam::Vec3::from_array(settings.camera_position);
             camera.target = glam::Vec3::from_array(settings.camera_target);
             // Update controller's yaw/pitch to match the loaded camera direction
@@ -202,6 +357,7 @@ impl App {
             },
         );
 
+        #[cfg(feature = "native")]
         let video_recorder = VideoRecorder::new(size.width, size.height, 60, VideoFormat::MP4);
 
         Self {
@@ -234,6 +390,7 @@ impl App {
             start_time: web_time::Instant::now(),
             camera_transition: CameraTransition::new(),
             smooth_transitions_enabled: true,
+            #[cfg(feature = "native")]
             video_recorder,
             screenshot_delay,
             exit_delay,
@@ -241,142 +398,9 @@ impl App {
             should_exit: false,
             bloom_texture_cleared: false,
             scene_dirty: true,
+            #[cfg(not(target_arch = "wasm32"))]
             gpu_scan_receiver: None,
         }
-    }
-
-    /// Create a new App instance (web version with error handling)
-    #[cfg(target_arch = "wasm32")]
-    pub async fn new_async(
-        window: Window,
-        screenshot_delay: Option<f32>,
-        exit_delay: Option<f32>,
-        preset_name: Option<String>,
-        quality_level: Option<usize>,
-    ) -> Result<Self, String> {
-        let window = Arc::new(window);
-        let mut size = window.inner_size();
-
-        // Ensure we have valid dimensions (fallback for web where size might be 0x0 initially)
-        if size.width == 0 || size.height == 0 {
-            log::warn!(
-                "Window size is {}x{}, using fallback 800x600",
-                size.width,
-                size.height
-            );
-            size = winit::dpi::PhysicalSize::new(800, 600);
-        }
-
-        log::info!(
-            "Initializing renderer with size {}x{}",
-            size.width,
-            size.height
-        );
-
-        // Create renderer (no GPU preference on web - browser handles this)
-        let renderer = Renderer::new(window.clone(), size).await;
-
-        // Use default fractal params for web (no persistent storage yet)
-        // TODO: Load from localStorage via platform abstraction
-        let fractal_params = if let Some(preset) = preset_name {
-            match crate::fractal::PresetGallery::get_builtin_preset(&preset) {
-                Some(preset_data) => {
-                    log::info!("Loaded preset: {}", preset);
-                    FractalParams::from_settings(preset_data.settings.clone())
-                }
-                None => {
-                    log::warn!("Preset '{}' not found, using defaults", preset);
-                    FractalParams::default()
-                }
-            }
-        } else {
-            FractalParams::default()
-        };
-
-        // Apply quality level from URL parameter if specified
-        let mut fractal_params = fractal_params;
-        if let Some(level) = quality_level {
-            let level = level.min(3); // Clamp to valid range 0-3
-            let quality_name = match level {
-                0 => "Ultra",
-                1 => "High",
-                2 => "Medium",
-                _ => "Low",
-            };
-            log::info!("Setting quality level: {}", quality_name);
-
-            // Enable LOD system and set to use the specified quality level
-            fractal_params.lod_config.enabled = true;
-            fractal_params.lod_state.current_level = level;
-            fractal_params.lod_state.target_level = level;
-            fractal_params.lod_state.transition_progress = 1.0;
-            fractal_params.lod_state.active_quality =
-                fractal_params.lod_config.quality_presets[level];
-
-            // Set min_quality_level so LOD won't drop below the requested level
-            fractal_params.lod_config.min_quality_level = level;
-
-            // Apply the quality settings to fractal params immediately
-            fractal_params.max_steps = fractal_params.lod_state.active_quality.max_steps;
-            fractal_params.min_distance = fractal_params.lod_state.active_quality.min_distance;
-        }
-
-        let mut camera = Camera::new(size.width, size.height);
-        camera.fovy = fractal_params.camera_fov;
-        let camera_controller = CameraController::new(fractal_params.camera_speed);
-
-        let ui = UI::new();
-
-        let egui_ctx = egui::Context::default();
-        let egui_state =
-            egui_winit::State::new(egui_ctx, egui::ViewportId::ROOT, &window, None, None, None);
-
-        let egui_renderer = egui_wgpu::Renderer::new(
-            &renderer.device,
-            renderer.config.format,
-            egui_wgpu::RendererOptions {
-                msaa_samples: 1,
-                ..Default::default()
-            },
-        );
-
-        Ok(Self {
-            window,
-            renderer,
-            camera,
-            camera_controller,
-            fractal_params,
-            ui,
-            egui_state,
-            egui_renderer,
-            last_frame_time: web_time::Instant::now(),
-            mouse_pressed: false,
-            last_mouse_pos: None,
-            cursor_pos: (0.0, 0.0),
-            shift_pressed: false,
-            active_touches: std::collections::HashMap::new(),
-            initial_pinch_distance: None,
-            last_touch_time: None,
-            frame_count: 0,
-            fps_timer: web_time::Instant::now(),
-            current_fps: 0.0,
-            save_screenshot: false,
-            save_hires_render: None,
-            camera_last_moved: web_time::Instant::now(),
-            camera_needs_save: false,
-            settings_last_changed: web_time::Instant::now(),
-            settings_need_save: false,
-            was_auto_orbiting: false,
-            start_time: web_time::Instant::now(),
-            camera_transition: CameraTransition::new(),
-            smooth_transitions_enabled: true,
-            screenshot_delay,
-            exit_delay,
-            screenshot_taken: false,
-            should_exit: false,
-            bloom_texture_cleared: false,
-            scene_dirty: true,
-        })
     }
 
     /// Borrow the application's window.

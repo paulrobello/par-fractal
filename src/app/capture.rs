@@ -1,3 +1,12 @@
+//! Native capture and recording (screenshots, hi-res renders, video).
+//!
+//! TODO(ARC-014): this module and `capture_web.rs` are a near-duplicate pair
+//! (734 vs 659 lines) that should be deduplicated behind the `platform::`
+//! `Capture` / `FileDialog` traits, mirroring the constructor merge already
+//! done on `App::new` / `App::new_async`. The capture dedup is deliberately
+//! out of scope for the ARC-014 constructor pass — see `AUDIT.md` and
+//! `AUDIT-REMEDIATION-PLAN.md` (Phase 3b, ARC-014) for the playbook.
+
 use super::App;
 
 /// Capture and recording methods

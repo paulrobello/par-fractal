@@ -3,6 +3,13 @@ mod camera;
 mod command_palette;
 mod fractal;
 mod lod;
+// `platform` is dormant infrastructure being incrementally wired up via the
+// `platform::` traits (ARC-014 constructor dedup uses `PlatformContext` +
+// `Storage`; the `FileDialog` / `Capture` traits and the unused `category`
+// constants await the larger `capture.rs` / `capture_web.rs` dedup noted in
+// AUDIT ARC-014). Silence dead-code until those land.
+#[allow(dead_code)]
+mod platform;
 mod renderer;
 mod ui;
 mod video_recorder;

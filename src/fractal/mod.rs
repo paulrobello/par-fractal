@@ -726,7 +726,12 @@ impl FractalParams {
     /// Returns `None` if the config dir cannot be determined, the file is
     /// missing, or the YAML fails to parse. Values are trust-boundary clamped
     /// via [`from_settings`](Self::from_settings).
+    ///
+    /// Unused inside this crate after ARC-014 routed construction through
+    /// `App::load_settings_via_platform`; retained as part of the public rlib
+    /// API. Slated for removal in QA-020.
     #[cfg(not(target_arch = "wasm32"))]
+    #[allow(dead_code)]
     pub fn load_from_file() -> Option<Self> {
         if let Some(config_dir) = directories::ProjectDirs::from("com", "fractal", "par-fractal") {
             let settings_file = config_dir.config_dir().join("settings.yaml");
@@ -743,6 +748,7 @@ impl FractalParams {
 
     /// Load from file (web stub — always returns `None` on WASM).
     #[cfg(target_arch = "wasm32")]
+    #[allow(dead_code)]
     pub fn load_from_file() -> Option<Self> {
         // Settings persistence not yet implemented for web
         None

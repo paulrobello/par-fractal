@@ -1,4 +1,11 @@
-//! Web capture implementation using WebGPU buffer readback
+//! Web capture implementation using WebGPU buffer readback.
+//!
+//! TODO(ARC-014): this module and `capture.rs` are a near-duplicate pair
+//! (659 vs 734 lines) that should be deduplicated behind the `platform::`
+//! `Capture` / `FileDialog` traits, mirroring the constructor merge already
+//! done on `App::new` / `App::new_async`. The capture dedup is deliberately
+//! out of scope for the ARC-014 constructor pass — see `AUDIT.md` and
+//! `AUDIT-REMEDIATION-PLAN.md` (Phase 3b, ARC-014) for the playbook.
 
 use crate::camera::Camera;
 use crate::fractal::FractalParams;
