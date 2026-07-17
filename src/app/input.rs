@@ -484,7 +484,9 @@ impl App {
                                 let center_x = (touches[0].0 + touches[1].0) / 2.0;
                                 let center_y = (touches[0].1 + touches[1].1) / 2.0;
 
-                                // Convert pinch center from screen coords to fractal coords
+                                // Convert pinch center from screen coords to NDC
+                                // ([-1,1], y-up, before aspect correction — same convention
+                                // as zoom_at: matches continuous-zoom and scroll-wheel paths).
                                 let screen_x =
                                     (center_x / self.renderer.size.width as f32) * 2.0 - 1.0;
                                 let screen_y =
@@ -492,26 +494,15 @@ impl App {
                                 let aspect = self.renderer.size.width as f64
                                     / self.renderer.size.height as f64;
 
-                                // Calculate where the pinch center is in fractal coordinates
-                                let fractal_x = self.fractal_params.center_2d[0]
-                                    + (screen_x as f64) * aspect
-                                        / self.fractal_params.zoom_2d as f64;
-                                let fractal_y = self.fractal_params.center_2d[1]
-                                    + (screen_y as f64) / self.fractal_params.zoom_2d as f64;
-
-                                // Apply zoom
-                                let old_zoom = self.fractal_params.zoom_2d;
-                                self.fractal_params.zoom_2d *= zoom_factor;
-
-                                // Adjust center so the pinch point stays in the same place
-                                // new_center = old_center + (point - old_center) * (1 - old_zoom/new_zoom)
-                                let zoom_ratio = old_zoom / self.fractal_params.zoom_2d;
-                                self.fractal_params.center_2d[0] += (fractal_x
-                                    - self.fractal_params.center_2d[0])
-                                    * (1.0 - zoom_ratio as f64);
-                                self.fractal_params.center_2d[1] += (fractal_y
-                                    - self.fractal_params.center_2d[1])
-                                    * (1.0 - zoom_ratio as f64);
+                                // Shared seam: zoom_at keeps the fractal point under the
+                                // pinch center fixed. (Replaces a bespoke computation that
+                                // differed from the reference by a factor of 2 in the
+                                // center correction, causing drift toward a corner.)
+                                self.fractal_params.zoom_at(
+                                    (screen_x as f64, screen_y as f64),
+                                    zoom_factor as f64,
+                                    aspect,
+                                );
 
                                 // Update initial distance for next frame
                                 self.initial_pinch_distance = Some(current_distance);
@@ -538,9 +529,9 @@ impl App {
                                 let aspect = self.renderer.size.width as f64
                                     / self.renderer.size.height as f64;
                                 self.fractal_params.center_2d[0] -=
-                                    delta_x * 2.0 / self.fractal_params.zoom_2d as f64 * aspect;
+                                    delta_x * 2.0 / self.fractal_params.zoom_2d * aspect;
                                 self.fractal_params.center_2d[1] +=
-                                    delta_y * 2.0 / self.fractal_params.zoom_2d as f64;
+                                    delta_y * 2.0 / self.fractal_params.zoom_2d;
                             }
                             self.last_mouse_pos = Some(current_pos);
                             true
@@ -592,9 +583,9 @@ impl App {
                         // Scale factor matches shader: world = screen * 2 / (zoom * height)
                         // delta is already normalized by width/height, so multiply by 2
                         self.fractal_params.center_2d[0] -=
-                            delta_x * 2.0 / self.fractal_params.zoom_2d as f64 * aspect;
+                            delta_x * 2.0 / self.fractal_params.zoom_2d * aspect;
                         self.fractal_params.center_2d[1] +=
-                            delta_y * 2.0 / self.fractal_params.zoom_2d as f64;
+                            delta_y * 2.0 / self.fractal_params.zoom_2d;
                     }
                     self.last_mouse_pos = Some(current_pos);
                     true
@@ -618,28 +609,14 @@ impl App {
                     let aspect = width / height;
 
                     // Convert cursor position to normalized coordinates [-1, 1]
+                    // (y-up, before aspect correction — matches the zoom_at seam).
                     let norm_x = (self.cursor_pos.0 as f64 / width) * 2.0 - 1.0;
                     let norm_y = 1.0 - (self.cursor_pos.1 as f64 / height) * 2.0; // Flip Y
 
-                    // Convert to fractal coordinates
-                    let zoom = self.fractal_params.zoom_2d as f64;
-                    let fractal_x =
-                        self.fractal_params.center_2d[0] + (norm_x * 2.0 / zoom) * aspect;
-                    let fractal_y = self.fractal_params.center_2d[1] + norm_y * 2.0 / zoom;
-
-                    // Apply zoom
-                    self.fractal_params.zoom_2d *= zoom_factor;
-
-                    // Adjust center so the point under cursor stays in place
-                    let new_zoom = self.fractal_params.zoom_2d as f64;
-                    let new_fractal_x =
-                        self.fractal_params.center_2d[0] + (norm_x * 2.0 / new_zoom) * aspect;
-                    let new_fractal_y = self.fractal_params.center_2d[1] + norm_y * 2.0 / new_zoom;
-
-                    self.fractal_params.center_2d[0] += fractal_x - new_fractal_x;
-                    self.fractal_params.center_2d[1] += fractal_y - new_fractal_y;
+                    self.fractal_params
+                        .zoom_at((norm_x, norm_y), zoom_factor as f64, aspect);
                 } else {
-                    self.fractal_params.zoom_2d *= zoom_factor;
+                    self.fractal_params.zoom_2d *= zoom_factor as f64;
                 }
                 true
             }

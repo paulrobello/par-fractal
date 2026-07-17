@@ -118,7 +118,7 @@ impl App {
                     compute.uniforms = BuddhabrotComputeUniforms {
                         center_x: self.fractal_params.center_2d[0] as f32,
                         center_y: self.fractal_params.center_2d[1] as f32,
-                        zoom: self.fractal_params.zoom_2d,
+                        zoom: self.fractal_params.zoom_2d as f32,
                         aspect_ratio: self.renderer.size.width as f32
                             / self.renderer.size.height as f32,
                         width: self.renderer.size.width,
@@ -184,7 +184,7 @@ impl App {
                         param_d: 0.0,
                         center_x: self.fractal_params.center_2d[0] as f32,
                         center_y: self.fractal_params.center_2d[1] as f32,
-                        zoom: self.fractal_params.zoom_2d,
+                        zoom: self.fractal_params.zoom_2d as f32,
                         aspect_ratio: self.renderer.size.width as f32
                             / self.renderer.size.height as f32,
                         width: self.renderer.size.width,

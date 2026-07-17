@@ -66,7 +66,12 @@ pub struct FractalParams {
 
     // 2D specific
     pub center_2d: [f64; 2],
-    pub zoom_2d: f32,
+    /// 2D zoom factor. Stored as f64 (ARC-001) so per-frame `* factor` accumulation
+    /// in `zoom_at` does not round at f32 precision across long zoom sequences.
+    /// The GPU uniform receives this as f32 (cast at the boundary in `Uniforms::update`),
+    /// which is the remaining precision limiter; the double-float center (hi/lo) is what
+    /// actually extends the on-GPU ceiling to ~1e11.
+    pub zoom_2d: f64,
     pub julia_c: [f32; 2],
     pub max_iterations: u32,
 
@@ -171,8 +176,9 @@ pub struct FractalParams {
     pub attractor_max_iterations: u64,
     /// Last view center for detecting pan (triggers auto-clear)
     pub attractor_last_center: [f64; 2],
-    /// Last zoom level for detecting zoom (triggers auto-clear)
-    pub attractor_last_zoom: f32,
+    /// Last zoom level for detecting zoom (triggers auto-clear). f64 to match
+    /// `zoom_2d` (ARC-001) so change detection isn't tripped by f32 rounding.
+    pub attractor_last_zoom: f64,
     /// Last julia_c parameters (triggers auto-clear on change)
     pub attractor_last_julia_c: [f32; 2],
 }
@@ -293,6 +299,28 @@ impl Default for FractalParams {
 }
 
 impl FractalParams {
+    /// Zoom by `factor` keeping the fractal point under `cursor_ndc` fixed.
+    ///
+    /// `cursor_ndc` is the cursor position in normalized device coordinates:
+    /// `[-1, 1]` on both axes, y-up (i.e. `norm_y = 1.0 - 2.0 * cursor_y / height`),
+    /// BEFORE aspect correction. `aspect` is `width / height`.
+    ///
+    /// This is the single seam for zoom-at-cursor in 2D mode; the three input paths
+    /// (continuous shift+drag, pinch, scroll wheel) all converge here so the f64
+    /// representation (ARC-001) and any future precision work flows through one place.
+    /// Reference behavior: matches `src/app/update.rs`'s continuous-zoom path exactly.
+    pub fn zoom_at(&mut self, cursor_ndc: (f64, f64), factor: f64, aspect: f64) {
+        let old_zoom = self.zoom_2d;
+        // Fractal point under the cursor in old coordinates.
+        let fx = self.center_2d[0] + (cursor_ndc.0 * 2.0 / old_zoom) * aspect;
+        let fy = self.center_2d[1] + cursor_ndc.1 * 2.0 / old_zoom;
+        let new_zoom = old_zoom * factor;
+        // Re-center so the same fractal point stays under the cursor at the new zoom.
+        self.center_2d[0] = fx - (cursor_ndc.0 * 2.0 / new_zoom) * aspect;
+        self.center_2d[1] = fy - cursor_ndc.1 * 2.0 / new_zoom;
+        self.zoom_2d = new_zoom;
+    }
+
     pub fn to_settings(&self) -> Settings {
         Settings {
             fractal_type: self.fractal_type,
@@ -433,7 +461,7 @@ impl FractalParams {
             settings.attractor_iterations_per_frame.clamp(1, 2_000_000);
         let shadow_samples = settings.shadow_samples.min(512);
         let dof_samples = settings.dof_samples.min(64);
-        let zoom_2d = clamp_finite_f32(settings.zoom_2d, 1e-6, 1e15, 1.0);
+        let zoom_2d = clamp_finite_f64(settings.zoom_2d, 1e-6, 1e30, 1.0);
         let min_distance = clamp_finite_f32(settings.min_distance, 1e-7, 1.0, 0.00035);
         let orbit_trap_scale = clamp_finite_f32(settings.orbit_trap_scale, 0.0, 1e6, 1.0);
         let power = clamp_finite_f32(settings.power, -1e4, 1e4, 2.0);

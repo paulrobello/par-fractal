@@ -277,12 +277,26 @@ impl Uniforms {
         self.camera_pos = camera.position.into();
 
         self.center = [params.center_2d[0] as f32, params.center_2d[1] as f32];
-        self.zoom = params.zoom_2d;
+        // ARC-001: zoom_2d is f64 CPU-side; the GPU uniform stays f32 (casting here at
+        // the boundary). The f32 GPU zoom is the remaining precision limiter; the
+        // double-float center (hi/lo) is what actually extends the on-GPU ceiling.
+        self.zoom = params.zoom_2d as f32;
         self.aspect_ratio[0] = camera.aspect;
 
-        // High-precision center: split f64 into (hi, lo) pair
-        // Auto-enable high precision when zoom > 1e6
-        let use_high_precision = params.zoom_2d > 1_000_000.0;
+        // High-precision center: split f64 into (hi, lo) pair.
+        //
+        // hp auto-enable threshold (QA-004 / ARC-002). The previous `> 1e6` rule
+        // engaged double-float two decades too late: f32 per-pixel spacing near a
+        // unit-magnitude center collapses at zoom ~2e4–6e4 at 1080p, so by 1e6 the
+        // image was already badly quantized. The derived form would scale pixel
+        // spacing against `center_mag * f32::EPSILON * safety`, but plumbing window
+        // height into `Uniforms::update` (which only sees `camera.aspect` today) is
+        // out of scope for this bundle; the simple 1e4 threshold lands two decades
+        // earlier at the conservative end of the visible-quantization range. hp is
+        // ~10–20× slower — drop the constant toward ~1e3 only if perf regresses at
+        // moderate zoom and the derived criterion is not yet plumbed.
+        const HP_ZOOM_THRESHOLD: f64 = 1e4;
+        let use_high_precision = params.zoom_2d > HP_ZOOM_THRESHOLD;
         self.high_precision = if use_high_precision { 1 } else { 0 };
 
         // Split center coordinates into double-float pairs

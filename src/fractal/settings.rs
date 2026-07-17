@@ -40,7 +40,7 @@ pub struct Settings {
 
     // 2D specific
     pub center_2d: [f64; 2],
-    pub zoom_2d: f32,
+    pub zoom_2d: f64,
     pub julia_c: [f32; 2],
     pub max_iterations: u32,
 

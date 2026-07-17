@@ -48,26 +48,15 @@ impl App {
             let zoom_speed = 2.0; // Zoom factor per second
             let zoom_factor = (zoom_speed * dt).exp();
 
-            // Zoom at cursor position
+            // Zoom at cursor position via the shared seam (cursor_ndc is y-up,
+            // [-1,1], before aspect correction).
             let width = self.renderer.size.width as f64;
             let height = self.renderer.size.height as f64;
             let aspect = width / height;
             let norm_x = (self.cursor_pos.0 as f64 / width) * 2.0 - 1.0;
             let norm_y = 1.0 - (self.cursor_pos.1 as f64 / height) * 2.0;
-
-            let zoom = self.fractal_params.zoom_2d as f64;
-            let fractal_x = self.fractal_params.center_2d[0] + (norm_x * 2.0 / zoom) * aspect;
-            let fractal_y = self.fractal_params.center_2d[1] + norm_y * 2.0 / zoom;
-
-            self.fractal_params.zoom_2d *= zoom_factor;
-
-            let new_zoom = self.fractal_params.zoom_2d as f64;
-            let new_fractal_x =
-                self.fractal_params.center_2d[0] + (norm_x * 2.0 / new_zoom) * aspect;
-            let new_fractal_y = self.fractal_params.center_2d[1] + norm_y * 2.0 / new_zoom;
-
-            self.fractal_params.center_2d[0] += fractal_x - new_fractal_x;
-            self.fractal_params.center_2d[1] += fractal_y - new_fractal_y;
+            self.fractal_params
+                .zoom_at((norm_x, norm_y), zoom_factor as f64, aspect);
         }
 
         // Update camera for 3D mode

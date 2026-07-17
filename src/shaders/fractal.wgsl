@@ -351,7 +351,11 @@ struct df2 {
     lo: vec2<f32>,  // Low parts (real, imag)
 }
 
-// Quick two-sum: a + b = s + e, where s = fl(a+b) and e = error
+// Quick two-sum: a + b = s + e, where s = fl(a+b) and e = error.
+// CORRECTNESS DEPENDS on the WGSL spec's guarantee that floating-point
+// operations are NOT reordered or associated (the error term would vanish
+// under fast-math reassociation). Do not simplify the algebra — every
+// intermediate `let` here is load-bearing for the error-free transform.
 fn two_sum(a: f32, b: f32) -> vec2<f32> {
     let s = a + b;
     let v = s - a;
@@ -377,10 +381,21 @@ fn df_add_full(a_hi: f32, a_lo: f32, b_hi: f32, b_lo: f32) -> vec2<f32> {
     return vec2<f32>(s3.x, s3.y + s2.y);
 }
 
-// Quick two-product: a * b = p + e (using FMA if available, otherwise split)
+// Two-product: a * b = p + e via Dekker split. Correct on all IEEE-754 f32
+// hardware without relying on hardware FMA (which naga/backends may lower to
+// `a*b + 0`, collapsing the error term to 0 and silently reducing DF to f32).
+// Do NOT let any simplification merge the intermediate `let`s — that destroys
+// the error-free transformation. (QA-005)
 fn two_prod(a: f32, b: f32) -> vec2<f32> {
     let p = a * b;
-    let e = fma(a, b, -p);
+    let SPLIT = 4097.0; // 2^12 + 1 for f32 (24-bit mantissa)
+    let a_t = a * SPLIT;
+    let a_hi = a_t - (a_t - a);
+    let a_lo = a - a_hi;
+    let b_t = b * SPLIT;
+    let b_hi = b_t - (b_t - b);
+    let b_lo = b - b_hi;
+    let e = ((a_hi * b_hi - p) + a_hi * b_lo + a_lo * b_hi) + a_lo * b_lo;
     return vec2<f32>(p, e);
 }
 
@@ -502,8 +517,11 @@ fn burning_ship_hp(c_hi: vec2<f32>, c_lo: vec2<f32>) -> f32 {
         }
 
         // Burning Ship: z = (|Re(z)| + i|Im(z)|)^2 + c
-        // Take absolute value of both components (using hi part, lo follows sign)
-        let z_abs = df2(abs(z.hi), abs(z.lo) * sign(z.hi));
+        // DF abs: when the hi word of a component is negative, BOTH words must be
+        // negated. Using `select` (rather than `sign(hi)`) avoids `sign(0.0) == 0.0`
+        // silently zeroing the lo word when hi == 0. (QA-002)
+        let neg = select(vec2<f32>(1.0), vec2<f32>(-1.0), z.hi < vec2<f32>(0.0));
+        let z_abs = df2(abs(z.hi), z.lo * neg);
         z = df2_add(df2_square(z_abs), c);
         iteration = i;
     }
@@ -2942,8 +2960,12 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
         var t: f32;
         var coord: vec2<f32>;
 
-        // Check if high-precision mode is enabled and fractal supports it
-        if (uniforms.high_precision == 1u && uniforms.fractal_type <= 4u) {
+        // Check if high-precision mode is enabled and fractal supports it.
+        // Gate covers types 0..=5 (Mandelbrot, Julia, Sierpinski, SierpinskiTriangle,
+        // BurningShip, Tricorn). Tricorn (type 5) was previously excluded here, which
+        // made tricorn_hp unreachable — the silent dispatch through the final `else`
+        // never fired because the gate short-circuited first. (QA-001)
+        if (uniforms.high_precision == 1u && uniforms.fractal_type <= 5u) {
             // High-precision coordinate calculation
             // offset = uv * 2.0 / zoom * aspect (for x) or uv * 2.0 / zoom (for y)
             let offset_x = input.uv.x * 2.0 / uniforms.zoom * aspect;
@@ -2967,8 +2989,17 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
                 t = sierpinski_triangle_hp(coord_hi, coord_lo);
             } else if (uniforms.fractal_type == 4u) {
                 t = burning_ship_hp(coord_hi, coord_lo);
-            } else {
+            } else if (uniforms.fractal_type == 5u) {
                 t = tricorn_hp(coord_hi, coord_lo);
+            } else {
+                // Defensive fallback (unreachable: gate ensures type in 0..=5).
+                // Use standard-precision coord + mandelbrot as a safe default —
+                // never silently dispatch through an hp function.
+                coord = vec2<f32>(
+                    uniforms.center.x + (input.uv.x * 2.0 / uniforms.zoom) * aspect,
+                    uniforms.center.y + (input.uv.y * 2.0 / uniforms.zoom)
+                );
+                t = mandelbrot(coord);
             }
         } else {
             // Standard precision coordinate
