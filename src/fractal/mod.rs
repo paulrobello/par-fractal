@@ -999,14 +999,47 @@ impl FractalParams {
         self.lod_state
             .update_transition(delta_time, self.lod_config.transition_duration);
 
-        // Get active quality (interpolated if transitioning)
+        // Cache the active (interpolated) quality so `effective_quality()`
+        // and the LOD debug overlay can read it. The values are NOT written
+        // into the user-visible FractalParams fields — that clobbered slider
+        // values and persisted degraded state into settings.yaml (ARC-008/QA-010).
+        // The merge with user values happens in `Uniforms::update`.
         self.lod_state.active_quality = self.lod_state.get_active_quality(
             &self.lod_config.quality_presets,
             self.lod_config.smooth_transitions,
         );
+    }
 
-        // Apply quality to rendering parameters
-        self.apply_lod_quality();
+    /// The `QualityLevel` currently in effect for rendering.
+    ///
+    /// When LOD is enabled, this is the LOD-active preset (interpolated during
+    /// smooth transitions). When LOD is disabled, it is a snapshot of the
+    /// user's own slider values — `FractalParams` no longer carries LOD-derived
+    /// quality in its serialized fields, so `to_settings()` persists only
+    /// authored values. `Uniforms::update` merges this with the user-authored
+    /// fields at uniform-build time; the merge is the only place LOD quality
+    /// reaches the GPU. (ARC-008 / QA-010.)
+    pub fn effective_quality(&self) -> crate::lod::QualityLevel {
+        use crate::lod::QualityLevel;
+        if self.lod_config.enabled {
+            self.lod_state.get_active_quality(
+                &self.lod_config.quality_presets,
+                self.lod_config.smooth_transitions,
+            )
+        } else {
+            QualityLevel {
+                max_steps: self.max_steps,
+                min_distance: self.min_distance,
+                shadow_samples: self.shadow_samples,
+                shadow_step_factor: self.shadow_step_factor,
+                ao_step_size: self.ao_step_size,
+                dof_samples: self.dof_samples,
+                // `render_scale` is unused by the renderer today (see the
+                // deleted `apply_lod_quality` comment in the prior commit);
+                // pass through 1.0 to keep the field well-formed.
+                render_scale: 1.0,
+            }
+        }
     }
 
     /// Calculate target LOD level based on current strategy
@@ -1146,21 +1179,9 @@ impl FractalParams {
         }
     }
 
-    /// Apply the active LOD quality level to rendering parameters
-    fn apply_lod_quality(&mut self) {
-        let quality = &self.lod_state.active_quality;
-
-        // Apply quality parameters to fractal params
-        self.max_steps = quality.max_steps;
-        self.min_distance = quality.min_distance;
-        self.shadow_samples = quality.shadow_samples;
-        self.shadow_step_factor = quality.shadow_step_factor;
-        self.ao_step_size = quality.ao_step_size;
-        self.dof_samples = quality.dof_samples;
-
-        // Render scale would require render target resizing, which we'll skip for now
-        // This could be added in a future phase
-    }
+    // ARC-008: `apply_lod_quality` was removed. LOD no longer mutates
+    // `FractalParams`; the effective quality is computed at uniform-build time
+    // in `Uniforms::update` via `effective_quality()`.
 }
 
 #[cfg(test)]

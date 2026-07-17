@@ -3,6 +3,7 @@ use crate::fractal::FractalParams;
 use crate::renderer::compute::{
     AccumulationDisplayUniforms, AttractorComputeUniforms, BuddhabrotComputeUniforms,
 };
+use crate::ui::UiActions;
 
 #[cfg(not(target_arch = "wasm32"))]
 use crate::video_recorder::VideoRecorder;
@@ -594,7 +595,14 @@ impl App {
             #[cfg(target_arch = "wasm32")]
             let is_rec = false; // Video recording not supported on web
 
-            let (
+            let actions = self.ui.render(
+                ctx,
+                &mut self.fractal_params,
+                self.camera.position,
+                self.camera.target,
+                is_rec,
+            );
+            let UiActions {
                 changed,
                 screenshot_requested,
                 reset_requested,
@@ -606,13 +614,7 @@ impl App {
                 gpu_scan_requested,
                 start_recording,
                 stop_recording,
-            ) = self.ui.render(
-                ctx,
-                &mut self.fractal_params,
-                self.camera.position,
-                self.camera.target,
-                is_rec,
-            );
+            } = actions;
 
             // Render command palette overlay (always on top)
             if let Some(command_action) = self.ui.render_command_palette(ctx) {

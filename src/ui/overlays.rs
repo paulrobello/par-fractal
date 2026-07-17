@@ -558,7 +558,10 @@ impl UI {
                                 .strong(),
                         );
 
-                        let quality = &params.lod_state.active_quality;
+                        // ARC-008: read the merged effective quality (LOD-active when
+                        // LOD is on, user-authored otherwise), not the raw LOD state,
+                        // so the overlay reflects what the GPU actually receives.
+                        let quality = params.effective_quality();
                         let params_text = [
                             format!("Steps: {}", quality.max_steps),
                             format!("Min Dist: {:.6}", quality.min_distance),

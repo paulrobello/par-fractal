@@ -22,6 +22,38 @@ use history::HistoryEntry;
 
 use crate::fractal::ProceduralPalette;
 
+/// Outputs from `UI::render` consumed by the app layer (ARC-003).
+///
+/// Replaces an 11-element tuple so consumers destructure by name — prevents
+/// the "two adjacent bools swapped" class of bug. Field order matches the
+/// historical tuple positional order; names are derived from how the
+/// call site in `app/render.rs` used each position.
+#[derive(Default)]
+pub struct UiActions {
+    /// Any fractal parameter changed this frame (triggers settings save).
+    pub changed: bool,
+    /// User clicked the screenshot button.
+    pub screenshot_requested: bool,
+    /// User requested a full parameter reset to defaults.
+    pub reset_requested: bool,
+    /// User requested a camera-only reset.
+    pub reset_camera_requested: bool,
+    /// User clicked "point camera at fractal center".
+    pub point_at_fractal_requested: bool,
+    /// User selected a preset to load from the gallery.
+    pub preset_to_load: Option<Preset>,
+    /// User requested a high-resolution render at this resolution.
+    pub hires_render_resolution: Option<(u32, u32)>,
+    /// User selected a camera bookmark to apply.
+    pub bookmark_to_load: Option<CameraBookmark>,
+    /// User clicked the GPU rescan button.
+    pub gpu_scan_requested: bool,
+    /// User clicked the video-record start button.
+    pub start_recording: bool,
+    /// User clicked the video-record stop button.
+    pub stop_recording: bool,
+}
+
 /// Generate a preview color for procedural palettes (CPU-side approximation of shader code)
 fn get_procedural_preview_color(
     palette_type: ProceduralPalette,
@@ -369,7 +401,6 @@ impl UI {
         &self.ui_state
     }
 
-    #[allow(clippy::type_complexity)]
     pub fn render(
         &mut self,
         ctx: &Context,
@@ -377,19 +408,7 @@ impl UI {
         camera_pos: Vec3,
         camera_target: Vec3,
         is_recording: bool,
-    ) -> (
-        bool,
-        bool,
-        bool,
-        bool,
-        bool,
-        Option<Preset>,
-        Option<(u32, u32)>,
-        Option<CameraBookmark>,
-        bool,
-        bool,
-        bool,
-    ) {
+    ) -> UiActions {
         // Apply theme
         if self.dark_theme {
             ctx.set_visuals(egui::Visuals::dark());
@@ -412,9 +431,7 @@ impl UI {
                         self.show_ui = true;
                     }
                 });
-            return (
-                false, false, false, false, false, None, None, None, false, false, false,
-            );
+            return UiActions::default();
         }
 
         let mut changed = false;
@@ -3261,7 +3278,7 @@ impl UI {
 
         // Render toast notifications
         self.render_toasts(ctx);
-        (
+        UiActions {
             changed,
             screenshot_requested,
             reset_requested,
@@ -3273,7 +3290,7 @@ impl UI {
             gpu_scan_requested,
             start_recording,
             stop_recording,
-        )
+        }
     }
 }
 

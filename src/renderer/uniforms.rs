@@ -367,8 +367,17 @@ impl Uniforms {
         };
 
         self.power = params.power;
-        self.max_steps = params.max_steps;
-        self.min_distance = params.min_distance;
+        // ARC-008: LOD no longer mutates FractalParams. The user's slider values
+        // stay authored; we merge with the LOD-active `QualityLevel` here at
+        // uniform-build time. Take the *cheaper* direction on every cost axis:
+        //   - smaller sample/step counts → fewer GPU iterations
+        //   - larger `min_distance`       → coarser surface precision
+        //   - larger `shadow_step_factor` → less precise shadow rays
+        //   - larger `ao_step_size`       → coarser AO sampling
+        // This is the single place LOD quality influences the GPU.
+        let q = params.effective_quality();
+        self.max_steps = params.max_steps.min(q.max_steps);
+        self.min_distance = params.min_distance.max(q.min_distance);
         // Pass scale parameters directly - each fractal handles them appropriately
         self.fractal_scale = params.fractal_scale;
         self.fractal_fold = params.fractal_fold;
@@ -475,16 +484,16 @@ impl Uniforms {
 
         self.dof_focal_length = params.dof_focal_length;
         self.dof_aperture = params.dof_aperture;
-        self.dof_samples = params.dof_samples;
+        self.dof_samples = params.dof_samples.min(q.dof_samples);
         self.time = time;
         self.light_intensity = params.light_intensity;
         self.ambient_light = params.ambient_light;
         self.ao_intensity = params.ao_intensity;
-        self.ao_step_size = params.ao_step_size;
+        self.ao_step_size = params.ao_step_size.max(q.ao_step_size);
         self.shadow_softness = params.shadow_softness;
         self.shadow_max_distance = params.shadow_max_distance;
-        self.shadow_samples = params.shadow_samples;
-        self.shadow_step_factor = params.shadow_step_factor;
+        self.shadow_samples = params.shadow_samples.min(q.shadow_samples);
+        self.shadow_step_factor = params.shadow_step_factor.max(q.shadow_step_factor);
 
         self.light_azimuth = params.light_azimuth;
         self.light_elevation = params.light_elevation;
@@ -583,4 +592,58 @@ pub(super) struct PostProcessUniforms {
 
     pub(super) _padding3: [f32; 4], // offset 48 (vec3 + alignment = 16 bytes)
                                     // Total: 64 bytes
+}
+
+#[cfg(test)]
+mod layout_tests {
+    use super::*;
+    use std::mem::offset_of;
+
+    /// Locks the `Uniforms` Rust struct to the WGSL `Uniforms` declaration in
+    /// `src/shaders/fractal.wgsl` (lines 1-134). Any field reorder, add, or
+    /// remove breaks this test, forcing the change to be deliberate and paired
+    /// with a matching WGSL edit.
+    ///
+    /// The compile-time `size_of == 864` assert above catches total-size
+    /// drift but misses equal-size field swaps; offset asserts catch those.
+    ///
+    /// Expected offsets were cross-checked against the WGSL declaration by
+    /// summing WGSL host-shareable layout rules:
+    ///   - mat4x4<f32>: 64B, align 16
+    ///   - vec4<f32>:   16B, align 16
+    ///   - vec3<f32>:   16B effective in uniform structs (12B data + 4B pad)
+    ///   - vec2<f32>:   8B,  align 8
+    ///   - f32/u32:     4B,  align 4
+    ///   - array<vec4<f32>, N>: stride 16, align 16
+    ///
+    /// Sentinels are spread across the struct (early, middle, late, trailing)
+    /// so an insertion anywhere shifts at least one of them.
+    #[test]
+    fn wgsl_layout_contract() {
+        assert_eq!(std::mem::size_of::<Uniforms>(), 864);
+
+        // 2D-params row: center vec2 (8) + zoom f32 (4) + max_iterations u32 (4),
+        // preceded by camera_pos vec3 + _padding1 = offset 144.
+        assert_eq!(offset_of!(Uniforms, max_iterations), 156);
+
+        // 3D-params row: power f32 + max_steps u32 + min_distance f32 + fractal_scale f32.
+        assert_eq!(offset_of!(Uniforms, max_steps), 180);
+
+        // palette: array<vec4<f32>, 8> — must start on 16B boundary; comes right
+        // after the power/max_steps/min_distance/fractal_scale/fractal_fold/
+        // fractal_min_radius/_padding2 block ending at offset 208.
+        assert_eq!(offset_of!(Uniforms, palette), 208);
+
+        // High-precision center block, immediately after the post-processing
+        // scalars (which end at fxaa_enabled @ 668 + 4 = 672).
+        assert_eq!(offset_of!(Uniforms, center_hi), 672);
+
+        // aspect_ratio: vec4<f32> stored in an explicit 16B slot, after the
+        // four LOD-debug scalars (lod_debug_enabled + 3× lod_zoneN = 16B).
+        assert_eq!(offset_of!(Uniforms, aspect_ratio), 736);
+
+        // procedural_phase: last vec4 in the procedural-palette block, just
+        // before the trailing 32B _padding_end.
+        assert_eq!(offset_of!(Uniforms, procedural_phase), 816);
+    }
 }
