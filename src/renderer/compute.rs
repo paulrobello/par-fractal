@@ -22,6 +22,7 @@
 #![allow(dead_code)] // Infrastructure code - will be used when integrated
 
 use bytemuck::{Pod, Zeroable};
+use wgpu::util::DeviceExt;
 
 /// Uniforms for the accumulation display shader
 #[repr(C)]
@@ -166,6 +167,11 @@ pub struct AccumulationTexture {
     /// Texture dimensions
     pub width: u32,
     pub height: u32,
+    /// ARC-012: persistent zeroed staging buffer reused across clears when
+    /// `Features::CLEAR_TEXTURE` is unavailable. Allocated lazily on first
+    /// fallback clear; lifetime tied to this texture (resize recreates the
+    /// `AccumulationTexture` and discards the buffer).
+    pub zero_buffer: Option<wgpu::Buffer>,
 }
 
 impl AccumulationTexture {
@@ -197,10 +203,11 @@ impl AccumulationTexture {
             // Use R32Uint for atomic accumulation - widely supported for read-write storage
             // We only need hit count in R channel, other channels unused
             format: wgpu::TextureFormat::R32Uint,
-            // STORAGE_BINDING for compute write, TEXTURE_BINDING for fragment read
+            // STORAGE_BINDING for compute write, TEXTURE_BINDING for fragment read.
+            // COPY_DST is kept for the CLEAR_TEXTURE-feature-absent fallback path.
             usage: wgpu::TextureUsages::STORAGE_BINDING
                 | wgpu::TextureUsages::TEXTURE_BINDING
-                | wgpu::TextureUsages::COPY_DST, // For clearing
+                | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
         });
 
@@ -222,42 +229,67 @@ impl AccumulationTexture {
             compute_bind_group,
             width,
             height,
+            zero_buffer: None,
         }
     }
 
     /// Clear the accumulation texture to zeros.
     ///
-    /// This queues a buffer copy to zero out the texture.
-    pub fn clear(&self, device: &wgpu::Device, queue: &wgpu::Queue) {
-        // bytes_per_row must be aligned to COPY_BYTES_PER_ROW_ALIGNMENT (256 bytes)
+    /// ARC-012: records the clear into the frame's existing encoder (no
+    /// dedicated encoder + no per-frame multi-MB staging allocation). Uses
+    /// `CommandEncoder::clear_texture` when the device supports
+    /// `Features::CLEAR_TEXTURE`; otherwise falls back to a persistent,
+    /// lazily-allocated zero buffer copied into the texture. The caller MUST
+    /// encode this clear BEFORE dispatching this frame's compute pass.
+    pub fn clear(
+        &mut self,
+        encoder: &mut wgpu::CommandEncoder,
+        device: &wgpu::Device,
+        clear_texture_supported: bool,
+    ) {
+        if clear_texture_supported {
+            encoder.clear_texture(
+                &self.texture,
+                &wgpu::ImageSubresourceRange {
+                    aspect: wgpu::TextureAspect::All,
+                    base_mip_level: 0,
+                    mip_level_count: None,
+                    base_array_layer: 0,
+                    array_layer_count: None,
+                },
+            );
+            return;
+        }
+
+        // Fallback: reuse a persistent zeroed buffer (sized to this texture).
+        // bytes_per_row must be aligned to COPY_BYTES_PER_ROW_ALIGNMENT (256).
         const COPY_BYTES_PER_ROW_ALIGNMENT: u32 = 256;
-        let unpadded_bytes_per_row = self.width * 4; // 1 u32 * 4 bytes (R32Uint)
+        let unpadded_bytes_per_row = self.width * 4; // R32Uint = 1 u32 per pixel
         let padded_bytes_per_row = unpadded_bytes_per_row.div_ceil(COPY_BYTES_PER_ROW_ALIGNMENT)
             * COPY_BYTES_PER_ROW_ALIGNMENT;
-
         let buffer_size = (padded_bytes_per_row * self.height) as u64;
-        let zeros = vec![0u8; buffer_size as usize];
 
-        let staging_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Accumulation Clear Buffer"),
-            size: buffer_size,
-            usage: wgpu::BufferUsages::COPY_SRC,
-            mapped_at_creation: true,
-        });
+        // Lazily allocate the first time we hit this path; reuse thereafter.
+        // If the buffer is the wrong size (shouldn't happen because resize
+        // recreates the whole AccumulationTexture), drop and rebuild.
+        let needs_init = self
+            .zero_buffer
+            .as_ref()
+            .is_none_or(|b| b.size() != buffer_size);
+        if needs_init {
+            self.zero_buffer = Some(
+                device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Accumulation Zero Buffer"),
+                    contents: &vec![0u8; buffer_size as usize],
+                    usage: wgpu::BufferUsages::COPY_SRC,
+                }),
+            );
+        }
 
-        staging_buffer
-            .slice(..)
-            .get_mapped_range_mut()
-            .copy_from_slice(&zeros);
-        staging_buffer.unmap();
-
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Accumulation Clear Encoder"),
-        });
-
+        let zero_buffer = self.zero_buffer.as_ref().unwrap();
         encoder.copy_buffer_to_texture(
             wgpu::TexelCopyBufferInfo {
-                buffer: &staging_buffer,
+                buffer: zero_buffer,
                 layout: wgpu::TexelCopyBufferLayout {
                     offset: 0,
                     bytes_per_row: Some(padded_bytes_per_row),
@@ -276,8 +308,6 @@ impl AccumulationTexture {
                 depth_or_array_layers: 1,
             },
         );
-
-        queue.submit(std::iter::once(encoder.finish()));
     }
 
     /// Resize the accumulation texture.
@@ -390,10 +420,14 @@ impl BuddhabrotAccumulationBuffer {
     }
 
     /// Clear the buffer to zeros.
-    pub fn clear(&self, queue: &wgpu::Queue) {
-        let buffer_size = (self.width * self.height * std::mem::size_of::<u32>() as u32) as usize;
-        let zeros = vec![0u8; buffer_size];
-        queue.write_buffer(&self.buffer, 0, &zeros);
+    ///
+    /// ARC-012: `CommandEncoder::clear_buffer` is always available (no feature
+    /// gate) and avoids building a multi-MB zeroed `Vec` every clear. The
+    /// caller MUST encode this clear BEFORE dispatching this frame's compute
+    /// pass.
+    pub fn clear(&self, encoder: &mut wgpu::CommandEncoder) {
+        let size_bytes = (self.width * self.height * std::mem::size_of::<u32>() as u32) as u64;
+        encoder.clear_buffer(&self.buffer, 0, Some(size_bytes));
     }
 }
 

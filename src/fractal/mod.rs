@@ -1053,14 +1053,27 @@ impl FractalParams {
         // Update FPS tracking
         self.lod_state.update_fps(delta_time);
 
-        // Update motion tracking
-        self.lod_state.update_motion(
-            camera_pos,
-            camera_forward,
-            delta_time,
-            self.lod_config.motion_threshold,
-            self.lod_config.motion_sensitivity,
-        );
+        // Update motion tracking. ARC-007: 2D fractals pan/zoom rather than
+        // translating a 3D camera, so feed the LOD motion detector the 2D
+        // state instead of constructing a synthetic 3D camera vector (which
+        // never registered wheel/pinch zoom as motion).
+        if self.render_mode == RenderMode::TwoD {
+            self.lod_state.update_motion_2d(
+                self.zoom_2d,
+                self.center_2d,
+                delta_time,
+                self.lod_config.motion_threshold,
+                self.lod_config.motion_sensitivity,
+            );
+        } else {
+            self.lod_state.update_motion(
+                camera_pos,
+                camera_forward,
+                delta_time,
+                self.lod_config.motion_threshold,
+                self.lod_config.motion_sensitivity,
+            );
+        }
 
         // Determine target LOD level based on strategy
         let target_level = self.calculate_target_lod_level(camera_pos, delta_time);
@@ -1109,6 +1122,8 @@ impl FractalParams {
                 // deleted `apply_lod_quality` comment in the prior commit);
                 // pass through 1.0 to keep the field well-formed.
                 render_scale: 1.0,
+                // LOD is disabled — never scale 2D iterations.
+                iteration_scale: 1.0,
             }
         }
     }

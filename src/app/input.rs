@@ -74,50 +74,61 @@ impl App {
                 }
                 KeyCode::KeyR => {
                     self.reset_view();
+                    self.mark_scene_dirty();
                     return true;
                 }
                 // 2D Fractals (1-7)
                 KeyCode::Digit1 => {
                     self.fractal_params
                         .switch_fractal(FractalType::Mandelbrot2D);
+                    self.mark_scene_dirty();
                     return true;
                 }
                 KeyCode::Digit2 => {
                     self.fractal_params.switch_fractal(FractalType::Julia2D);
+                    self.mark_scene_dirty();
                     return true;
                 }
                 KeyCode::Digit3 => {
                     self.fractal_params
                         .switch_fractal(FractalType::Sierpinski2D);
+                    self.mark_scene_dirty();
                     return true;
                 }
                 KeyCode::Digit4 => {
                     self.fractal_params
                         .switch_fractal(FractalType::BurningShip2D);
+                    self.mark_scene_dirty();
                     return true;
                 }
                 KeyCode::Digit5 => {
                     self.fractal_params.switch_fractal(FractalType::Tricorn2D);
+                    self.mark_scene_dirty();
                     return true;
                 }
                 KeyCode::Digit6 => {
                     self.fractal_params.switch_fractal(FractalType::Phoenix2D);
+                    self.mark_scene_dirty();
                     return true;
                 }
                 KeyCode::Digit7 => {
                     self.fractal_params.switch_fractal(FractalType::Celtic2D);
+                    self.mark_scene_dirty();
                     return true;
                 }
                 KeyCode::Digit8 => {
                     self.fractal_params.switch_fractal(FractalType::Newton2D);
+                    self.mark_scene_dirty();
                     return true;
                 }
                 KeyCode::Digit9 => {
                     self.fractal_params.switch_fractal(FractalType::Lyapunov2D);
+                    self.mark_scene_dirty();
                     return true;
                 }
                 KeyCode::Digit0 => {
                     self.fractal_params.switch_fractal(FractalType::Nova2D);
+                    self.mark_scene_dirty();
                     return true;
                 }
                 // Magnet and Collatz: use UI (no hotkey due to limited keys)
@@ -126,57 +137,67 @@ impl App {
                     self.fractal_params
                         .switch_fractal(FractalType::Mandelbulb3D);
                     self.reset_view();
+                    self.mark_scene_dirty();
                     return true;
                 }
                 KeyCode::F2 => {
                     self.fractal_params
                         .switch_fractal(FractalType::MengerSponge3D);
                     self.reset_view();
+                    self.mark_scene_dirty();
                     return true;
                 }
                 KeyCode::F3 => {
                     self.fractal_params
                         .switch_fractal(FractalType::SierpinskiPyramid3D);
                     self.reset_view();
+                    self.mark_scene_dirty();
                     return true;
                 }
                 KeyCode::F4 => {
                     self.fractal_params.switch_fractal(FractalType::JuliaSet3D);
                     self.reset_view();
+                    self.mark_scene_dirty();
                     return true;
                 }
                 KeyCode::F5 => {
                     self.fractal_params.switch_fractal(FractalType::Mandelbox3D);
                     self.reset_view();
+                    self.mark_scene_dirty();
                     return true;
                 }
                 KeyCode::F6 => {
                     self.fractal_params
                         .switch_fractal(FractalType::OctahedralIFS3D);
                     self.reset_view();
+                    self.mark_scene_dirty();
                     return true;
                 }
                 KeyCode::F7 => {
                     self.fractal_params
                         .switch_fractal(FractalType::IcosahedralIFS3D);
                     self.reset_view();
+                    self.mark_scene_dirty();
                     return true;
                 }
                 KeyCode::F8 => {
                     self.fractal_params
                         .switch_fractal(FractalType::ApollonianGasket3D);
                     self.reset_view();
+                    self.mark_scene_dirty();
                     return true;
                 }
                 KeyCode::F9 => {
                     self.fractal_params.switch_fractal(FractalType::Kleinian3D);
                     self.reset_view();
+                    self.mark_scene_dirty();
                     return true;
                 }
                 KeyCode::F10 => {
                     self.fractal_params
                         .switch_fractal(FractalType::HybridMandelbulbJulia3D);
                     self.reset_view();
+                    self.mark_scene_dirty();
                     return true;
                 }
                 // QuaternionCubic3D: accessible via UI only (no F12 - reserved for screenshot)
@@ -204,15 +225,18 @@ impl App {
                         self.ui
                             .show_toast(format!("Palette: {}", self.fractal_params.palette.name));
                     }
+                    self.mark_scene_dirty();
                     return true;
                 }
                 KeyCode::F12 => {
                     self.save_screenshot = true;
+                    self.mark_scene_dirty();
                     println!("Screenshot queued...");
                     return true;
                 }
                 KeyCode::KeyO => {
                     self.fractal_params.auto_orbit = !self.fractal_params.auto_orbit;
+                    self.mark_scene_dirty();
                     println!(
                         "Auto-orbit: {}",
                         if self.fractal_params.auto_orbit {
@@ -226,12 +250,14 @@ impl App {
                 KeyCode::BracketLeft => {
                     self.fractal_params.orbit_speed =
                         (self.fractal_params.orbit_speed - 0.1).max(0.1);
+                    self.mark_scene_dirty();
                     println!("Orbit speed: {:.2}", self.fractal_params.orbit_speed);
                     return true;
                 }
                 KeyCode::BracketRight => {
                     self.fractal_params.orbit_speed =
                         (self.fractal_params.orbit_speed + 0.1).min(5.0);
+                    self.mark_scene_dirty();
                     println!("Orbit speed: {:.2}", self.fractal_params.orbit_speed);
                     return true;
                 }
@@ -251,6 +277,7 @@ impl App {
                             println!("Max steps: {}", self.fractal_params.max_steps);
                         }
                     }
+                    self.mark_scene_dirty();
                     return true;
                 }
                 KeyCode::Equal => {
@@ -266,20 +293,24 @@ impl App {
                             println!("Max steps: {}", self.fractal_params.max_steps);
                         }
                     }
+                    self.mark_scene_dirty();
                     return true;
                 }
                 KeyCode::Comma => {
                     self.fractal_params.power = (self.fractal_params.power - 0.5).max(2.0);
+                    self.mark_scene_dirty();
                     println!("Power: {:.1}", self.fractal_params.power);
                     return true;
                 }
                 KeyCode::Period => {
                     self.fractal_params.power = (self.fractal_params.power + 0.5).min(16.0);
+                    self.mark_scene_dirty();
                     println!("Power: {:.1}", self.fractal_params.power);
                     return true;
                 }
                 KeyCode::KeyL => {
                     self.fractal_params.ambient_occlusion = !self.fractal_params.ambient_occlusion;
+                    self.mark_scene_dirty();
                     println!(
                         "Ambient Occlusion: {}",
                         if self.fractal_params.ambient_occlusion {
@@ -292,6 +323,7 @@ impl App {
                 }
                 KeyCode::KeyT => {
                     self.fractal_params.depth_of_field = !self.fractal_params.depth_of_field;
+                    self.mark_scene_dirty();
                     println!(
                         "Depth of Field: {}",
                         if self.fractal_params.depth_of_field {
@@ -304,6 +336,7 @@ impl App {
                 }
                 KeyCode::KeyG => {
                     self.fractal_params.show_floor = !self.fractal_params.show_floor;
+                    self.mark_scene_dirty();
                     println!(
                         "Floor: {}",
                         if self.fractal_params.show_floor {
@@ -322,6 +355,7 @@ impl App {
                         1 => "HARD",
                         _ => "SOFT",
                     };
+                    self.mark_scene_dirty();
                     println!("Shadow Mode: {}", mode_name);
                     return true;
                 }
@@ -329,6 +363,7 @@ impl App {
                     // Toggle LOD system on/off
                     self.fractal_params.lod_config.enabled =
                         !self.fractal_params.lod_config.enabled;
+                    self.mark_scene_dirty();
                     println!(
                         "LOD System: {}",
                         if self.fractal_params.lod_config.enabled {
@@ -344,6 +379,7 @@ impl App {
                     if self.shift_pressed {
                         self.fractal_params.lod_config.debug_visualization =
                             !self.fractal_params.lod_config.debug_visualization;
+                        self.mark_scene_dirty();
                         println!(
                             "LOD Debug Visualization: {}",
                             if self.fractal_params.lod_config.debug_visualization {
@@ -390,7 +426,7 @@ impl App {
                     self.fractal_params.render_mode
                 );
             }
-            match self.fractal_params.render_mode {
+            let handled = match self.fractal_params.render_mode {
                 RenderMode::TwoD => self.handle_2d_input(event),
                 RenderMode::ThreeD => {
                     // Don't process camera events during auto-orbit to prevent state accumulation
@@ -400,7 +436,12 @@ impl App {
                         false
                     }
                 }
+            };
+            // ARC-006: 2D pan/zoom or 3D camera events mutate the image.
+            if handled {
+                self.mark_scene_dirty();
             }
+            handled
         } else {
             false
         }

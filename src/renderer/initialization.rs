@@ -124,10 +124,24 @@ impl Renderer {
         adapter: wgpu::Adapter,
         size: winit::dpi::PhysicalSize<u32>,
     ) -> Self {
+        // ARC-012: prefer `CommandEncoder::clear_texture` for accumulation
+        // clears (no per-frame multi-MB staging allocation). The feature is
+        // widely supported on native backends; request it when available and
+        // fall back to a persistent zero buffer otherwise (see
+        // `AccumulationTexture::clear`). WebGPU does not expose this feature,
+        // so the fallback path is the norm on wasm.
+        let available_features = adapter.features();
+        let clear_texture_supported = available_features.contains(wgpu::Features::CLEAR_TEXTURE);
+        let required_features = if clear_texture_supported {
+            wgpu::Features::CLEAR_TEXTURE
+        } else {
+            wgpu::Features::empty()
+        };
+
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: None,
-                required_features: wgpu::Features::empty(),
+                required_features,
                 required_limits: wgpu::Limits::default(),
                 memory_hints: Default::default(),
                 experimental_features: Default::default(),
@@ -897,6 +911,14 @@ impl Renderer {
             accumulation_display_bind_group: None,
             accumulation_display_uniform_buffer,
             accumulation_display_uniform_bind_group,
+
+            // ARC-012: whether `clear_texture` is available on this device.
+            clear_texture_supported,
+
+            // ARC-017: uniform-write change-detection caches start empty so the
+            // first frame's write always happens.
+            cached_bloom_uniforms: None,
+            cached_composite_uniforms: None,
         }
     }
 
@@ -1147,6 +1169,7 @@ impl Renderer {
                     compute_bind_group,
                     width: self.size.width,
                     height: self.size.height,
+                    zero_buffer: None,
                 });
             }
 
@@ -1180,7 +1203,7 @@ impl Renderer {
             };
 
             // Create accumulation texture with current window size
-            let accumulation_texture = AccumulationTexture::new(
+            let mut accumulation_texture = AccumulationTexture::new(
                 &self.device,
                 self.size.width,
                 self.size.height,
@@ -1201,8 +1224,21 @@ impl Renderer {
                     }],
                 });
 
-            // Clear the texture immediately to avoid garbage data
-            accumulation_texture.clear(&self.device, &self.queue);
+            // Clear the texture immediately to avoid garbage data. This is an
+            // init-time (not per-frame) clear, so a one-shot dedicated encoder
+            // is appropriate here; per-frame clears go through the frame encoder
+            // via `AccumulationTexture::clear` (see app/render.rs, ARC-012).
+            let mut clear_encoder =
+                self.device
+                    .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                        label: Some("Accumulation Init Clear Encoder"),
+                    });
+            accumulation_texture.clear(
+                &mut clear_encoder,
+                &self.device,
+                self.clear_texture_supported,
+            );
+            self.queue.submit(std::iter::once(clear_encoder.finish()));
 
             self.accumulation_texture = Some(accumulation_texture);
             self.accumulation_display_bind_group = Some(accumulation_display_bind_group);

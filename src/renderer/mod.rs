@@ -102,4 +102,17 @@ pub struct Renderer {
     pub accumulation_display_bind_group: Option<wgpu::BindGroup>,
     pub accumulation_display_uniform_buffer: wgpu::Buffer,
     pub accumulation_display_uniform_bind_group: wgpu::BindGroup,
+
+    /// ARC-012: true when the device supports `Features::CLEAR_TEXTURE`, letting
+    /// `AccumulationTexture::clear` use `CommandEncoder::clear_texture` instead
+    /// of the persistent-zero-buffer fallback. Always false on wasm (WebGPU
+    /// does not expose the feature).
+    pub clear_texture_supported: bool,
+
+    /// ARC-017: cached `BloomUniforms` from the last upload; the buffer write
+    /// is skipped when the value hasn't changed. `None` until first upload.
+    cached_bloom_uniforms: Option<uniforms::BloomUniforms>,
+    /// ARC-017: cached `PostProcessUniforms` from the last upload; the buffer
+    /// write is skipped when the value hasn't changed. `None` until first upload.
+    cached_composite_uniforms: Option<uniforms::PostProcessUniforms>,
 }

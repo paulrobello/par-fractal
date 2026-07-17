@@ -54,7 +54,28 @@ pub struct QualityLevel {
     /// Depth of field sample count
     pub dof_samples: u32,
     /// Resolution multiplier (1.0 = native, 0.5 = half res)
+    ///
+    /// NOTE: `render_scale` is a UI-exposed no-op today — the renderer always
+    /// renders at native resolution. The field is retained so existing
+    /// settings.yaml files keep parsing and the slider remains visible behind
+    /// a "(not yet applied)" label (see ENH-003 for the wiring plan).
     pub render_scale: f32,
+    /// ARC-007: 2D iteration multiplier applied to the zoom-bonus-adjusted
+    /// iteration count. LOD previously had no lever for the (often dominant)
+    /// 2D escape-time cost; deep-zoom interaction collapsed FPS before any
+    /// other LOD knob could help. Ultra keeps the authored value; lower
+    /// presets scale it down so 2D panning stays responsive during deep zoom.
+    /// Applied in `Uniforms::update` AFTER the `+log2(zoom)×15` bonus so deep
+    /// zoom does not re-lose detail it just paid for.
+    #[serde(default = "default_iteration_scale")]
+    pub iteration_scale: f32,
+}
+
+/// Serde default for `QualityLevel::iteration_scale`. Old settings.yaml files
+/// predating ARC-007 lack the field; they parse with `1.0` (no scaling), which
+/// preserves their pre-ARC-007 behavior exactly.
+fn default_iteration_scale() -> f32 {
+    1.0
 }
 
 impl QualityLevel {
@@ -68,6 +89,7 @@ impl QualityLevel {
             ao_step_size: 0.12,
             dof_samples: 8,
             render_scale: 1.0,
+            iteration_scale: 1.0,
         }
     }
 
@@ -81,6 +103,7 @@ impl QualityLevel {
             ao_step_size: 0.18,
             dof_samples: 4,
             render_scale: 0.85,
+            iteration_scale: 0.85,
         }
     }
 
@@ -94,6 +117,7 @@ impl QualityLevel {
             ao_step_size: 0.24,
             dof_samples: 2,
             render_scale: 0.7,
+            iteration_scale: 0.6,
         }
     }
 
@@ -107,6 +131,7 @@ impl QualityLevel {
             ao_step_size: 0.35,
             dof_samples: 1,
             render_scale: 0.5,
+            iteration_scale: 0.35,
         }
     }
 
@@ -121,6 +146,7 @@ impl QualityLevel {
             ao_step_size: lerp_f32(self.ao_step_size, other.ao_step_size, t),
             dof_samples: lerp_u32(self.dof_samples, other.dof_samples, t),
             render_scale: lerp_f32(self.render_scale, other.render_scale, t),
+            iteration_scale: lerp_f32(self.iteration_scale, other.iteration_scale, t),
         }
     }
 }
@@ -312,6 +338,12 @@ pub struct LODState {
     /// Previous camera forward vector for rotation detection
     pub prev_camera_forward: Vec3,
 
+    /// ARC-007: previous 2D zoom (f64 CPU-side) for 2D motion detection.
+    /// Updated each frame by `update_motion_2d`.
+    pub prev_zoom_2d: f64,
+    /// ARC-007: previous 2D center for 2D motion detection.
+    pub prev_center_2d: [f64; 2],
+
     /// Is camera currently moving
     pub is_moving: bool,
 
@@ -341,6 +373,8 @@ impl LODState {
             camera_velocity: Vec3::ZERO,
             prev_camera_pos: Vec3::ZERO,
             prev_camera_forward: Vec3::Z,
+            prev_zoom_2d: 1.0,
+            prev_center_2d: [0.0, 0.0],
             is_moving: false,
             time_since_stopped: 0.0,
             current_fps: 60.0,
@@ -403,6 +437,67 @@ impl LODState {
         // Update previous values for next frame
         self.prev_camera_pos = camera_pos;
         self.prev_camera_forward = camera_forward;
+    }
+
+    /// ARC-007: 2D motion detection. The 3D `update_motion` path watches
+    /// camera translation/rotation; for 2D fractals the image-affecting
+    /// motion is zoom and pan, measured in screen-space units. Without this
+    /// path, continuous wheel/pinch zoom never registered as motion, so the
+    /// LOD system never engaged its quality levers during deep-zoom
+    /// interaction — exactly when FPS collapses.
+    ///
+    /// Formula (per second):
+    ///   zoom_rate = |log2(zoom / prev_zoom)| / dt      (octaves/sec)
+    ///   pan_speed = length((center - prev_center) * zoom) / dt
+    ///   motion_magnitude = zoom_rate * ZOOM_MOTION_WEIGHT + pan_speed
+    ///
+    /// The zoom weight (0.5) is tuned so one scroll-wheel notch per frame
+    /// (~1.1× zoom ≈ 0.49 octaves/sec at 16ms frame time, scaled back up to
+    /// ~30 oct/sec by `/dt`) registers well above the default 0.1 motion
+    /// threshold, while sub-ulp jitter from f64 rounding does not.
+    pub fn update_motion_2d(
+        &mut self,
+        zoom: f64,
+        center: [f64; 2],
+        delta_time: f32,
+        motion_threshold: f32,
+        motion_sensitivity: f32,
+    ) {
+        const ZOOM_MOTION_WEIGHT: f64 = 0.5;
+
+        let mut motion_magnitude = 0.0_f64;
+        if delta_time > 0.0 && self.prev_zoom_2d > 0.0 {
+            let dt = delta_time as f64;
+            let zoom_ratio = zoom / self.prev_zoom_2d;
+            if zoom_ratio > 0.0 {
+                let zoom_rate = zoom_ratio.abs().log2().abs() / dt;
+                let dx = (center[0] - self.prev_center_2d[0]) * zoom;
+                let dy = (center[1] - self.prev_center_2d[1]) * zoom;
+                let pan_speed = (dx * dx + dy * dy).sqrt() / dt;
+                motion_magnitude = zoom_rate * ZOOM_MOTION_WEIGHT + pan_speed;
+            }
+        }
+
+        let adjusted_magnitude = (motion_magnitude as f32) * motion_sensitivity;
+
+        // Reuse the same EMA + hysteresis as the 3D path so the LOD state
+        // machine (`is_moving`, `time_since_stopped`) behaves identically.
+        let alpha = 0.3;
+        self.camera_velocity =
+            self.camera_velocity * (1.0 - alpha) + Vec3::new(adjusted_magnitude, 0.0, 0.0) * alpha;
+
+        let was_moving = self.is_moving;
+        self.is_moving = self.camera_velocity.x > motion_threshold;
+        // Moving or just-stopped this frame: reset the idle timer. Otherwise
+        // accumulate so restore-delay logic can fire after `restore_delay`.
+        if self.is_moving || was_moving {
+            self.time_since_stopped = 0.0;
+        } else {
+            self.time_since_stopped += delta_time;
+        }
+
+        self.prev_zoom_2d = zoom;
+        self.prev_center_2d = center;
     }
 
     /// Update FPS tracking

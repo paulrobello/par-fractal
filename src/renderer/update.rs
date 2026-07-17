@@ -197,17 +197,27 @@ impl Renderer {
             bytemuck::cast_slice(&[self.uniforms]),
         );
 
-        // Update post-processing uniforms
+        // ARC-017: gate the post-processing uniform uploads behind change
+        // detection. With ARC-006's dirty-flag redraw skipping most frames
+        // while idle, the `time`-driven main uniform still has to be rewritten
+        // each rendered frame (palette/animation fields change); but the
+        // bloom and composite params are static across typical interaction,
+        // so skipping the `write_buffer` when the value matches the cache
+        // saves two <1KB uploads per rendered frame. PartialEq on the structs
+        // is field-wise (padding is consistent because both derive Pod).
         let bloom_uniforms = BloomUniforms {
             threshold: params.bloom_threshold,
             intensity: params.bloom_intensity,
             _padding: [0.0; 2],
         };
-        self.queue.write_buffer(
-            &self.bloom_uniform_buffer,
-            0,
-            bytemuck::cast_slice(&[bloom_uniforms]),
-        );
+        if self.cached_bloom_uniforms != Some(bloom_uniforms) {
+            self.queue.write_buffer(
+                &self.bloom_uniform_buffer,
+                0,
+                bytemuck::cast_slice(&[bloom_uniforms]),
+            );
+            self.cached_bloom_uniforms = Some(bloom_uniforms);
+        }
 
         // Blur uniforms don't change (direction is fixed)
         // We use the same buffer for both H and V passes, just different bind groups
@@ -226,10 +236,13 @@ impl Renderer {
             _padding2: [0.0; 2],
             _padding3: [0.0; 4],
         };
-        self.queue.write_buffer(
-            &self.composite_uniform_buffer,
-            0,
-            bytemuck::cast_slice(&[composite_uniforms]),
-        );
+        if self.cached_composite_uniforms != Some(composite_uniforms) {
+            self.queue.write_buffer(
+                &self.composite_uniform_buffer,
+                0,
+                bytemuck::cast_slice(&[composite_uniforms]),
+            );
+            self.cached_composite_uniforms = Some(composite_uniforms);
+        }
     }
 }

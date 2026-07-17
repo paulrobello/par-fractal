@@ -309,10 +309,16 @@ impl Uniforms {
             (center_y - self.center_hi[1] as f64) as f32,
         ];
 
-        // Auto-scale iterations with zoom for 2D fractals, combined with user slider
+        // Auto-scale iterations with zoom for 2D fractals, combined with user
+        // slider. ARC-007: also fold in the LOD `iteration_scale`, applied
+        // AFTER the zoom bonus (so deep zoom does not re-lose detail it just
+        // paid for) and floored at ≥16 to avoid blank renders at low quality.
+        // 2D-only: 3D ray-march cost is dominated by `max_steps`, not iters.
+        let q = params.effective_quality();
         if params.render_mode == crate::fractal::RenderMode::TwoD {
             let zoom_bonus = (params.zoom_2d.max(1.0).log2() * 15.0) as u32;
-            self.max_iterations = params.max_iterations + zoom_bonus;
+            let scaled = ((params.max_iterations + zoom_bonus) as f32 * q.iteration_scale) as u32;
+            self.max_iterations = scaled.max(16);
         } else {
             self.max_iterations = params.max_iterations;
         }
@@ -375,7 +381,7 @@ impl Uniforms {
         //   - larger `shadow_step_factor` → less precise shadow rays
         //   - larger `ao_step_size`       → coarser AO sampling
         // This is the single place LOD quality influences the GPU.
-        let q = params.effective_quality();
+        // (`q` was computed above, before the 2D iteration scaling.)
         self.max_steps = params.max_steps.min(q.max_steps);
         self.min_distance = params.min_distance.max(q.min_distance);
         // Pass scale parameters directly - each fractal handles them appropriately
@@ -559,7 +565,7 @@ const _: () = assert!(
 
 // Post-processing uniform structs
 #[repr(C)]
-#[derive(Copy, Clone, Debug, Pod, Zeroable)]
+#[derive(Copy, Clone, Debug, PartialEq, Pod, Zeroable)]
 pub(super) struct BloomUniforms {
     pub(super) threshold: f32,
     pub(super) intensity: f32,
@@ -574,7 +580,7 @@ pub(super) struct BlurUniforms {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, Debug, Pod, Zeroable)]
+#[derive(Copy, Clone, Debug, PartialEq, Pod, Zeroable)]
 pub(super) struct PostProcessUniforms {
     pub(super) brightness: f32, // offset 0
     pub(super) contrast: f32,   // offset 4

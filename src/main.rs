@@ -9,7 +9,10 @@ mod video_recorder;
 
 use app::App;
 use std::env;
-use winit::{event::*, event_loop::EventLoop};
+use winit::{
+    event::*,
+    event_loop::{ControlFlow, EventLoop},
+};
 
 fn print_help() {
     println!("Par Fractal - GPU Accelerated Fractal Renderer");
@@ -279,7 +282,18 @@ fn main() {
                 if app.should_exit() {
                     target.exit();
                 }
-                app.window().request_redraw();
+                // ARC-006: render-on-demand. Only request a redraw when the
+                // scene changed, an animation source is active (auto-orbit,
+                // palette animation, LOD transition, attractor accumulation,
+                // video recording), or egui wants another frame. Otherwise
+                // park the loop in `ControlFlow::Wait` — the OS wakes us on
+                // the next input/expose event and idle CPU/GPU goes to ~0.
+                // (`Wait` + `request_redraw` is the render-on-demand idiom:
+                // winit schedules exactly one RedrawRequested, then sleeps.)
+                target.set_control_flow(ControlFlow::Wait);
+                if app.should_render_next_frame() {
+                    app.window().request_redraw();
+                }
             }
             _ => {}
         })

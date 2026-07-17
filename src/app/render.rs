@@ -96,12 +96,16 @@ impl App {
                 if is_buddhabrot {
                     // Clear Buddhabrot buffer
                     if let Some(ref buffer) = self.renderer.buddhabrot_accumulation_buffer {
-                        buffer.clear(&self.renderer.queue);
+                        buffer.clear(&mut encoder);
                     }
                 } else {
                     // Clear attractor texture
-                    if let Some(ref accum_tex) = self.renderer.accumulation_texture {
-                        accum_tex.clear(&self.renderer.device, &self.renderer.queue);
+                    if let Some(ref mut accum_tex) = self.renderer.accumulation_texture {
+                        accum_tex.clear(
+                            &mut encoder,
+                            &self.renderer.device,
+                            self.renderer.clear_texture_supported,
+                        );
                     }
                 }
                 self.fractal_params.attractor_pending_clear = false;
@@ -355,9 +359,12 @@ impl App {
             }
         }
 
-        // Pass 2-4: Bloom pipeline (always run to keep texture valid)
-        if true {
-            // Always run bloom passes, composite will decide whether to use it
+        // Pass 2-4: Bloom pipeline.
+        // ARC-005: the three full-res Rgba16Float passes are pure waste when
+        // bloom is disabled (the default) or when accumulation mode skips the
+        // composite pass entirely. Gate them on `bloom_enabled && !use_accumulation`.
+        let bloom_active = self.fractal_params.bloom_enabled && !use_accumulation;
+        if bloom_active {
             // Pass 2: Extract bright pixels
             {
                 let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -458,6 +465,38 @@ impl App {
                 render_pass.set_vertex_buffer(0, self.renderer.postprocess_vertex_buffer.slice(..));
                 render_pass.draw(0..4, 0..1);
             }
+
+            // The three passes overwrote `bloom_view` with valid (possibly-black)
+            // contents; the next clean-frame skip can rely on that.
+            self.bloom_texture_cleared = false;
+        } else if !use_accumulation && !self.bloom_texture_cleared {
+            // Composite samples `bloom_view` regardless of `bloom_enabled` (the
+            // shader-side toggle multiplies the contribution but still reads the
+            // texture). After an enabled→disabled transition — or before the
+            // first bloom frame — the texture would otherwise hold stale or
+            // undefined memory on some backends, leaking garbage pixels into
+            // the composite. Record ONE cheap clear with no draw, then mark the
+            // texture as cleared so we don't repeat this on every idle frame.
+            // (Accumulation mode skips composite entirely, so it never samples
+            // `bloom_view`; we still mark it cleared so the first post-accum
+            // composite frame doesn't sample uninitialized memory.)
+            let _ = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Bloom Output One-Shot Clear"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &self.renderer.bloom_view,
+                    depth_slice: None,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                occlusion_query_set: None,
+                timestamp_writes: None,
+                multiview_mask: None,
+            });
+            self.bloom_texture_cleared = true;
         }
 
         // Pass 5: Composite (scene + bloom + color grading + vignette)
@@ -589,6 +628,10 @@ impl App {
 
         // Render UI
         let raw_input = self.egui_state.take_egui_input(self.window.as_ref());
+        // ARC-006: populated by the UI closure; consulted after `run_ui`
+        // returns (we can't call `self.mark_scene_dirty()` inside the closure
+        // — `egui_ctx()` holds an immutable borrow on `self.egui_state`).
+        let mut ui_mutated_scene = false;
         let full_output = self.egui_state.egui_ctx().run_ui(raw_input, |ctx| {
             #[cfg(not(target_arch = "wasm32"))]
             let is_rec = self.video_recorder.is_recording();
@@ -616,13 +659,31 @@ impl App {
                 stop_recording,
             } = actions;
 
+            // ARC-006: snapshot which UI actions mutate scene state BEFORE the
+            // handlers consume the Options, so we can mark the scene dirty in
+            // one place after the closure. UI `changed` covers slider/checkbox
+            // edits; the rest are explicit action flags. (Command palette's
+            // own `changed` is OR'd in below.)
+            ui_mutated_scene = changed
+                || preset_to_load.is_some()
+                || bookmark_to_load.is_some()
+                || reset_requested
+                || reset_camera_requested
+                || point_at_fractal_requested
+                || screenshot_requested
+                || hires_render_resolution.is_some()
+                || start_recording
+                || stop_recording;
+
             // Render command palette overlay (always on top)
             if let Some(command_action) = self.ui.render_command_palette(ctx) {
-                let (changed, message) = self
+                let (cp_changed, message) = self
                     .ui
                     .execute_command(command_action, &mut self.fractal_params);
 
-                if changed {
+                ui_mutated_scene |= cp_changed;
+
+                if cp_changed {
                     self.settings_last_changed = web_time::Instant::now();
                     self.settings_need_save = true;
                 }
@@ -830,6 +891,16 @@ impl App {
         self.egui_state
             .handle_platform_output(self.window.as_ref(), full_output.platform_output);
 
+        // ARC-006: a UI action mutated scene state (slider edit, preset load,
+        // bookmark, reset, screenshot, hi-res render, recording toggle, or
+        // command-palette action). Mark dirty so the next frame renders and
+        // (for non-animating changes) the loop returns to idle after that one
+        // frame. Done here, outside the `run_ui` closure, so it doesn't
+        // conflict with egui's borrow on `self.egui_state`.
+        if ui_mutated_scene {
+            self.mark_scene_dirty();
+        }
+
         let tris = self
             .egui_state
             .egui_ctx()
@@ -891,5 +962,13 @@ impl App {
             .submit(std::iter::once(encoder.finish()));
 
         output.present();
+
+        // ARC-006: we just rendered a frame. Clear the dirty flag unless a
+        // continuous animation source (auto-orbit, palette animation, camera
+        // transition, LOD interpolation, attractor accumulation, video
+        // recording) is still active — those keep the loop spinning by
+        // returning `is_scene_animation_active() == true` from
+        // `should_render_next_frame()`.
+        self.after_render_frame();
     }
 }

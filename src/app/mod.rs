@@ -68,6 +68,22 @@ pub struct App {
     exit_delay: Option<f32>,       // CLI option: exit after N seconds
     screenshot_taken: bool,        // Track if delayed screenshot was taken
     should_exit: bool,             // Track if app should exit
+    /// ARC-005: tracks whether the bloom output texture currently holds defined
+    /// (cleared-to-black) contents. The composite pass samples `bloom_view`
+    /// unconditionally, so when bloom is disabled we must record one cheap clear
+    /// of the bloom target (`LoadOp::Clear(BLACK)` + no draw) to avoid sampling
+    /// stale/garbage memory after an enabled→disabled transition. Reset to
+    /// `false` whenever the bloom passes run, since they overwrite the texture.
+    bloom_texture_cleared: bool,
+    /// ARC-006: dirty flag for render-on-demand. Set true by every image-
+    /// affecting state change (input handlers, UI actions, LOD transitions,
+    /// camera moves, palette animation, etc.). Cleared at the end of `render()`
+    /// when no continuous animation source is active. The event loop consults
+    /// `should_render_next_frame()` in `AboutToWait` to decide whether to
+    /// request another redraw; when clean and idle the native loop sets
+    /// `ControlFlow::Wait` and the app sleeps until the next OS event.
+    /// Progressive refinement while idle is ENH-002, NOT this flag.
+    scene_dirty: bool,
 }
 
 impl App {
@@ -216,6 +232,8 @@ impl App {
             exit_delay,
             screenshot_taken: false,
             should_exit: false,
+            bloom_texture_cleared: false,
+            scene_dirty: true,
         }
     }
 
@@ -348,6 +366,8 @@ impl App {
             exit_delay,
             screenshot_taken: false,
             should_exit: false,
+            bloom_texture_cleared: false,
+            scene_dirty: true,
         })
     }
 
@@ -361,11 +381,108 @@ impl App {
         self.should_exit
     }
 
+    /// ARC-006: mark the scene as needing a re-render. Called from every
+    /// image-affecting state change (input handlers, UI actions, camera moves,
+    /// palette animation, etc.). Cheap (one bool write); the gating happens in
+    /// `should_render_next_frame`.
+    pub fn mark_scene_dirty(&mut self) {
+        self.scene_dirty = true;
+    }
+
+    /// ARC-006: true when something is animating the scene continuously,
+    /// independent of user input. Each of these would re-render every frame
+    /// even without the dirty flag, so we OR them in at the redraw decision.
+    /// The `time`-uniform path is gated here so a static palette doesn't keep
+    /// the loop spinning: only `palette_animation_enabled` (advances
+    /// `palette_offset`) or a non-`None` `procedural_palette` (uses `time`)
+    /// actually change the image.
+    pub fn is_scene_animation_active(&self) -> bool {
+        use crate::fractal::{ProceduralPalette, RenderMode};
+
+        // 3D auto-orbit rotates the camera each frame.
+        if self.fractal_params.auto_orbit && self.fractal_params.render_mode == RenderMode::ThreeD {
+            return true;
+        }
+        // Smooth camera transition (bookmark load) is interpolating.
+        if self.camera_transition.active {
+            return true;
+        }
+        // Palette offset advances each frame when the user enables animation.
+        if self.ui.palette_animation_enabled {
+            return true;
+        }
+        // Procedural palette samples the `time` uniform, which advances.
+        if self.fractal_params.procedural_palette != ProceduralPalette::None {
+            return true;
+        }
+        // LOD is smoothly interpolating between quality presets.
+        if self.fractal_params.lod_config.enabled
+            && self.fractal_params.lod_state.transition_progress < 1.0
+        {
+            return true;
+        }
+        // Attractor / Buddhabrot still accumulating samples.
+        if self.fractal_params.attractor_accumulation_enabled
+            && !self.fractal_params.attractor_paused
+            && (self.fractal_params.fractal_type.is_2d_attractor()
+                || self.fractal_params.fractal_type.is_buddhabrot())
+        {
+            return true;
+        }
+        // Video capture needs a fresh frame each render.
+        #[cfg(not(target_arch = "wasm32"))]
+        if self.video_recorder.is_recording() {
+            return true;
+        }
+        false
+    }
+
+    /// ARC-006: whether egui wants another frame (UI animation, hover, drag,
+    /// etc.). Without this OR-term, egui panels freeze while the fractal is
+    /// idle — the user moves a slider and nothing repaints until they nudge
+    /// the fractal.
+    pub fn ui_needs_repaint(&self) -> bool {
+        self.egui_state.egui_ctx().has_requested_repaint()
+    }
+
+    /// ARC-006: the redraw decision consulted by the event loop in
+    /// `AboutToWait`. True when the scene changed, something is animating, or
+    /// egui requested a repaint. Also forces a frame while a screenshot /
+    /// hi-res render / exit is pending so the request doesn't get stuck.
+    pub fn should_render_next_frame(&self) -> bool {
+        if self.scene_dirty || self.is_scene_animation_active() || self.ui_needs_repaint() {
+            return true;
+        }
+        // One-shot events that need a frame to fire even when nothing else changed.
+        if self.save_screenshot || self.save_hires_render.is_some() {
+            return true;
+        }
+        false
+    }
+
+    /// ARC-006: hook called from `App::render` after the fractal pass + UI
+    /// submit. Clears the dirty flag when no continuous animation source is
+    /// active (animation sources keep the flag set so the next frame also
+    /// renders). Called by `render.rs` at the end of `App::render`.
+    pub fn after_render_frame(&mut self) {
+        if !self.is_scene_animation_active() {
+            self.scene_dirty = false;
+        }
+    }
+
     /// Handle a window resize: reconfigure the renderer surface, update the
     /// camera aspect ratio, and (on native) persist the new window size.
     pub fn resize(&mut self, new_size: PhysicalSize<u32>) {
         self.renderer.resize(new_size);
         self.camera.resize(new_size.width, new_size.height);
+
+        // ARC-006: a fresh surface + recreated intermediate textures means the
+        // next composite samples cleared-to-black bloom output; flag dirty so
+        // one redraw fires after the resize event chain settles, and reset the
+        // bloom-cleared flag so the post-resize frame re-establishes defined
+        // bloom contents if bloom is enabled.
+        self.mark_scene_dirty();
+        self.bloom_texture_cleared = false;
 
         // Persist window size (native only)
         #[cfg(feature = "native")]

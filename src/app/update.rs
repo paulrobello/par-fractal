@@ -57,6 +57,8 @@ impl App {
             let norm_y = 1.0 - (self.cursor_pos.1 as f64 / height) * 2.0;
             self.fractal_params
                 .zoom_at((norm_x, norm_y), zoom_factor as f64, aspect);
+            // ARC-006: user is actively zooming — keep the redraw loop alive.
+            self.mark_scene_dirty();
         }
 
         // Update camera for 3D mode
@@ -112,6 +114,8 @@ impl App {
             if old_pos != self.camera.position || old_target != self.camera.target {
                 self.camera_last_moved = web_time::Instant::now();
                 self.camera_needs_save = true;
+                // ARC-006: camera moved — the image changed, keep rendering.
+                self.mark_scene_dirty();
             }
         }
 

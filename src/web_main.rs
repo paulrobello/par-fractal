@@ -328,7 +328,13 @@ pub async fn main_web() {
                 }
             }
             Event::AboutToWait => {
-                app.window().request_redraw();
+                // ARC-006: render-on-demand on web. winit's web backend drives
+                // the loop via requestAnimationFrame; gating `request_redraw`
+                // lets the rAF tick skip the scene pass when the scene is
+                // clean and nothing is animating, dropping idle GPU work.
+                if app.should_render_next_frame() {
+                    app.window().request_redraw();
+                }
             }
             _ => {}
         }
