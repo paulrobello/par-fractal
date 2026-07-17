@@ -211,8 +211,9 @@ pub struct UI {
     preset_category_filter: PresetCategory,
     user_presets: Vec<String>,
     last_preset_list_update: web_time::Instant,
-    // Undo/Redo system
-    history: Vec<HistoryEntry>,
+    // Undo/Redo system. ARC-019: VecDeque so oldest-entry eviction is O(1)
+    // (`pop_front`) instead of the previous O(n) `Vec::remove(0)`.
+    history: std::collections::VecDeque<HistoryEntry>,
     history_index: usize,
     max_history_size: usize,
     last_saved_params: Option<FractalParams>,
@@ -275,7 +276,7 @@ impl UI {
             preset_category_filter: PresetCategory::All,
             user_presets: PresetGallery::list_user_presets().unwrap_or_default(),
             last_preset_list_update: web_time::Instant::now(),
-            history: Vec::new(),
+            history: std::collections::VecDeque::new(),
             history_index: 0,
             max_history_size: 50,
             last_saved_params: None,

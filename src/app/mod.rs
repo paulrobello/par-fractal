@@ -15,7 +15,7 @@ use camera_transition::CameraTransition;
 
 use crate::camera::{Camera, CameraController};
 use crate::fractal::{FractalParams, RenderMode};
-use crate::renderer::Renderer;
+use crate::renderer::{GpuInfo, Renderer};
 use crate::ui::UI;
 use std::sync::Arc;
 use winit::dpi::PhysicalSize;
@@ -84,6 +84,13 @@ pub struct App {
     /// `ControlFlow::Wait` and the app sleeps until the next OS event.
     /// Progressive refinement while idle is ENH-002, NOT this flag.
     scene_dirty: bool,
+    /// ARC-018: in-flight background GPU enumeration. `Some` while a worker
+    /// thread is scanning adapters; the result is drained from the receiver
+    /// in `App::update` each frame (no blocking). Native only — on wasm,
+    /// `enumerate_gpus` returns an empty `Vec`, so the receiver stays `None`
+    /// and the UI's "Scanning…" label is set/cleared synchronously.
+    #[cfg(not(target_arch = "wasm32"))]
+    gpu_scan_receiver: Option<std::sync::mpsc::Receiver<Vec<GpuInfo>>>,
 }
 
 impl App {
@@ -234,6 +241,7 @@ impl App {
             should_exit: false,
             bloom_texture_cleared: false,
             scene_dirty: true,
+            gpu_scan_receiver: None,
         }
     }
 
@@ -469,6 +477,41 @@ impl App {
             self.scene_dirty = false;
         }
     }
+
+    /// ARC-018: drain the background GPU-enumeration result if it has landed.
+    /// Called from `App::update` every frame so the UI list populates as soon
+    /// as the worker thread finishes, without ever blocking the render loop.
+    /// Native only — on wasm, `enumerate_gpus` is synchronous and returns an
+    /// empty `Vec`, so the receiver is never set and this is a no-op stub.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn poll_gpu_scan(&mut self) {
+        let Some(rx) = self.gpu_scan_receiver.as_ref() else {
+            return;
+        };
+        match rx.try_recv() {
+            Ok(gpus) => {
+                self.ui.available_gpus = gpus;
+                self.ui.gpu_selection_message =
+                    Some(format!("Found {} GPU(s)", self.ui.available_gpus.len()));
+                self.gpu_scan_receiver = None;
+            }
+            Err(std::sync::mpsc::TryRecvError::Empty) => {
+                // Still scanning — the "Scanning…" label set on click stays.
+            }
+            Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                // Worker thread died before sending (panic in enumerate_gpus).
+                // Reset so the user can click "Detect" again.
+                self.ui.gpu_selection_message =
+                    Some("GPU scan failed — click Detect to retry.".to_string());
+                self.gpu_scan_receiver = None;
+            }
+        }
+    }
+
+    /// ARC-018: wasm stub — GPU enumeration isn't available on web (the browser
+    /// handles adapter selection), so there's never a receiver to poll.
+    #[cfg(target_arch = "wasm32")]
+    fn poll_gpu_scan(&mut self) {}
 
     /// Handle a window resize: reconfigure the renderer surface, update the
     /// camera aspect ratio, and (on native) persist the new window size.

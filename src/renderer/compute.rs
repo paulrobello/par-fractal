@@ -15,11 +15,13 @@
 //!
 //! # Status
 //!
-//! This module provides the infrastructure for compute shader-based accumulation.
-//! Integration with the main renderer is pending - the UI controls are available
-//! but the actual compute passes are not yet wired into the render loop.
-
-#![allow(dead_code)] // Infrastructure code - will be used when integrated
+//! ARC-016: this module IS integrated with the main renderer. The attractor and
+//! Buddhabot compute pipelines (`AttractorComputePipeline`, `BuddhabotComputePipeline`)
+//! are owned by `Renderer` and dispatched every accumulation frame from
+//! `app/render.rs::dispatch_accumulation` when `attractor_accumulation_enabled`
+//! is true and the active fractal is a 2D attractor or Buddhabrot. The four
+//! compute/copy shaders live in `src/shaders/` (`attractor_compute.wgsl`,
+//! `attractor_display.wgsl`, `buddhabot_compute.wgsl`, `buddhabot_copy.wgsl`).
 
 use bytemuck::{Pod, Zeroable};
 use wgpu::util::DeviceExt;
@@ -309,29 +311,6 @@ impl AccumulationTexture {
             },
         );
     }
-
-    /// Resize the accumulation texture.
-    ///
-    /// This creates a new texture with the new dimensions and recreates bind groups.
-    pub fn resize(
-        &mut self,
-        device: &wgpu::Device,
-        width: u32,
-        height: u32,
-        compute_bind_group_layout: &wgpu::BindGroupLayout,
-    ) {
-        if width == self.width && height == self.height {
-            return;
-        }
-
-        *self = Self::new(
-            device,
-            width,
-            height,
-            compute_bind_group_layout,
-            "Accumulation Texture",
-        );
-    }
 }
 
 /// Creates the bind group layout for compute shader storage texture access.
@@ -465,8 +444,6 @@ pub struct AttractorComputePipeline {
     pub storage_layout: wgpu::BindGroupLayout,
     /// Current uniform values
     pub uniforms: AttractorComputeUniforms,
-    /// Random state for orbit starting points (persists between frames)
-    pub random_state: [u32; 4],
 }
 
 impl AttractorComputePipeline {
@@ -514,16 +491,12 @@ impl AttractorComputePipeline {
             }],
         });
 
-        // Initialize random state with some seed values
-        let random_state = [0x12345678u32, 0x9ABCDEF0, 0xDEADBEEF, 0xCAFEBABE];
-
         Self {
             pipeline,
             uniform_buffer,
             uniform_bind_group,
             storage_layout,
             uniforms,
-            random_state,
         }
     }
 
@@ -685,29 +658,5 @@ impl BuddhabrotComputePipeline {
         compute_pass.set_bind_group(1, &self.uniform_bind_group, &[]);
         // Each workgroup (256 threads) tests samples_per_thread samples each
         compute_pass.dispatch_workgroups(num_workgroups, 1, 1);
-    }
-}
-
-/// Configuration for attractor accumulation rendering
-#[derive(Debug, Clone)]
-pub struct AttractorAccumulationConfig {
-    /// Number of orbit iterations to compute per frame
-    pub iterations_per_frame: u32,
-    /// Whether accumulation mode is enabled
-    pub enabled: bool,
-    /// Total accumulated iterations
-    pub total_iterations: u64,
-    /// Whether to clear on next frame
-    pub pending_clear: bool,
-}
-
-impl Default for AttractorAccumulationConfig {
-    fn default() -> Self {
-        Self {
-            iterations_per_frame: 100_000,
-            enabled: false,
-            total_iterations: 0,
-            pending_clear: false,
-        }
     }
 }

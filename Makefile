@@ -1,9 +1,14 @@
 # Par Fractal Makefile
 # Cross-platform GPU-accelerated fractal renderer
 
+# ARC-020: single source of truth for the published version. Used by the
+# macOS `bundle` target's CFBundleVersion / CFBundleShortVersionString so
+# the app bundle stays in sync with Cargo.toml instead of drifting.
+VERSION := $(shell grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+
 .PHONY: help build build-release run run-release test check clean clippy clippy-fix fmt fmt-check \
         install-deps doc checkall pre-commit-install pre-commit-uninstall pre-commit-run \
-        pre-commit-update lint deploy release cache-clean \
+        pre-commit-update lint deploy release cache-clean typecheck \
         web-install web-build web-serve web-clean web-deploy
 
 # Default target
@@ -170,6 +175,9 @@ check:
 	@echo "Checking code..."
 	cargo check
 
+# ARC-020: house-convention alias (`make typecheck` == `make check`).
+typecheck: check
+
 checkall: test lint
 	@echo ""
 	@echo "======================================================================"
@@ -309,9 +317,9 @@ ifeq ($(shell uname),Darwin)
 	@echo '    <key>CFBundleIdentifier</key>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
 	@echo '    <string>com.paulrobello.par-fractal</string>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
 	@echo '    <key>CFBundleVersion</key>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
-	@echo '    <string>0.7.0</string>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
+	@echo '    <string>$(VERSION)</string>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
 	@echo '    <key>CFBundleShortVersionString</key>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
-	@echo '    <string>0.7.0</string>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
+	@echo '    <string>$(VERSION)</string>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
 	@echo '    <key>CFBundleExecutable</key>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
 	@echo '    <string>par-fractal</string>' >> target/release/bundle/par-fractal.app/Contents/Info.plist
 	@echo '    <key>CFBundleIconFile</key>' >> target/release/bundle/par-fractal.app/Contents/Info.plist

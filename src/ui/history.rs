@@ -27,17 +27,19 @@ impl UI {
         };
 
         if should_save {
-            self.history.push(HistoryEntry {
+            self.history.push_back(HistoryEntry {
                 params: params.clone(),
                 timestamp: web_time::Instant::now(),
             });
 
-            // Maintain max history size
+            // Maintain max history size. ARC-019: VecDeque keeps the
+            // Oldest entry at the front, so pop_front is O(1) (vs the
+            // previous Vec::remove(0) which shifted every entry).
             if self.history.len() > self.max_history_size {
-                self.history.remove(0);
-            } else {
-                self.history_index = self.history.len();
+                self.history.pop_front();
             }
+            // Index always tracks the just-pushed tail.
+            self.history_index = self.history.len();
 
             self.last_saved_params = Some(params.clone());
         }

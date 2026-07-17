@@ -8,7 +8,28 @@ use crate::ui::UiActions;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::video_recorder::VideoRecorder;
 
-/// Render methods
+/// Render methods.
+///
+/// ARC-004: the original ~900-line `App::render` was a God method mixing six
+/// responsibilities. It is now an orchestration shell that delegates to four
+/// behavior-preserving extractions:
+///
+/// - `dispatch_accumulation` — attractor/Buddhabrot compute + display pass.
+/// - `run_post_chain` — bloom/blur/composite/FXAA passes (bloom-gated per
+///   ARC-005; one-shot clear of the bloom target on enabled→disabled
+///   transitions).
+/// - `render_ui` — the egui frame (UI panels, command palette, overlays) and
+///   the egui render pass into the frame's encoder. Returns the `UiActions`
+///   built inside the egui closure plus a flag telling the caller whether any
+///   UI action mutated scene state (so it can mark the scene dirty).
+/// - `handle_ui_actions` — preset/bookmark/reset/recorder/etc. state side
+///   effects, plus the non-blocking GPU scan kickoff (ARC-018).
+///
+/// What stays inline in `render`: surface acquisition, encoder creation, the
+/// non-accumulation scene render pass (a single 25-line block), the
+/// screenshot/video capture block (which forks the encoder mid-function —
+/// moving it would risk reordering `queue.submit` and break capture
+/// correctness), and the final submit/present.
 impl App {
     pub fn render(&mut self) {
         let output = match self.renderer.surface.get_current_texture() {
@@ -53,282 +74,9 @@ impl App {
         let use_accumulation =
             self.fractal_params.attractor_accumulation_enabled && (is_attractor || is_buddhabrot);
 
+        // Pass 1: fractal pass (accumulation compute chain OR the standard scene render).
         if use_accumulation {
-            // Check if texture needs recreation (None or wrong size)
-            let texture_needs_recreation = match &self.renderer.accumulation_texture {
-                None => true,
-                Some(tex) => {
-                    tex.width != self.renderer.size.width || tex.height != self.renderer.size.height
-                }
-            };
-
-            // Initialize compute infrastructure if needed (handles resize too)
-            if is_buddhabrot {
-                self.renderer.init_buddhabrot_compute();
-            } else {
-                self.renderer.init_accumulation_compute();
-            }
-
-            // Reset iteration counter if texture was just recreated
-            if texture_needs_recreation {
-                self.fractal_params.attractor_total_iterations = 0;
-            }
-
-            // Auto-clear when view parameters change (zoom, pan, or attractor params)
-            let view_changed = self.fractal_params.center_2d
-                != self.fractal_params.attractor_last_center
-                || self.fractal_params.zoom_2d != self.fractal_params.attractor_last_zoom
-                || (!is_buddhabrot
-                    && self.fractal_params.julia_c != self.fractal_params.attractor_last_julia_c);
-
-            if view_changed {
-                self.fractal_params.attractor_pending_clear = true;
-                self.fractal_params.attractor_total_iterations = 0;
-                self.fractal_params.attractor_paused = false; // Resume accumulation on view change
-                // Update last values
-                self.fractal_params.attractor_last_center = self.fractal_params.center_2d;
-                self.fractal_params.attractor_last_zoom = self.fractal_params.zoom_2d;
-                self.fractal_params.attractor_last_julia_c = self.fractal_params.julia_c;
-            }
-
-            // Handle clear request
-            if self.fractal_params.attractor_pending_clear {
-                if is_buddhabrot {
-                    // Clear Buddhabrot buffer
-                    if let Some(ref buffer) = self.renderer.buddhabrot_accumulation_buffer {
-                        buffer.clear(&mut encoder);
-                    }
-                } else {
-                    // Clear attractor texture
-                    if let Some(ref mut accum_tex) = self.renderer.accumulation_texture {
-                        accum_tex.clear(
-                            &mut encoder,
-                            &self.renderer.device,
-                            self.renderer.clear_texture_supported,
-                        );
-                    }
-                }
-                self.fractal_params.attractor_pending_clear = false;
-                self.fractal_params.attractor_total_iterations = 0;
-            }
-
-            // Dispatch appropriate compute shader based on fractal type (only if not paused)
-            if !self.fractal_params.attractor_paused && is_buddhabrot {
-                // Update Buddhabrot compute uniforms
-                if let Some(ref mut compute) = self.renderer.buddhabrot_compute {
-                    // Filter trajectories by minimum iteration count
-                    // Short trajectories (outer glow) vs long trajectories (Buddha interior)
-                    // Higher min = more Buddha detail, lower = more outer structure
-                    let min_iter = (self.fractal_params.max_iterations / 10).max(20);
-                    compute.uniforms = BuddhabrotComputeUniforms {
-                        center_x: self.fractal_params.center_2d[0] as f32,
-                        center_y: self.fractal_params.center_2d[1] as f32,
-                        zoom: self.fractal_params.zoom_2d as f32,
-                        aspect_ratio: self.renderer.size.width as f32
-                            / self.renderer.size.height as f32,
-                        width: self.renderer.size.width,
-                        height: self.renderer.size.height,
-                        iterations_per_frame: self.fractal_params.attractor_iterations_per_frame,
-                        max_iterations: self.fractal_params.max_iterations,
-                        total_iterations: self.fractal_params.attractor_total_iterations as u32,
-                        clear_accumulation: 0,
-                        min_iterations: min_iter,
-                        _padding: 0,
-                    };
-                    compute.update_uniforms(&self.renderer.queue);
-
-                    // Dispatch compute shader using the atomic buffer
-                    if let Some(ref buffer) = self.renderer.buddhabrot_accumulation_buffer {
-                        // Each workgroup (256 threads) tests multiple samples
-                        let num_workgroups =
-                            (self.fractal_params.attractor_iterations_per_frame / 256).max(1);
-                        compute.dispatch(&mut encoder, &buffer.compute_bind_group, num_workgroups);
-
-                        // Copy from atomic buffer to texture for display
-                        let has_copy_pipeline = self.renderer.buddhabrot_copy_pipeline.is_some();
-                        let has_copy_bind_group =
-                            self.renderer.buddhabrot_copy_bind_group.is_some();
-
-                        if has_copy_pipeline && has_copy_bind_group {
-                            let copy_pipeline =
-                                self.renderer.buddhabrot_copy_pipeline.as_ref().unwrap();
-                            let copy_bind_group =
-                                self.renderer.buddhabrot_copy_bind_group.as_ref().unwrap();
-                            let mut copy_pass =
-                                encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                                    label: Some("Buddhabrot Copy Pass"),
-                                    timestamp_writes: None,
-                                });
-                            copy_pass.set_pipeline(copy_pipeline);
-                            copy_pass.set_bind_group(0, copy_bind_group, &[]);
-                            // Dispatch enough workgroups to cover all pixels (16x16 workgroup size)
-                            let wg_x = self.renderer.size.width.div_ceil(16);
-                            let wg_y = self.renderer.size.height.div_ceil(16);
-                            copy_pass.dispatch_workgroups(wg_x, wg_y, 1);
-                        }
-                    }
-
-                    // Update total iterations counter
-                    self.fractal_params.attractor_total_iterations +=
-                        self.fractal_params.attractor_iterations_per_frame as u64;
-
-                    // Auto-pause when max iterations reached
-                    if self.fractal_params.attractor_total_iterations
-                        >= self.fractal_params.attractor_max_iterations
-                    {
-                        self.fractal_params.attractor_paused = true;
-                    }
-                }
-            } else if !self.fractal_params.attractor_paused {
-                // Update attractor compute uniforms (only if not paused)
-                if let Some(ref mut compute) = self.renderer.attractor_compute {
-                    compute.uniforms = AttractorComputeUniforms {
-                        param_a: self.fractal_params.julia_c[0],
-                        param_b: self.fractal_params.julia_c[1],
-                        param_c: 0.0, // Could expose more params
-                        param_d: 0.0,
-                        center_x: self.fractal_params.center_2d[0] as f32,
-                        center_y: self.fractal_params.center_2d[1] as f32,
-                        zoom: self.fractal_params.zoom_2d as f32,
-                        aspect_ratio: self.renderer.size.width as f32
-                            / self.renderer.size.height as f32,
-                        width: self.renderer.size.width,
-                        height: self.renderer.size.height,
-                        iterations_per_frame: self.fractal_params.attractor_iterations_per_frame,
-                        attractor_type: self.fractal_params.fractal_type.attractor_index(),
-                        total_iterations: self.fractal_params.attractor_total_iterations as u32,
-                        clear_accumulation: 0,
-                        _padding: [0; 2],
-                    };
-                    compute.update_uniforms(&self.renderer.queue);
-
-                    // Dispatch compute shader
-                    if let Some(ref accum_tex) = self.renderer.accumulation_texture {
-                        // Number of workgroups: iterations_per_frame / (256 threads * iterations_per_thread)
-                        // Each thread does iterations_per_frame / 256 iterations
-                        // We want ~iterations_per_frame total, so dispatch (iterations / 256) / per_thread
-                        // Simplify: dispatch enough to cover all iterations
-                        let num_workgroups =
-                            (self.fractal_params.attractor_iterations_per_frame / 256).max(1);
-                        compute.dispatch(
-                            &mut encoder,
-                            &accum_tex.compute_bind_group,
-                            num_workgroups,
-                        );
-                    }
-
-                    // Update total iterations counter
-                    self.fractal_params.attractor_total_iterations +=
-                        self.fractal_params.attractor_iterations_per_frame as u64;
-
-                    // Auto-pause when max iterations reached
-                    if self.fractal_params.attractor_total_iterations
-                        >= self.fractal_params.attractor_max_iterations
-                    {
-                        self.fractal_params.attractor_paused = true;
-                    }
-                }
-            }
-
-            // Update accumulation display uniforms with palette from fractal params
-            let palette_colors = self.fractal_params.palette.colors;
-            let display_uniforms = AccumulationDisplayUniforms {
-                log_scale: self.fractal_params.attractor_log_scale,
-                gamma: 0.6,
-                palette_offset: self.fractal_params.palette_offset,
-                _padding: 0.0,
-                palette: [
-                    [
-                        palette_colors[0].x,
-                        palette_colors[0].y,
-                        palette_colors[0].z,
-                        1.0,
-                    ],
-                    [
-                        palette_colors[1].x,
-                        palette_colors[1].y,
-                        palette_colors[1].z,
-                        1.0,
-                    ],
-                    [
-                        palette_colors[2].x,
-                        palette_colors[2].y,
-                        palette_colors[2].z,
-                        1.0,
-                    ],
-                    [
-                        palette_colors[3].x,
-                        palette_colors[3].y,
-                        palette_colors[3].z,
-                        1.0,
-                    ],
-                    [
-                        palette_colors[4].x,
-                        palette_colors[4].y,
-                        palette_colors[4].z,
-                        1.0,
-                    ],
-                    [
-                        palette_colors[5].x,
-                        palette_colors[5].y,
-                        palette_colors[5].z,
-                        1.0,
-                    ],
-                    [
-                        palette_colors[6].x,
-                        palette_colors[6].y,
-                        palette_colors[6].z,
-                        1.0,
-                    ],
-                    [
-                        palette_colors[7].x,
-                        palette_colors[7].y,
-                        palette_colors[7].z,
-                        1.0,
-                    ],
-                ],
-            };
-            self.renderer.queue.write_buffer(
-                &self.renderer.accumulation_display_uniform_buffer,
-                0,
-                bytemuck::cast_slice(&[display_uniforms]),
-            );
-
-            // Render accumulation texture to scene_texture with log scaling
-            {
-                let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: Some("Accumulation Display Pass"),
-                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: &self.renderer.scene_view,
-                        depth_slice: None,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                            store: wgpu::StoreOp::Store,
-                        },
-                    })],
-                    depth_stencil_attachment: None,
-                    occlusion_query_set: None,
-                    timestamp_writes: None,
-                    multiview_mask: None,
-                });
-
-                let mut render_pass = render_pass.forget_lifetime();
-
-                // Use the accumulation display pipeline with log scaling visualization
-                if let Some(ref bind_group) = self.renderer.accumulation_display_bind_group {
-                    render_pass.set_pipeline(&self.renderer.accumulation_display_pipeline);
-                    render_pass.set_bind_group(0, bind_group, &[]);
-                    render_pass.set_bind_group(
-                        1,
-                        &self.renderer.accumulation_display_uniform_bind_group,
-                        &[],
-                    );
-                    render_pass
-                        .set_vertex_buffer(0, self.renderer.postprocess_vertex_buffer.slice(..));
-                    render_pass.draw(0..4, 0..1);
-                }
-            }
+            self.dispatch_accumulation(&mut encoder);
         } else {
             // Multi-pass rendering pipeline
             // Pass 1: Render fractal to scene_texture
@@ -359,6 +107,400 @@ impl App {
             }
         }
 
+        // Passes 2-6: bloom (gated), composite, FXAA/final.
+        self.run_post_chain(&mut encoder, &view, use_accumulation);
+
+        // If screenshot requested or recording, capture fractal before UI is rendered.
+        // ARC-004: this block stays inline because it forks the encoder
+        // mid-function (submits the fractal passes, then opens a fresh
+        // encoder for the UI). Moving it would risk reordering `queue.submit`
+        // and breaking screenshot/video correctness.
+        let should_screenshot = self.save_screenshot;
+        #[cfg(not(target_arch = "wasm32"))]
+        let is_recording = self.video_recorder.is_recording();
+        #[cfg(target_arch = "wasm32")]
+        let is_recording = false; // Video recording not supported on web
+
+        let mut encoder = if should_screenshot || is_recording {
+            // Submit the fractal rendering first
+            self.renderer
+                .queue
+                .submit(std::iter::once(encoder.finish()));
+
+            if should_screenshot {
+                // Capture the screenshot (fractal only)
+                #[cfg(not(target_arch = "wasm32"))]
+                self.capture_screenshot(&output.texture);
+                #[cfg(target_arch = "wasm32")]
+                {
+                    let fractal_name = self
+                        .fractal_params
+                        .fractal_type
+                        .filename_safe_name()
+                        .to_string();
+                    let width = self.renderer.config.width;
+                    let height = self.renderer.config.height;
+                    // Create a closure that captures what we need for the toast
+                    let show_toast: Box<dyn Fn(String) + Send + 'static> =
+                        Box::new(move |msg: String| {
+                            log::info!("{}", msg);
+                        });
+                    super::capture_web::capture_screenshot_web(
+                        &self.renderer.device,
+                        &self.renderer.queue,
+                        &output.texture,
+                        width,
+                        height,
+                        fractal_name,
+                        show_toast,
+                    );
+                }
+                self.save_screenshot = false;
+            }
+
+            #[cfg(not(target_arch = "wasm32"))]
+            if is_recording {
+                // Capture video frame (fractal only) - native only
+                self.capture_video_frame(&output.texture);
+            }
+
+            // Create a new encoder for UI rendering
+            self.renderer
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("UI Render Encoder"),
+                })
+        } else {
+            encoder
+        };
+
+        // Render UI into `view` (encodes the egui draw lists into `encoder`),
+        // returning the actions the user triggered and whether any of them
+        // mutated scene state. Then apply the side effects.
+        let (actions, ui_mutated_scene) = self.render_ui(&mut encoder, &view);
+        self.handle_ui_actions(actions);
+
+        // ARC-006: a UI action mutated scene state (slider edit, preset load,
+        // bookmark, reset, screenshot, hi-res render, recording toggle, or
+        // command-palette action). Mark dirty so the next frame renders and
+        // (for non-animating changes) the loop returns to idle after that one
+        // frame. `render_ui` computes the flag instead of marking dirty
+        // in-place because the egui closure holds an immutable borrow on
+        // `self.egui_state` for the duration of `run_ui`.
+        if ui_mutated_scene {
+            self.mark_scene_dirty();
+        }
+
+        self.renderer
+            .queue
+            .submit(std::iter::once(encoder.finish()));
+
+        output.present();
+
+        // ARC-006: we just rendered a frame. Clear the dirty flag unless a
+        // continuous animation source (auto-orbit, palette animation, camera
+        // transition, LOD interpolation, attractor accumulation, video
+        // recording) is still active — those keep the loop spinning by
+        // returning `is_scene_animation_active() == true` from
+        // `should_render_next_frame()`.
+        self.after_render_frame();
+    }
+
+    /// Dispatch the attractor/Buddhabrot accumulation compute passes and the
+    /// "Accumulation Display Pass" that blits the result to `scene_view`.
+    ///
+    /// Extracted verbatim from the original `App::render`; behavior unchanged.
+    /// The caller has already decided `use_accumulation` is true and created
+    /// the encoder; this method encodes into that same encoder (the clear
+    /// must precede the dispatch in the same command stream — see ARC-012).
+    fn dispatch_accumulation(&mut self, encoder: &mut wgpu::CommandEncoder) {
+        let is_buddhabrot = self.fractal_params.fractal_type.is_buddhabrot();
+
+        // Check if texture needs recreation (None or wrong size)
+        let texture_needs_recreation = match &self.renderer.accumulation_texture {
+            None => true,
+            Some(tex) => {
+                tex.width != self.renderer.size.width || tex.height != self.renderer.size.height
+            }
+        };
+
+        // Initialize compute infrastructure if needed (handles resize too)
+        if is_buddhabrot {
+            self.renderer.init_buddhabrot_compute();
+        } else {
+            self.renderer.init_accumulation_compute();
+        }
+
+        // Reset iteration counter if texture was just recreated
+        if texture_needs_recreation {
+            self.fractal_params.attractor_total_iterations = 0;
+        }
+
+        // Auto-clear when view parameters change (zoom, pan, or attractor params)
+        let view_changed = self.fractal_params.center_2d
+            != self.fractal_params.attractor_last_center
+            || self.fractal_params.zoom_2d != self.fractal_params.attractor_last_zoom
+            || (!is_buddhabrot
+                && self.fractal_params.julia_c != self.fractal_params.attractor_last_julia_c);
+
+        if view_changed {
+            self.fractal_params.attractor_pending_clear = true;
+            self.fractal_params.attractor_total_iterations = 0;
+            self.fractal_params.attractor_paused = false; // Resume accumulation on view change
+            // Update last values
+            self.fractal_params.attractor_last_center = self.fractal_params.center_2d;
+            self.fractal_params.attractor_last_zoom = self.fractal_params.zoom_2d;
+            self.fractal_params.attractor_last_julia_c = self.fractal_params.julia_c;
+        }
+
+        // Handle clear request
+        if self.fractal_params.attractor_pending_clear {
+            if is_buddhabrot {
+                // Clear Buddhabrot buffer
+                if let Some(ref buffer) = self.renderer.buddhabrot_accumulation_buffer {
+                    buffer.clear(encoder);
+                }
+            } else {
+                // Clear attractor texture
+                if let Some(ref mut accum_tex) = self.renderer.accumulation_texture {
+                    accum_tex.clear(
+                        encoder,
+                        &self.renderer.device,
+                        self.renderer.clear_texture_supported,
+                    );
+                }
+            }
+            self.fractal_params.attractor_pending_clear = false;
+            self.fractal_params.attractor_total_iterations = 0;
+        }
+
+        // Dispatch appropriate compute shader based on fractal type (only if not paused)
+        if !self.fractal_params.attractor_paused && is_buddhabrot {
+            // Update Buddhabrot compute uniforms
+            if let Some(ref mut compute) = self.renderer.buddhabrot_compute {
+                // Filter trajectories by minimum iteration count
+                // Short trajectories (outer glow) vs long trajectories (Buddha interior)
+                // Higher min = more Buddha detail, lower = more outer structure
+                let min_iter = (self.fractal_params.max_iterations / 10).max(20);
+                compute.uniforms = BuddhabrotComputeUniforms {
+                    center_x: self.fractal_params.center_2d[0] as f32,
+                    center_y: self.fractal_params.center_2d[1] as f32,
+                    zoom: self.fractal_params.zoom_2d as f32,
+                    aspect_ratio: self.renderer.size.width as f32
+                        / self.renderer.size.height as f32,
+                    width: self.renderer.size.width,
+                    height: self.renderer.size.height,
+                    iterations_per_frame: self.fractal_params.attractor_iterations_per_frame,
+                    max_iterations: self.fractal_params.max_iterations,
+                    total_iterations: self.fractal_params.attractor_total_iterations as u32,
+                    clear_accumulation: 0,
+                    min_iterations: min_iter,
+                    _padding: 0,
+                };
+                compute.update_uniforms(&self.renderer.queue);
+
+                // Dispatch compute shader using the atomic buffer
+                if let Some(ref buffer) = self.renderer.buddhabrot_accumulation_buffer {
+                    // Each workgroup (256 threads) tests multiple samples
+                    let num_workgroups =
+                        (self.fractal_params.attractor_iterations_per_frame / 256).max(1);
+                    compute.dispatch(encoder, &buffer.compute_bind_group, num_workgroups);
+
+                    // Copy from atomic buffer to texture for display
+                    let has_copy_pipeline = self.renderer.buddhabrot_copy_pipeline.is_some();
+                    let has_copy_bind_group = self.renderer.buddhabrot_copy_bind_group.is_some();
+
+                    if has_copy_pipeline && has_copy_bind_group {
+                        let copy_pipeline =
+                            self.renderer.buddhabrot_copy_pipeline.as_ref().unwrap();
+                        let copy_bind_group =
+                            self.renderer.buddhabrot_copy_bind_group.as_ref().unwrap();
+                        let mut copy_pass =
+                            encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                                label: Some("Buddhabot Copy Pass"),
+                                timestamp_writes: None,
+                            });
+                        copy_pass.set_pipeline(copy_pipeline);
+                        copy_pass.set_bind_group(0, copy_bind_group, &[]);
+                        // Dispatch enough workgroups to cover all pixels (16x16 workgroup size)
+                        let wg_x = self.renderer.size.width.div_ceil(16);
+                        let wg_y = self.renderer.size.height.div_ceil(16);
+                        copy_pass.dispatch_workgroups(wg_x, wg_y, 1);
+                    }
+                }
+
+                // Update total iterations counter
+                self.fractal_params.attractor_total_iterations +=
+                    self.fractal_params.attractor_iterations_per_frame as u64;
+
+                // Auto-pause when max iterations reached
+                if self.fractal_params.attractor_total_iterations
+                    >= self.fractal_params.attractor_max_iterations
+                {
+                    self.fractal_params.attractor_paused = true;
+                }
+            }
+        } else if !self.fractal_params.attractor_paused {
+            // Update attractor compute uniforms (only if not paused)
+            if let Some(ref mut compute) = self.renderer.attractor_compute {
+                compute.uniforms = AttractorComputeUniforms {
+                    param_a: self.fractal_params.julia_c[0],
+                    param_b: self.fractal_params.julia_c[1],
+                    param_c: 0.0, // Could expose more params
+                    param_d: 0.0,
+                    center_x: self.fractal_params.center_2d[0] as f32,
+                    center_y: self.fractal_params.center_2d[1] as f32,
+                    zoom: self.fractal_params.zoom_2d as f32,
+                    aspect_ratio: self.renderer.size.width as f32
+                        / self.renderer.size.height as f32,
+                    width: self.renderer.size.width,
+                    height: self.renderer.size.height,
+                    iterations_per_frame: self.fractal_params.attractor_iterations_per_frame,
+                    attractor_type: self.fractal_params.fractal_type.attractor_index(),
+                    total_iterations: self.fractal_params.attractor_total_iterations as u32,
+                    clear_accumulation: 0,
+                    _padding: [0; 2],
+                };
+                compute.update_uniforms(&self.renderer.queue);
+
+                // Dispatch compute shader
+                if let Some(ref accum_tex) = self.renderer.accumulation_texture {
+                    // Number of workgroups: iterations_per_frame / (256 threads * iterations_per_thread)
+                    // Each thread does iterations_per_frame / 256 iterations
+                    // We want ~iterations_per_frame total, so dispatch (iterations / 256) / per_thread
+                    // Simplify: dispatch enough to cover all iterations
+                    let num_workgroups =
+                        (self.fractal_params.attractor_iterations_per_frame / 256).max(1);
+                    compute.dispatch(encoder, &accum_tex.compute_bind_group, num_workgroups);
+                }
+
+                // Update total iterations counter
+                self.fractal_params.attractor_total_iterations +=
+                    self.fractal_params.attractor_iterations_per_frame as u64;
+
+                // Auto-pause when max iterations reached
+                if self.fractal_params.attractor_total_iterations
+                    >= self.fractal_params.attractor_max_iterations
+                {
+                    self.fractal_params.attractor_paused = true;
+                }
+            }
+        }
+
+        // Update accumulation display uniforms with palette from fractal params
+        let palette_colors = self.fractal_params.palette.colors;
+        let display_uniforms = AccumulationDisplayUniforms {
+            log_scale: self.fractal_params.attractor_log_scale,
+            gamma: 0.6,
+            palette_offset: self.fractal_params.palette_offset,
+            _padding: 0.0,
+            palette: [
+                [
+                    palette_colors[0].x,
+                    palette_colors[0].y,
+                    palette_colors[0].z,
+                    1.0,
+                ],
+                [
+                    palette_colors[1].x,
+                    palette_colors[1].y,
+                    palette_colors[1].z,
+                    1.0,
+                ],
+                [
+                    palette_colors[2].x,
+                    palette_colors[2].y,
+                    palette_colors[2].z,
+                    1.0,
+                ],
+                [
+                    palette_colors[3].x,
+                    palette_colors[3].y,
+                    palette_colors[3].z,
+                    1.0,
+                ],
+                [
+                    palette_colors[4].x,
+                    palette_colors[4].y,
+                    palette_colors[4].z,
+                    1.0,
+                ],
+                [
+                    palette_colors[5].x,
+                    palette_colors[5].y,
+                    palette_colors[5].z,
+                    1.0,
+                ],
+                [
+                    palette_colors[6].x,
+                    palette_colors[6].y,
+                    palette_colors[6].z,
+                    1.0,
+                ],
+                [
+                    palette_colors[7].x,
+                    palette_colors[7].y,
+                    palette_colors[7].z,
+                    1.0,
+                ],
+            ],
+        };
+        self.renderer.queue.write_buffer(
+            &self.renderer.accumulation_display_uniform_buffer,
+            0,
+            bytemuck::cast_slice(&[display_uniforms]),
+        );
+
+        // Render accumulation texture to scene_texture with log scaling
+        {
+            let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Accumulation Display Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &self.renderer.scene_view,
+                    depth_slice: None,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                occlusion_query_set: None,
+                timestamp_writes: None,
+                multiview_mask: None,
+            });
+
+            let mut render_pass = render_pass.forget_lifetime();
+
+            // Use the accumulation display pipeline with log scaling visualization
+            if let Some(ref bind_group) = self.renderer.accumulation_display_bind_group {
+                render_pass.set_pipeline(&self.renderer.accumulation_display_pipeline);
+                render_pass.set_bind_group(0, bind_group, &[]);
+                render_pass.set_bind_group(
+                    1,
+                    &self.renderer.accumulation_display_uniform_bind_group,
+                    &[],
+                );
+                render_pass.set_vertex_buffer(0, self.renderer.postprocess_vertex_buffer.slice(..));
+                render_pass.draw(0..4, 0..1);
+            }
+        }
+    }
+
+    /// Encode the post-processing chain: bloom extract + horizontal blur +
+    /// vertical blur (gated on `bloom_enabled` per ARC-005; with a one-shot
+    /// clear of the bloom target on enabled→disabled transitions so the
+    /// composite pass never samples stale memory), the composite pass
+    /// (skipped in accumulation mode), and the final pass to the frame's
+    /// `view` (FXAA when enabled, else a direct copy).
+    ///
+    /// Extracted verbatim from the original `App::render`; behavior unchanged.
+    fn run_post_chain(
+        &mut self,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+        use_accumulation: bool,
+    ) {
         // Pass 2-4: Bloom pipeline.
         // ARC-005: the three full-res Rgba16Float passes are pure waste when
         // bloom is disabled (the default) or when accumulation mode skips the
@@ -533,7 +675,7 @@ impl App {
             let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Final Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
+                    view,
                     depth_slice: None,
                     resolve_target: None,
                     ops: wgpu::Operations {
@@ -566,85 +708,48 @@ impl App {
             render_pass.set_vertex_buffer(0, self.renderer.postprocess_vertex_buffer.slice(..));
             render_pass.draw(0..4, 0..1);
         }
+    }
 
-        // If screenshot requested or recording, capture fractal before UI is rendered
-        let should_screenshot = self.save_screenshot;
-        #[cfg(not(target_arch = "wasm32"))]
-        let is_recording = self.video_recorder.is_recording();
-        #[cfg(target_arch = "wasm32")]
-        let is_recording = false; // Video recording not supported on web
-
-        if should_screenshot || is_recording {
-            // Submit the fractal rendering first
-            self.renderer
-                .queue
-                .submit(std::iter::once(encoder.finish()));
-
-            if should_screenshot {
-                // Capture the screenshot (fractal only)
-                #[cfg(not(target_arch = "wasm32"))]
-                self.capture_screenshot(&output.texture);
-                #[cfg(target_arch = "wasm32")]
-                {
-                    let fractal_name = self
-                        .fractal_params
-                        .fractal_type
-                        .filename_safe_name()
-                        .to_string();
-                    let width = self.renderer.config.width;
-                    let height = self.renderer.config.height;
-                    // Create a closure that captures what we need for the toast
-                    let show_toast: Box<dyn Fn(String) + Send + 'static> =
-                        Box::new(move |msg: String| {
-                            log::info!("{}", msg);
-                        });
-                    super::capture_web::capture_screenshot_web(
-                        &self.renderer.device,
-                        &self.renderer.queue,
-                        &output.texture,
-                        width,
-                        height,
-                        fractal_name,
-                        show_toast,
-                    );
-                }
-                self.save_screenshot = false;
-            }
-
-            #[cfg(not(target_arch = "wasm32"))]
-            if is_recording {
-                // Capture video frame (fractal only) - native only
-                self.capture_video_frame(&output.texture);
-            }
-
-            // Create a new encoder for UI rendering
-            encoder =
-                self.renderer
-                    .device
-                    .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                        label: Some("UI Render Encoder"),
-                    });
-        }
-
-        // Render UI
+    /// Render the egui frame (UI panels, command palette, overlays) and encode
+    /// the egui draw lists into `encoder` against `view`. Returns the actions
+    /// the user triggered this frame plus a flag telling the caller whether
+    /// any of them mutated scene state (so the caller can mark the scene
+    /// dirty outside the egui closure, which holds an immutable borrow on
+    /// `self.egui_state`).
+    ///
+    /// ARC-004: extracted verbatim from `App::render`; behavior unchanged.
+    /// The `gpu_scan_requested` action is included in `ui_mutated_scene` so a
+    /// scan request triggers a redraw (the "Scanning…" label needs to paint).
+    fn render_ui(
+        &mut self,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+    ) -> (UiActions, bool) {
         let raw_input = self.egui_state.take_egui_input(self.window.as_ref());
-        // ARC-006: populated by the UI closure; consulted after `run_ui`
+        // ARC-006: populated inside the UI closure; consulted after `run_ui`
         // returns (we can't call `self.mark_scene_dirty()` inside the closure
         // — `egui_ctx()` holds an immutable borrow on `self.egui_state`).
         let mut ui_mutated_scene = false;
+        let mut actions = UiActions::default();
         let full_output = self.egui_state.egui_ctx().run_ui(raw_input, |ctx| {
             #[cfg(not(target_arch = "wasm32"))]
             let is_rec = self.video_recorder.is_recording();
             #[cfg(target_arch = "wasm32")]
             let is_rec = false; // Video recording not supported on web
 
-            let actions = self.ui.render(
+            actions = self.ui.render(
                 ctx,
                 &mut self.fractal_params,
                 self.camera.position,
                 self.camera.target,
                 is_rec,
             );
+
+            // ARC-006: snapshot which UI actions mutate scene state BEFORE the
+            // handlers consume the Options, so we can mark the scene dirty in
+            // one place after the closure. UI `changed` covers slider/checkbox
+            // edits; the rest are explicit action flags. (Command palette's
+            // own `changed` is OR'd in below.)
             let UiActions {
                 changed,
                 screenshot_requested,
@@ -657,25 +762,21 @@ impl App {
                 gpu_scan_requested,
                 start_recording,
                 stop_recording,
-            } = actions;
-
-            // ARC-006: snapshot which UI actions mutate scene state BEFORE the
-            // handlers consume the Options, so we can mark the scene dirty in
-            // one place after the closure. UI `changed` covers slider/checkbox
-            // edits; the rest are explicit action flags. (Command palette's
-            // own `changed` is OR'd in below.)
-            ui_mutated_scene = changed
+            } = &actions;
+            ui_mutated_scene = *changed
                 || preset_to_load.is_some()
                 || bookmark_to_load.is_some()
-                || reset_requested
-                || reset_camera_requested
-                || point_at_fractal_requested
-                || screenshot_requested
+                || *reset_requested
+                || *reset_camera_requested
+                || *point_at_fractal_requested
+                || *screenshot_requested
                 || hires_render_resolution.is_some()
-                || start_recording
-                || stop_recording;
+                || *gpu_scan_requested
+                || *start_recording
+                || *stop_recording;
 
-            // Render command palette overlay (always on top)
+            // Render command palette overlay (always on top). Stays inside the
+            // closure because it needs `ctx`.
             if let Some(command_action) = self.ui.render_command_palette(ctx) {
                 let (cp_changed, message) = self
                     .ui
@@ -691,182 +792,6 @@ impl App {
                 if let Some(msg) = message {
                     self.ui.show_toast(msg);
                 }
-            }
-
-            // Handle GPU scan request / Monitor scan request
-            if gpu_scan_requested {
-                // Scan monitors (always do this when the button is clicked)
-                self.ui.scan_monitors(&self.window);
-
-                // Also scan GPUs for backward compatibility (native only)
-                #[cfg(not(target_arch = "wasm32"))]
-                {
-                    // Spawn async task to enumerate GPUs
-                    // Note: We can't easily do async here, so we'll use pollster to block
-                    let gpus = pollster::block_on(crate::renderer::Renderer::enumerate_gpus());
-                    self.ui.available_gpus = gpus;
-                    self.ui.gpu_selection_message =
-                        Some(format!("Found {} GPU(s)", self.ui.available_gpus.len()));
-                }
-                #[cfg(target_arch = "wasm32")]
-                {
-                    self.ui.gpu_selection_message =
-                        Some("GPU selection not available on web".to_string());
-                }
-            }
-
-            // Handle preset loading
-            if let Some(preset) = preset_to_load {
-                println!("Loading preset: {}", preset.name);
-                self.fractal_params = FractalParams::from_settings(preset.settings.clone());
-
-                // Apply camera settings from preset
-                self.camera.position = glam::Vec3::from_array(preset.settings.camera_position);
-                self.camera.target = glam::Vec3::from_array(preset.settings.camera_target);
-                self.camera.fovy = preset.settings.camera_fov;
-
-                // Update camera controller
-                self.camera_controller
-                    .set_speed(preset.settings.camera_speed);
-                self.camera_controller
-                    .point_at_target(self.camera.position, self.camera.target);
-
-                // Mark settings for save
-                self.settings_last_changed = web_time::Instant::now();
-                self.settings_need_save = true;
-            }
-
-            // Handle camera bookmark loading
-            if let Some(bookmark) = bookmark_to_load {
-                println!("Loading camera bookmark: {}", bookmark.name);
-                if self.smooth_transitions_enabled {
-                    // Start smooth transition
-                    self.camera_transition.start(
-                        self.camera.position,
-                        self.camera.target,
-                        self.camera.fovy,
-                        bookmark.get_position(),
-                        bookmark.get_target(),
-                        bookmark.fov,
-                        1.5, // 1.5 second transition
-                    );
-                } else {
-                    // Instant jump
-                    self.camera.position = bookmark.get_position();
-                    self.camera.target = bookmark.get_target();
-                    self.camera.fovy = bookmark.fov;
-                    self.camera_controller
-                        .point_at_target(self.camera.position, self.camera.target);
-                }
-                self.fractal_params.camera_fov = bookmark.fov;
-            }
-
-            if reset_requested {
-                self.fractal_params = FractalParams::default();
-                // Reset camera to default position and settings
-                self.camera.reset_to_default();
-                self.camera.fovy = self.fractal_params.camera_fov;
-                self.camera_controller
-                    .set_speed(self.fractal_params.camera_speed);
-                // Sync controller with reset camera position
-                self.camera_controller
-                    .point_at_target(self.camera.position, self.camera.target);
-                println!("Settings and camera reset to defaults");
-            }
-
-            if reset_camera_requested {
-                self.camera.reset_to_default();
-                self.camera.fovy = self.fractal_params.camera_fov;
-                // Sync controller with reset camera position
-                self.camera_controller
-                    .point_at_target(self.camera.position, self.camera.target);
-                println!("Camera reset to default position");
-            }
-
-            if point_at_fractal_requested {
-                self.camera_controller
-                    .point_at_target(self.camera.position, glam::Vec3::ZERO);
-                println!("Camera pointed at fractal");
-            }
-
-            if screenshot_requested {
-                self.save_screenshot = true;
-            }
-
-            if let Some(resolution) = hires_render_resolution {
-                self.save_hires_render = Some(resolution);
-                println!(
-                    "High-resolution render requested: {}x{}",
-                    resolution.0, resolution.1
-                );
-            }
-
-            // Handle video recording (native only)
-            #[cfg(not(target_arch = "wasm32"))]
-            {
-                if start_recording {
-                    // Generate filename with fractal type and timestamp
-                    let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
-                    let fractal_name = self.fractal_params.fractal_type.filename_safe_name();
-                    let filename = format!(
-                        "{}_{}.{}",
-                        fractal_name,
-                        timestamp,
-                        self.ui.video_format.extension()
-                    );
-
-                    // Update video recorder settings
-                    self.video_recorder = VideoRecorder::new(
-                        self.renderer.config.width,
-                        self.renderer.config.height,
-                        self.ui.video_fps,
-                        self.ui.video_format,
-                    );
-
-                    if let Err(e) = self.video_recorder.start_recording(filename.clone()) {
-                        eprintln!("Failed to start recording: {}", e);
-                    } else {
-                        println!("Started recording to {}", filename);
-                    }
-                }
-
-                if stop_recording {
-                    match self.video_recorder.stop_recording() {
-                        Ok(filename) => {
-                            // Convert to absolute path and show in toast
-                            let abs_path = std::path::Path::new(&filename)
-                                .canonicalize()
-                                .unwrap_or_else(|_| std::path::PathBuf::from(&filename));
-
-                            // Auto-open if enabled
-                            if self.ui.auto_open_captures
-                                && let Err(e) = open::that(&abs_path)
-                            {
-                                eprintln!("Failed to open video: {}", e);
-                            }
-
-                            self.ui.show_toast_with_file(
-                                format!("🎬 Video saved: {} - Click to open", filename),
-                                abs_path.to_string_lossy().to_string(),
-                            );
-                        }
-                        Err(e) => {
-                            eprintln!("Failed to stop recording: {}", e);
-                        }
-                    }
-                }
-            }
-            // Video recording not supported on web - UI section is hidden via cfg
-
-            // Mark settings for auto-save (debounced)
-            if changed {
-                self.settings_last_changed = web_time::Instant::now();
-                self.settings_need_save = true;
-
-                // Update camera parameters from fractal_params
-                self.camera.fovy = self.fractal_params.camera_fov;
-                self.camera_controller
-                    .set_speed(self.fractal_params.camera_speed);
             }
 
             self.ui.render_fps(ctx, self.current_fps);
@@ -891,16 +816,6 @@ impl App {
         self.egui_state
             .handle_platform_output(self.window.as_ref(), full_output.platform_output);
 
-        // ARC-006: a UI action mutated scene state (slider edit, preset load,
-        // bookmark, reset, screenshot, hi-res render, recording toggle, or
-        // command-palette action). Mark dirty so the next frame renders and
-        // (for non-animating changes) the loop returns to idle after that one
-        // frame. Done here, outside the `run_ui` closure, so it doesn't
-        // conflict with egui's borrow on `self.egui_state`.
-        if ui_mutated_scene {
-            self.mark_scene_dirty();
-        }
-
         let tris = self
             .egui_state
             .egui_ctx()
@@ -923,7 +838,7 @@ impl App {
         self.egui_renderer.update_buffers(
             &self.renderer.device,
             &self.renderer.queue,
-            &mut encoder,
+            encoder,
             &tris,
             &screen_descriptor,
         );
@@ -932,7 +847,7 @@ impl App {
             let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("UI Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
+                    view,
                     depth_slice: None,
                     resolve_target: None,
                     ops: wgpu::Operations {
@@ -957,18 +872,228 @@ impl App {
             self.egui_renderer.free_texture(id);
         }
 
-        self.renderer
-            .queue
-            .submit(std::iter::once(encoder.finish()));
+        (actions, ui_mutated_scene)
+    }
 
-        output.present();
+    /// Apply the side effects of the UI actions returned from `render_ui`:
+    /// preset/bookmark loading, parameter and camera resets, screenshot and
+    /// hi-res render kickoff, video recorder lifecycle, settings auto-save
+    /// flagging, and the GPU rescan request (ARC-018: native spawns a worker
+    /// thread + returns immediately; the result is drained by
+    /// `App::poll_gpu_scan` each frame).
+    ///
+    /// ARC-004 interim placement: this is called immediately after `render_ui`
+    /// inside `render()`, NOT from `App::update`. The original code ran these
+    /// handlers inside the egui closure at the end of `render()`, so this
+    /// placement preserves behavior exactly (same-frame execution). Moving
+    /// them to `update()` would apply actions one frame sooner — safe in
+    /// principle since screenshot/recording flags are consumed at the top of
+    /// the NEXT render — but it is a behavior change and out of scope for
+    /// this behavior-preserving extraction.
+    ///
+    /// Actions that MUST affect the current frame stay here (none of them
+    /// do: `save_screenshot` and the recorder state are read at the top of
+    /// the next render call, not this one).
+    fn handle_ui_actions(&mut self, actions: UiActions) {
+        let UiActions {
+            changed,
+            screenshot_requested,
+            reset_requested,
+            reset_camera_requested,
+            point_at_fractal_requested,
+            preset_to_load,
+            hires_render_resolution,
+            bookmark_to_load,
+            gpu_scan_requested,
+            start_recording,
+            stop_recording,
+        } = actions;
 
-        // ARC-006: we just rendered a frame. Clear the dirty flag unless a
-        // continuous animation source (auto-orbit, palette animation, camera
-        // transition, LOD interpolation, attractor accumulation, video
-        // recording) is still active — those keep the loop spinning by
-        // returning `is_scene_animation_active() == true` from
-        // `should_render_next_frame()`.
-        self.after_render_frame();
+        // Handle GPU scan request / Monitor scan request
+        if gpu_scan_requested {
+            // Scan monitors (always do this when the button is clicked)
+            self.ui.scan_monitors(&self.window);
+
+            // ARC-018: kick off GPU enumeration off the render path. Native
+            // spawns a worker thread (with a fresh `wgpu::Instance` inside
+            // `Renderer::enumerate_gpus`) that sends the result through a
+            // channel; `App::poll_gpu_scan` (called from `update`) drains it
+            // via `try_recv` next frame, so the render loop never blocks on
+            // adapter enumeration (which can take hundreds of ms).
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                if self.gpu_scan_receiver.is_none() {
+                    let (tx, rx) = std::sync::mpsc::channel::<Vec<crate::renderer::GpuInfo>>();
+                    self.gpu_scan_receiver = Some(rx);
+                    std::thread::spawn(move || {
+                        let gpus = pollster::block_on(crate::renderer::Renderer::enumerate_gpus());
+                        // Ignore send errors: if the receiver was dropped (App
+                        // dropped), the result is just unused.
+                        let _ = tx.send(gpus);
+                    });
+                    self.ui.gpu_selection_message = Some("Scanning for GPUs...".to_string());
+                }
+            }
+            #[cfg(target_arch = "wasm32")]
+            {
+                self.ui.gpu_selection_message =
+                    Some("GPU selection not available on web".to_string());
+            }
+        }
+
+        // Handle preset loading
+        if let Some(preset) = preset_to_load {
+            println!("Loading preset: {}", preset.name);
+            self.fractal_params = FractalParams::from_settings(preset.settings.clone());
+
+            // Apply camera settings from preset
+            self.camera.position = glam::Vec3::from_array(preset.settings.camera_position);
+            self.camera.target = glam::Vec3::from_array(preset.settings.camera_target);
+            self.camera.fovy = preset.settings.camera_fov;
+
+            // Update camera controller
+            self.camera_controller
+                .set_speed(preset.settings.camera_speed);
+            self.camera_controller
+                .point_at_target(self.camera.position, self.camera.target);
+
+            // Mark settings for save
+            self.settings_last_changed = web_time::Instant::now();
+            self.settings_need_save = true;
+        }
+
+        // Handle camera bookmark loading
+        if let Some(bookmark) = bookmark_to_load {
+            println!("Loading camera bookmark: {}", bookmark.name);
+            if self.smooth_transitions_enabled {
+                // Start smooth transition
+                self.camera_transition.start(
+                    self.camera.position,
+                    self.camera.target,
+                    self.camera.fovy,
+                    bookmark.get_position(),
+                    bookmark.get_target(),
+                    bookmark.fov,
+                    1.5, // 1.5 second transition
+                );
+            } else {
+                // Instant jump
+                self.camera.position = bookmark.get_position();
+                self.camera.target = bookmark.get_target();
+                self.camera.fovy = bookmark.fov;
+                self.camera_controller
+                    .point_at_target(self.camera.position, self.camera.target);
+            }
+            self.fractal_params.camera_fov = bookmark.fov;
+        }
+
+        if reset_requested {
+            self.fractal_params = FractalParams::default();
+            // Reset camera to default position and settings
+            self.camera.reset_to_default();
+            self.camera.fovy = self.fractal_params.camera_fov;
+            self.camera_controller
+                .set_speed(self.fractal_params.camera_speed);
+            // Sync controller with reset camera position
+            self.camera_controller
+                .point_at_target(self.camera.position, self.camera.target);
+            println!("Settings and camera reset to defaults");
+        }
+
+        if reset_camera_requested {
+            self.camera.reset_to_default();
+            self.camera.fovy = self.fractal_params.camera_fov;
+            // Sync controller with reset camera position
+            self.camera_controller
+                .point_at_target(self.camera.position, self.camera.target);
+            println!("Camera reset to default position");
+        }
+
+        if point_at_fractal_requested {
+            self.camera_controller
+                .point_at_target(self.camera.position, glam::Vec3::ZERO);
+            println!("Camera pointed at fractal");
+        }
+
+        if screenshot_requested {
+            self.save_screenshot = true;
+        }
+
+        if let Some(resolution) = hires_render_resolution {
+            self.save_hires_render = Some(resolution);
+            println!(
+                "High-resolution render requested: {}x{}",
+                resolution.0, resolution.1
+            );
+        }
+
+        // Handle video recording (native only)
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            if start_recording {
+                // Generate filename with fractal type and timestamp
+                let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+                let fractal_name = self.fractal_params.fractal_type.filename_safe_name();
+                let filename = format!(
+                    "{}_{}.{}",
+                    fractal_name,
+                    timestamp,
+                    self.ui.video_format.extension()
+                );
+
+                // Update video recorder settings
+                self.video_recorder = VideoRecorder::new(
+                    self.renderer.config.width,
+                    self.renderer.config.height,
+                    self.ui.video_fps,
+                    self.ui.video_format,
+                );
+
+                if let Err(e) = self.video_recorder.start_recording(filename.clone()) {
+                    eprintln!("Failed to start recording: {}", e);
+                } else {
+                    println!("Started recording to {}", filename);
+                }
+            }
+
+            if stop_recording {
+                match self.video_recorder.stop_recording() {
+                    Ok(filename) => {
+                        // Convert to absolute path and show in toast
+                        let abs_path = std::path::Path::new(&filename)
+                            .canonicalize()
+                            .unwrap_or_else(|_| std::path::PathBuf::from(&filename));
+
+                        // Auto-open if enabled
+                        if self.ui.auto_open_captures
+                            && let Err(e) = open::that(&abs_path)
+                        {
+                            eprintln!("Failed to open video: {}", e);
+                        }
+
+                        self.ui.show_toast_with_file(
+                            format!("🎬 Video saved: {} - Click to open", filename),
+                            abs_path.to_string_lossy().to_string(),
+                        );
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to stop recording: {}", e);
+                    }
+                }
+            }
+        }
+        // Video recording not supported on web - UI section is hidden via cfg
+
+        // Mark settings for auto-save (debounced) and sync camera parameters
+        // from fractal_params (fovy / camera_speed sliders).
+        if changed {
+            self.settings_last_changed = web_time::Instant::now();
+            self.settings_need_save = true;
+
+            // Update camera parameters from fractal_params
+            self.camera.fovy = self.fractal_params.camera_fov;
+            self.camera_controller
+                .set_speed(self.fractal_params.camera_speed);
+        }
     }
 }

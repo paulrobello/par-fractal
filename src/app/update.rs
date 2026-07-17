@@ -8,6 +8,11 @@ impl App {
         let dt = (now - self.last_frame_time).as_secs_f32();
         self.last_frame_time = now;
 
+        // ARC-018: drain the background GPU scan if it has completed. Cheap
+        // (`try_recv`) and runs every frame so the UI list populates the
+        // instant the worker thread finishes, without blocking the loop.
+        self.poll_gpu_scan();
+
         // Update FPS counter
         self.frame_count += 1;
         let fps_elapsed = (now - self.fps_timer).as_secs_f32();
