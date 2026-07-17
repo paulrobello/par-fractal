@@ -308,8 +308,7 @@ impl App {
                     multiview_mask: None,
                 });
 
-                let mut render_pass: wgpu::RenderPass<'static> =
-                    unsafe { std::mem::transmute(render_pass) };
+                let mut render_pass = render_pass.forget_lifetime();
 
                 // Use the accumulation display pipeline with log scaling visualization
                 if let Some(ref bind_group) = self.renderer.accumulation_display_bind_group {
@@ -346,9 +345,7 @@ impl App {
                     multiview_mask: None,
                 });
 
-                // SAFETY: We drop the render_pass before using encoder again, so this is safe.
-                let mut render_pass: wgpu::RenderPass<'static> =
-                    unsafe { std::mem::transmute(render_pass) };
+                let mut render_pass = render_pass.forget_lifetime();
 
                 render_pass.set_pipeline(&self.renderer.render_pipeline);
                 render_pass.set_bind_group(0, &self.renderer.uniform_bind_group, &[]);
@@ -379,9 +376,7 @@ impl App {
                     multiview_mask: None,
                 });
 
-                // SAFETY: We drop the render_pass before using encoder again, so this is safe.
-                let mut render_pass: wgpu::RenderPass<'static> =
-                    unsafe { std::mem::transmute(render_pass) };
+                let mut render_pass = render_pass.forget_lifetime();
 
                 render_pass.set_pipeline(&self.renderer.bloom_extract_pipeline);
                 render_pass.set_bind_group(0, &self.renderer.scene_bind_group, &[]);
@@ -409,9 +404,7 @@ impl App {
                     multiview_mask: None,
                 });
 
-                // SAFETY: We drop the render_pass before using encoder again, so this is safe.
-                let mut render_pass: wgpu::RenderPass<'static> =
-                    unsafe { std::mem::transmute(render_pass) };
+                let mut render_pass = render_pass.forget_lifetime();
 
                 render_pass.set_pipeline(&self.renderer.blur_pipeline);
                 render_pass.set_bind_group(0, &self.renderer.bright_bind_group, &[]);
@@ -456,9 +449,7 @@ impl App {
                     multiview_mask: None,
                 });
 
-                // SAFETY: We drop the render_pass before using encoder again, so this is safe.
-                let mut render_pass: wgpu::RenderPass<'static> =
-                    unsafe { std::mem::transmute(render_pass) };
+                let mut render_pass = render_pass.forget_lifetime();
 
                 render_pass.set_pipeline(&self.renderer.blur_pipeline);
                 render_pass.set_bind_group(0, &self.renderer.blur_temp_bind_group, &[]);
@@ -488,9 +479,7 @@ impl App {
                 multiview_mask: None,
             });
 
-            // SAFETY: We drop the render_pass before using encoder again, so this is safe.
-            let mut render_pass: wgpu::RenderPass<'static> =
-                unsafe { std::mem::transmute(render_pass) };
+            let mut render_pass = render_pass.forget_lifetime();
 
             render_pass.set_pipeline(&self.renderer.composite_pipeline);
             render_pass.set_bind_group(0, &self.renderer.composite_bind_group, &[]);
@@ -518,9 +507,7 @@ impl App {
                 multiview_mask: None,
             });
 
-            // SAFETY: We drop the render_pass before using encoder again, so this is safe.
-            let mut render_pass: wgpu::RenderPass<'static> =
-                unsafe { std::mem::transmute(render_pass) };
+            let mut render_pass = render_pass.forget_lifetime();
 
             if use_accumulation {
                 // For accumulation mode, copy directly from scene to screen (skip composite/bloom)
@@ -886,9 +873,7 @@ impl App {
                 multiview_mask: None,
             });
 
-            // SAFETY: We drop the render_pass before using encoder again, so this is safe.
-            let mut render_pass: wgpu::RenderPass<'static> =
-                unsafe { std::mem::transmute(render_pass) };
+            let mut render_pass = render_pass.forget_lifetime();
 
             self.egui_renderer
                 .render(&mut render_pass, &tris, &screen_descriptor);

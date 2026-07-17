@@ -16,6 +16,28 @@ use glam::Vec3;
 
 use crate::lod::{LODConfig, LODState};
 
+/// Clamp a finite f32 to `[min, max]`; NaN/Inf inputs return `default`.
+/// Used at the `from_settings` trust boundary because presets/settings arrive
+/// from YAML, JSON import, and web localStorage — all bypassing the bounded UI
+/// sliders. `f32::clamp` alone propagates NaN (NaN order comparisons are always
+/// false), so the `is_finite()` guard is mandatory.
+fn clamp_finite_f32(v: f32, min: f32, max: f32, default: f32) -> f32 {
+    if v.is_finite() {
+        v.clamp(min, max)
+    } else {
+        default
+    }
+}
+
+/// Clamp a finite f64 to `[min, max]`; NaN/Inf inputs return `default`.
+fn clamp_finite_f64(v: f64, min: f64, max: f64, default: f64) -> f64 {
+    if v.is_finite() {
+        v.clamp(min, max)
+    } else {
+        default
+    }
+}
+
 #[derive(Clone)]
 pub struct FractalParams {
     pub fractal_type: FractalType,
@@ -400,6 +422,106 @@ impl FractalParams {
             | FractalType::Rossler3D => RenderMode::ThreeD,
         };
 
+        // SEC-001: Trust-boundary clamps. Clamp every resource-driving field to a
+        // sane maximum (mirroring UI slider bounds where they exist) and reject
+        // NaN/Inf on every float that reaches a GPU uniform. The clamped values
+        // are also reused for the attractor_last_* bookkeeping below so a hostile
+        // preset cannot smuggle bad values in through those either.
+        let max_iterations = settings.max_iterations.clamp(1, 100_000);
+        let max_steps = settings.max_steps.clamp(1, 2_000);
+        let attractor_iterations_per_frame =
+            settings.attractor_iterations_per_frame.clamp(1, 2_000_000);
+        let shadow_samples = settings.shadow_samples.min(512);
+        let dof_samples = settings.dof_samples.min(64);
+        let zoom_2d = clamp_finite_f32(settings.zoom_2d, 1e-6, 1e15, 1.0);
+        let min_distance = clamp_finite_f32(settings.min_distance, 1e-7, 1.0, 0.00035);
+        let orbit_trap_scale = clamp_finite_f32(settings.orbit_trap_scale, 0.0, 1e6, 1.0);
+        let power = clamp_finite_f32(settings.power, -1e4, 1e4, 2.0);
+        let julia_c = [
+            clamp_finite_f32(settings.julia_c[0], -1e6, 1e6, -0.7),
+            clamp_finite_f32(settings.julia_c[1], -1e6, 1e6, 0.27015),
+        ];
+        let ao_intensity = clamp_finite_f32(settings.ao_intensity, 0.0, 1e6, 1.0);
+        let ao_step_size = clamp_finite_f32(settings.ao_step_size, 1e-7, 1e6, 0.12);
+        let shadow_softness = clamp_finite_f32(settings.shadow_softness, 0.0, 1e6, 8.0);
+        let shadow_max_distance = clamp_finite_f32(settings.shadow_max_distance, 0.0, 1e6, 5.0);
+        let shadow_step_factor = clamp_finite_f32(settings.shadow_step_factor, 0.0, 1e6, 0.6);
+        let dof_focal_length = clamp_finite_f32(settings.dof_focal_length, 0.0, 1e6, 6.0);
+        let dof_aperture = clamp_finite_f32(settings.dof_aperture, 0.0, 1e6, 0.01);
+        let fractal_scale = clamp_finite_f32(settings.fractal_scale, -1e6, 1e6, 2.0);
+        let fractal_fold = clamp_finite_f32(settings.fractal_fold, 0.0, 1e6, 1.0);
+        let fractal_min_radius = clamp_finite_f32(settings.fractal_min_radius, 0.0, 1e6, 0.5);
+        let roughness = clamp_finite_f32(settings.roughness, 0.0, 1e6, 0.4);
+        let metallic = clamp_finite_f32(settings.metallic, 0.0, 1e6, 0.20);
+        let light_intensity = clamp_finite_f32(settings.light_intensity, 0.0, 1e6, 3.0);
+        let ambient_light = clamp_finite_f32(settings.ambient_light, 0.0, 1e6, 0.15);
+        let light_azimuth = clamp_finite_f32(settings.light_azimuth, -1e6, 1e6, 45.0);
+        let light_elevation = clamp_finite_f32(settings.light_elevation, -1e6, 1e6, 35.0);
+        let floor_height = clamp_finite_f32(settings.floor_height, -1e6, 1e6, -2.0);
+        let floor_reflection_strength =
+            clamp_finite_f32(settings.floor_reflection_strength, 0.0, 1e6, 0.5);
+        let fog_density = clamp_finite_f32(settings.fog_density, 0.0, 1e6, 0.005);
+        let fixed_step_size = clamp_finite_f32(settings.fixed_step_size, 1e-7, 1e6, 0.1);
+        let step_multiplier = clamp_finite_f32(settings.step_multiplier, 0.0, 1e6, 1.0);
+        let max_distance = clamp_finite_f32(settings.max_distance, 0.0, 1e6, 100.0);
+        let camera_speed = clamp_finite_f32(settings.camera_speed, 0.0, 1e6, 2.0);
+        let camera_fov = clamp_finite_f32(settings.camera_fov, 1e-3, 180.0, 45.0);
+        let orbit_speed = clamp_finite_f32(settings.orbit_speed, -1e6, 1e6, 0.2);
+        let brightness = clamp_finite_f32(settings.brightness, 0.0, 1e6, 1.0);
+        let contrast = clamp_finite_f32(settings.contrast, 0.0, 1e6, 1.0);
+        let saturation = clamp_finite_f32(settings.saturation, 0.0, 1e6, 1.0);
+        let hue_shift = clamp_finite_f32(settings.hue_shift, -1e6, 1e6, 0.0);
+        let vignette_intensity = clamp_finite_f32(settings.vignette_intensity, 0.0, 1e6, 0.5);
+        let vignette_radius = clamp_finite_f32(settings.vignette_radius, 0.0, 1e6, 0.8);
+        let bloom_threshold = clamp_finite_f32(settings.bloom_threshold, 0.0, 1e6, 0.75);
+        let bloom_intensity = clamp_finite_f32(settings.bloom_intensity, 0.0, 1e6, 0.1);
+        let bloom_radius = clamp_finite_f32(settings.bloom_radius, 0.0, 1e6, 0.005);
+        let attractor_log_scale = clamp_finite_f32(settings.attractor_log_scale, 0.0, 1e6, 4.0);
+        let center_2d = [
+            clamp_finite_f64(settings.center_2d[0], -1e15, 1e15, 0.0),
+            clamp_finite_f64(settings.center_2d[1], -1e15, 1e15, 0.0),
+        ];
+        let procedural_brightness = [
+            clamp_finite_f32(settings.procedural_brightness[0], -1e6, 1e6, 0.5),
+            clamp_finite_f32(settings.procedural_brightness[1], -1e6, 1e6, 0.5),
+            clamp_finite_f32(settings.procedural_brightness[2], -1e6, 1e6, 0.5),
+        ];
+        let procedural_contrast = [
+            clamp_finite_f32(settings.procedural_contrast[0], -1e6, 1e6, 0.5),
+            clamp_finite_f32(settings.procedural_contrast[1], -1e6, 1e6, 0.5),
+            clamp_finite_f32(settings.procedural_contrast[2], -1e6, 1e6, 0.5),
+        ];
+        let procedural_frequency = [
+            clamp_finite_f32(settings.procedural_frequency[0], -1e6, 1e6, 1.0),
+            clamp_finite_f32(settings.procedural_frequency[1], -1e6, 1e6, 1.0),
+            clamp_finite_f32(settings.procedural_frequency[2], -1e6, 1e6, 1.0),
+        ];
+        let procedural_phase = [
+            clamp_finite_f32(settings.procedural_phase[0], -1e6, 1e6, 0.0),
+            clamp_finite_f32(settings.procedural_phase[1], -1e6, 1e6, 0.333),
+            clamp_finite_f32(settings.procedural_phase[2], -1e6, 1e6, 0.667),
+        ];
+        let albedo = Vec3::from_array([
+            clamp_finite_f32(settings.albedo[0], 0.0, 1e6, 0.8),
+            clamp_finite_f32(settings.albedo[1], 0.0, 1e6, 0.8),
+            clamp_finite_f32(settings.albedo[2], 0.0, 1e6, 0.8),
+        ]);
+        let floor_color1 = Vec3::from_array([
+            clamp_finite_f32(settings.floor_color1[0], 0.0, 1e6, 1.0),
+            clamp_finite_f32(settings.floor_color1[1], 0.0, 1e6, 1.0),
+            clamp_finite_f32(settings.floor_color1[2], 0.0, 1e6, 1.0),
+        ]);
+        let floor_color2 = Vec3::from_array([
+            clamp_finite_f32(settings.floor_color2[0], 0.0, 1e6, 0.0),
+            clamp_finite_f32(settings.floor_color2[1], 0.0, 1e6, 0.0),
+            clamp_finite_f32(settings.floor_color2[2], 0.0, 1e6, 0.0),
+        ]);
+        let fog_color = Vec3::from_array([
+            clamp_finite_f32(settings.fog_color[0], 0.0, 1e6, 0.0),
+            clamp_finite_f32(settings.fog_color[1], 0.0, 1e6, 0.0),
+            clamp_finite_f32(settings.fog_color[2], 0.0, 1e6, 0.0),
+        ]);
+
         Self {
             fractal_type: settings.fractal_type,
             render_mode,
@@ -408,86 +530,86 @@ impl FractalParams {
             palette,
             palette_index,
             palette_offset: 0.0,
-            orbit_trap_scale: settings.orbit_trap_scale,
+            orbit_trap_scale,
             channel_r: settings.channel_r,
             channel_g: settings.channel_g,
             channel_b: settings.channel_b,
             procedural_palette: settings.procedural_palette,
-            procedural_brightness: settings.procedural_brightness,
-            procedural_contrast: settings.procedural_contrast,
-            procedural_frequency: settings.procedural_frequency,
-            procedural_phase: settings.procedural_phase,
-            center_2d: settings.center_2d,
-            zoom_2d: settings.zoom_2d,
-            julia_c: settings.julia_c,
-            max_iterations: settings.max_iterations,
-            power: settings.power,
-            max_steps: settings.max_steps,
-            min_distance: settings.min_distance,
+            procedural_brightness,
+            procedural_contrast,
+            procedural_frequency,
+            procedural_phase,
+            center_2d,
+            zoom_2d,
+            julia_c,
+            max_iterations,
+            power,
+            max_steps,
+            min_distance,
             ambient_occlusion: settings.ambient_occlusion,
-            ao_intensity: settings.ao_intensity,
-            ao_step_size: settings.ao_step_size,
+            ao_intensity,
+            ao_step_size,
             shadow_mode: settings.shadow_mode,
-            shadow_softness: settings.shadow_softness,
-            shadow_max_distance: settings.shadow_max_distance,
-            shadow_samples: settings.shadow_samples,
-            shadow_step_factor: settings.shadow_step_factor,
+            shadow_softness,
+            shadow_max_distance,
+            shadow_samples,
+            shadow_step_factor,
             depth_of_field: settings.depth_of_field,
-            dof_focal_length: settings.dof_focal_length,
-            dof_aperture: settings.dof_aperture,
-            dof_samples: settings.dof_samples,
-            fractal_scale: settings.fractal_scale,
-            fractal_fold: settings.fractal_fold,
-            fractal_min_radius: settings.fractal_min_radius,
-            roughness: settings.roughness,
-            metallic: settings.metallic,
-            albedo: Vec3::from_array(settings.albedo),
-            light_intensity: settings.light_intensity,
-            ambient_light: settings.ambient_light,
-            light_azimuth: settings.light_azimuth,
-            light_elevation: settings.light_elevation,
+            dof_focal_length,
+            dof_aperture,
+            dof_samples,
+            fractal_scale,
+            fractal_fold,
+            fractal_min_radius,
+            roughness,
+            metallic,
+            albedo,
+            light_intensity,
+            ambient_light,
+            light_azimuth,
+            light_elevation,
             show_floor: settings.show_floor,
-            floor_height: settings.floor_height,
-            floor_color1: Vec3::from_array(settings.floor_color1),
-            floor_color2: Vec3::from_array(settings.floor_color2),
+            floor_height,
+            floor_color1,
+            floor_color2,
             floor_reflections: settings.floor_reflections,
-            floor_reflection_strength: settings.floor_reflection_strength,
+            floor_reflection_strength,
             fog_enabled: settings.fog_enabled,
             fog_mode: settings.fog_mode,
-            fog_density: settings.fog_density,
-            fog_color: Vec3::from_array(settings.fog_color),
+            fog_density,
+            fog_color,
             use_adaptive_step: settings.use_adaptive_step,
-            fixed_step_size: settings.fixed_step_size,
-            step_multiplier: settings.step_multiplier,
-            max_distance: settings.max_distance,
-            camera_speed: settings.camera_speed,
-            camera_fov: settings.camera_fov,
+            fixed_step_size,
+            step_multiplier,
+            max_distance,
+            camera_speed,
+            camera_fov,
             auto_orbit: settings.auto_orbit,
-            orbit_speed: settings.orbit_speed,
-            brightness: settings.brightness,
-            contrast: settings.contrast,
-            saturation: settings.saturation,
-            hue_shift: settings.hue_shift,
+            orbit_speed,
+            brightness,
+            contrast,
+            saturation,
+            hue_shift,
             vignette_enabled: settings.vignette_enabled,
-            vignette_intensity: settings.vignette_intensity,
-            vignette_radius: settings.vignette_radius,
+            vignette_intensity,
+            vignette_radius,
             bloom_enabled: settings.bloom_enabled,
-            bloom_threshold: settings.bloom_threshold,
-            bloom_intensity: settings.bloom_intensity,
-            bloom_radius: settings.bloom_radius,
+            bloom_threshold,
+            bloom_intensity,
+            bloom_radius,
             fxaa_enabled: settings.fxaa_enabled,
             lod_config: settings.lod_config,
             lod_state: LODState::default(),
             attractor_accumulation_enabled: settings.attractor_accumulation_enabled,
-            attractor_iterations_per_frame: settings.attractor_iterations_per_frame,
+            attractor_iterations_per_frame,
             attractor_total_iterations: 0, // Always reset on load
-            attractor_log_scale: settings.attractor_log_scale,
+            attractor_log_scale,
             attractor_pending_clear: false,
             attractor_paused: false,
             attractor_max_iterations: 8_000_000,
-            attractor_last_center: settings.center_2d,
-            attractor_last_zoom: settings.zoom_2d,
-            attractor_last_julia_c: settings.julia_c,
+            attractor_last_center: center_2d,
+            attractor_last_zoom: zoom_2d,
+            attractor_last_julia_c: julia_c,
         }
     }
 

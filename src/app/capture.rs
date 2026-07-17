@@ -57,7 +57,7 @@ impl App {
         let buffer_slice = buffer.slice(..);
         let (sender, receiver) = std::sync::mpsc::channel();
         buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
-            sender.send(result).unwrap();
+            let _ = sender.send(result);
         });
 
         // Wait for GPU to finish
@@ -69,7 +69,11 @@ impl App {
             })
             .ok();
 
-        if receiver.recv().unwrap().is_ok() {
+        let Ok(recv_result) = receiver.recv() else {
+            eprintln!("GPU readback channel closed (device lost?)");
+            return;
+        };
+        if recv_result.is_ok() {
             let data = buffer_slice.get_mapped_range();
 
             // Convert from padded buffer to image
@@ -185,7 +189,7 @@ impl App {
         let buffer_slice = buffer.slice(..);
         let (sender, receiver) = std::sync::mpsc::channel();
         buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
-            sender.send(result).unwrap();
+            let _ = sender.send(result);
         });
 
         // Wait for GPU to finish
@@ -197,7 +201,11 @@ impl App {
             })
             .ok();
 
-        if receiver.recv().unwrap().is_ok() {
+        let Ok(recv_result) = receiver.recv() else {
+            eprintln!("GPU readback channel closed (device lost?)");
+            return;
+        };
+        if recv_result.is_ok() {
             let data = buffer_slice.get_mapped_range();
 
             // Convert from padded buffer to unpadded RGBA data
@@ -647,7 +655,7 @@ impl App {
         let buffer_slice = buffer.slice(..);
         let (sender, receiver) = std::sync::mpsc::channel();
         buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
-            sender.send(result).unwrap();
+            let _ = sender.send(result);
         });
 
         // Wait for GPU to finish
