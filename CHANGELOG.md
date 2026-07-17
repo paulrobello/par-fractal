@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Full remediation of the 2026-07-16 audit (81 issues across security, architecture, code quality, and documentation). See `git log` for per-commit detail.
+
+### Security
+- Clamp untrusted preset/settings/imported-JSON resource values at the trust boundary (rejects NaN/Inf) — closes a persistent GPU-DoS via hostile presets
+- Replace all `unsafe transmute` render-pass lifetime extensions with `RenderPass::forget_lifetime()` (`app/render.rs` is now `unsafe`-free)
+- Harden capture readback channels (device-lost no longer panics the render loop)
+- Pin third-party CI actions (`Ilshidur/action-discord`, `rustsec/audit-check`) to commit SHAs
+- Add a `cargo-audit` CI gate (`.cargo/audit.toml`); sanitize gallery filenames (CWE-22); clamp internal hi-res render resolution (CWE-789); surface a toast when imported presets are clamped
+
+### Fixed
+- **Deep-zoom correctness bundle**: high-precision (double-float) now auto-enables at zoom > 1e4 (was 1e6 — two decades late), `tricorn_hp` is reachable (gate `<=4`→`<=5`), `burning_ship_hp` DF `abs` negates both words correctly, and `two_prod` uses a Dekker split so DF no longer collapses to f32 on backends without fused FMA
+- Clamp the `acos` input in LOD motion tracking — fixes permanent NaN-poisoning of the motion EMA mid-session
+- Guard `max_iterations == 0` underflow in the shader; fix the inside-set sentinel (`0.0`→`-1.0`) so a legitimate first-iteration value isn't colored as interior
+- GPU-index out-of-range now logs and falls back instead of unwrap-panicking on startup
+- Make the Buddhabrot/attractor counter wrap explicit and documented
+
+### Performance
+- Render-on-demand: a `scene_dirty` flag + `ControlFlow::Wait` lets static scenes sleep instead of re-rendering at 60 Hz
+- Gate the three full-screen bloom passes on `bloom_enabled` (off by default — was always-on)
+- 2D LOD: `iteration_scale` quality lever + 2D zoom/pan motion detection (LOD previously couldn't reduce 2D cost)
+- Split `fs_main` into `fs_main_2d`/`fs_main_3d` so each pipeline drops the other's register/occupancy footprint (per-entry-point DCE)
+- Reusable `clear_texture`/`clear_buffer` accumulation clear (no per-frame multi-MB staging allocation during zoom/pan)
+
+### Changed
+- Migrate to winit 0.30 `ApplicationHandler` (drop deprecated `event_loop.run`)
+- Store `zoom_2d` as `f64` (was `f32`); extract a single `FractalParams::zoom_at()` seam
+- Stop LOD from mutating `FractalParams` — effective values are computed at uniform-build time (user slider edits are no longer clobbered; degraded values no longer persist)
+- Decompose the 900-line `App::render` into `dispatch_accumulation` / `run_post_chain` / `render_ui` / `handle_ui_actions`
+- Split the `FractalParams` God object into `RenderSettings` / `LodRuntime` / `AccumulationState` (undo no longer clones FPS/accumulation state); YAML schema unchanged (guarded by roundtrip tests)
+- Deduplicate the native/web `App` constructors via a shared `init_common`
+- Replace `UI::render`'s 11-element tuple with a named `UiActions` struct; split `ui/mod.rs` into per-panel submodules (3,349 → 604 lines)
+- `#[repr(u32)]` discriminants on GPU-crossing enums (collapses the 30-arm match + triplicated channel matches); standardize logging on `log::` (keep CLI stdout)
+- Move GPU enumeration off the render path (background thread + "Scanning…" UX); `VecDeque` undo history; Makefile bundle version derived from `Cargo.toml`; `typecheck` target added
+
+### Added
+- Numeric-core test suite (DF split, zoom→iteration bonus, enum discriminants, YAML/preset roundtrip, LOD NaN regression) — 54 → 114 tests
+- Uniform-layout `offset_of!` tests cross-checked against the WGSL struct
+- `CONTRIBUTING.md`; rustdoc for the crate and public API
+
+### Documentation
+- Correct README keybindings (F12 / `/`·Ctrl-K / E-Q), MSRV (Rust 1.85+, Edition 2024), and counts (35 fractals, 48 palettes, 864-byte uniform buffer)
+- Sync ARCHITECTURE/FRACTALS3D/FEATURES (LOD 325/250/175/100, compute integrated, epsilon 0.00035), document deep-zoom thresholds, refresh the docs index, remove the unimplemented wheel-speed claim, fix stale CLAUDE.md facts
+
 ## [0.8.3] - 2026-07-07
 
 ### Changed
