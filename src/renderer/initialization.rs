@@ -52,23 +52,34 @@ impl Renderer {
 
         let surface = instance.create_surface(window).unwrap();
 
-        // Select adapter based on preference or fallback to default
+        // Select adapter based on preference or fallback to default.
+        // QA-012: bounds-check `preferred_gpu_index` against the enumerated
+        // adapter list BEFORE consuming it. A stale saved index (hardware
+        // changed, external GPU unplugged, driver update reordered enumeration)
+        // used to land in `nth(gpu_index).unwrap()` and panic the app at
+        // startup. Now we fall back to the same default path the no-preference
+        // branch takes, with a `log::warn!` so the user sees what happened.
         let adapter = if let Some(gpu_index) = preferred_gpu_index {
-            // Try to get the adapter at the specified index
             let adapters = instance.enumerate_adapters(wgpu::Backends::all()).await;
+            let adapter_count = adapters.len();
 
-            if gpu_index < adapters.len() {
+            if gpu_index < adapter_count {
                 let selected = adapters.into_iter().nth(gpu_index).unwrap();
                 let info = selected.get_info();
-                println!(
+                log::info!(
                     "Using selected GPU #{}: {} ({:?}, {:?})",
-                    gpu_index, info.name, info.backend, info.device_type
+                    gpu_index,
+                    info.name,
+                    info.backend,
+                    info.device_type
                 );
                 selected
             } else {
-                println!(
-                    "Preferred GPU index {} not found, falling back to default",
-                    gpu_index
+                log::warn!(
+                    "Saved preferred_gpu_index {} is out of range ({} adapter(s) available); \
+                     falling back to default GPU selection",
+                    gpu_index,
+                    adapter_count
                 );
                 instance
                     .request_adapter(&wgpu::RequestAdapterOptions {

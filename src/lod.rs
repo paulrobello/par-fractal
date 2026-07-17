@@ -6,6 +6,23 @@ use glam::Vec3;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
+/// QA-025: Single source of truth for the default Balanced LOD distance-zone
+/// boundaries (`distance_zones` field of `LODConfig`). Shared by
+/// `LODConfig::default()` / `apply_profile()` and `Uniforms::new()`'s
+/// `lod_zoneN` defaults so a saved `preferred_gpu_index`-style stale value
+/// can't drift the CPU and GPU sides apart.
+pub const DEFAULT_LOD_ZONES: [f32; 3] = [10.0, 25.0, 50.0];
+
+/// QA-025: EMA smoothing factor for `LODState::camera_velocity`. Shared by
+/// the 3D (`update_motion`) and 2D (`update_motion_2d`) motion paths so both
+/// respond identically to a given motion magnitude.
+const MOTION_EMA_ALPHA: f32 = 0.3;
+
+/// QA-025: Weight of rotational velocity in the combined motion metric,
+/// relative to translation speed. Tuned so a moderate orbit registers above
+/// `motion_threshold` at the default sensitivity.
+const ROTATION_WEIGHT: f32 = 5.0;
+
 /// LOD strategy for quality adjustment
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum LODStrategy {
@@ -210,7 +227,7 @@ impl Default for LODConfig {
             profile: LODProfile::Balanced,
             strategy: LODStrategy::Hybrid,
             target_fps: 60.0,
-            distance_zones: [10.0, 25.0, 50.0],
+            distance_zones: DEFAULT_LOD_ZONES,
             motion_threshold: 0.1,
             restore_delay: 0.5,
             quality_presets: [
@@ -245,7 +262,7 @@ impl LODConfig {
                 self.transition_duration = 0.3;
                 self.aggressive_mode = false;
                 self.min_quality_level = 0;
-                self.distance_zones = [10.0, 25.0, 50.0];
+                self.distance_zones = DEFAULT_LOD_ZONES;
             }
             LODProfile::QualityFirst => {
                 self.strategy = LODStrategy::Hybrid;
@@ -281,7 +298,7 @@ impl LODConfig {
                 self.transition_duration = 0.3;
                 self.aggressive_mode = false;
                 self.min_quality_level = 0;
-                self.distance_zones = [10.0, 25.0, 50.0];
+                self.distance_zones = DEFAULT_LOD_ZONES;
             }
             LODProfile::MotionOnly => {
                 self.strategy = LODStrategy::Motion;
@@ -293,7 +310,7 @@ impl LODConfig {
                 self.transition_duration = 0.2; // Fast transitions
                 self.aggressive_mode = false;
                 self.min_quality_level = 0;
-                self.distance_zones = [10.0, 25.0, 50.0];
+                self.distance_zones = DEFAULT_LOD_ZONES;
             }
             LODProfile::Custom => {
                 // Don't change anything for custom profile
@@ -329,8 +346,12 @@ pub struct LODState {
     /// Recent FPS samples for performance tracking
     pub fps_samples: VecDeque<f32>,
 
-    /// Camera velocity vector
-    pub camera_velocity: Vec3,
+    /// QA-026: combined motion magnitude (translation + rotation, in
+    /// units/sec) after EMA smoothing. Was a `Vec3` whose `.y` and `.z`
+    /// components were always zero — the LOD path only ever consumed `.x`.
+    /// Stored as a scalar so the unused components can't mislead callers or
+    /// debug overlays.
+    pub camera_velocity: f32,
 
     /// Previous camera position for velocity calculation
     pub prev_camera_pos: Vec3,
@@ -370,7 +391,7 @@ impl LODState {
             target_level: 0,
             transition_progress: 1.0,
             fps_samples: VecDeque::with_capacity(60),
-            camera_velocity: Vec3::ZERO,
+            camera_velocity: 0.0,
             prev_camera_pos: Vec3::ZERO,
             prev_camera_forward: Vec3::Z,
             prev_zoom_2d: 1.0,
@@ -400,8 +421,18 @@ impl LODState {
             Vec3::ZERO
         };
 
-        // Calculate rotational velocity (angle change per second)
-        let rotation_change = self.prev_camera_forward.dot(camera_forward).acos();
+        // Calculate rotational velocity (angle change per second).
+        // QA-003: clamp the dot product before `acos`. The inputs are
+        // normalized direction vectors, but rounding can push the dot
+        // product one ulp past ±1.0 — `acos` of that returns NaN, and the
+        // EMA below would then propagate the NaN forever (motion tracking
+        // never recovers mid-session). The clamp is a no-op for in-range
+        // inputs.
+        let dot = self
+            .prev_camera_forward
+            .dot(camera_forward)
+            .clamp(-1.0, 1.0);
+        let rotation_change = dot.acos();
         let rotation_velocity = if delta_time > 0.0 {
             rotation_change / delta_time
         } else {
@@ -410,19 +441,18 @@ impl LODState {
 
         // Combine translation and rotation into single motion metric
         let translation_speed = translation_velocity.length();
-        let motion_magnitude = translation_speed + rotation_velocity * 5.0; // Rotation weighted higher
+        let motion_magnitude = translation_speed + rotation_velocity * ROTATION_WEIGHT;
 
         // Apply sensitivity multiplier
         let adjusted_magnitude = motion_magnitude * motion_sensitivity;
 
         // Update velocity with exponential moving average (smoothing)
-        let alpha = 0.3; // Smoothing factor
         self.camera_velocity =
-            self.camera_velocity * (1.0 - alpha) + Vec3::new(adjusted_magnitude, 0.0, 0.0) * alpha;
+            self.camera_velocity * (1.0 - MOTION_EMA_ALPHA) + adjusted_magnitude * MOTION_EMA_ALPHA;
 
         // Detect motion
         let was_moving = self.is_moving;
-        self.is_moving = self.camera_velocity.x > motion_threshold;
+        self.is_moving = self.camera_velocity > motion_threshold;
 
         // Update time since stopped
         if self.is_moving {
@@ -482,12 +512,11 @@ impl LODState {
 
         // Reuse the same EMA + hysteresis as the 3D path so the LOD state
         // machine (`is_moving`, `time_since_stopped`) behaves identically.
-        let alpha = 0.3;
         self.camera_velocity =
-            self.camera_velocity * (1.0 - alpha) + Vec3::new(adjusted_magnitude, 0.0, 0.0) * alpha;
+            self.camera_velocity * (1.0 - MOTION_EMA_ALPHA) + adjusted_magnitude * MOTION_EMA_ALPHA;
 
         let was_moving = self.is_moving;
-        self.is_moving = self.camera_velocity.x > motion_threshold;
+        self.is_moving = self.camera_velocity > motion_threshold;
         // Moving or just-stopped this frame: reset the idle timer. Otherwise
         // accumulate so restore-delay logic can fire after `restore_delay`.
         if self.is_moving || was_moving {
@@ -604,6 +633,56 @@ mod tests {
 
         state.update_motion(pos2, Vec3::Z, 0.1, 0.1, 1.0);
         assert!(state.is_moving);
+    }
+
+    /// QA-003 / QA-019: regression test for the LOD NaN-poisoning bug.
+    ///
+    /// The dot product of two normalized vectors can land one ulp outside
+    /// [-1, 1] due to rounding. Before the clamp in `update_motion`, that
+    /// made `acos` return NaN, which the EMA then propagated forever —
+    /// `is_moving` could never recover and LOD was wedged mid-session.
+    ///
+    /// The first case uses bit-identical forwards (dot == 1.0 exactly), the
+    /// second uses near-parallel vectors whose dot rounds to 1.0+ε. Both
+    /// must leave `camera_velocity` finite after repeated updates.
+    #[test]
+    fn test_motion_tracking_never_nan() {
+        let mut state = LODState::new();
+
+        // Identical forwards: dot == 1.0 exactly; acos(1.0) == 0.0, finite.
+        let pos = Vec3::new(0.0, 0.0, 5.0);
+        state.update_motion(pos, Vec3::Z, 0.016, 0.1, 1.0);
+        state.update_motion(pos, Vec3::Z, 0.016, 0.1, 1.0);
+        assert!(
+            state.camera_velocity.is_finite(),
+            "camera_velocity NaN after identical forwards: {}",
+            state.camera_velocity
+        );
+
+        // Near-parallel forwards whose dot rounds above 1.0. Construct by
+        // perturbing one axis by a sub-ulp-of-the-magnitude amount: this is
+        // the exact failure mode the in-the-wild bug exhibited.
+        let mut state2 = LODState::new();
+        let fwd_a = Vec3::Z;
+        // Normalized vector almost-but-not-quite parallel to Z. Even when
+        // rounding produces dot > 1.0, the clamp keeps acos finite.
+        let fwd_b = Vec3::new(1.0e-8, 0.0, 1.0).normalize();
+        state2.update_motion(Vec3::ZERO, fwd_a, 0.016, 0.1, 1.0);
+        for _ in 0..10 {
+            state2.update_motion(Vec3::ZERO, fwd_b, 0.016, 0.1, 1.0);
+        }
+        assert!(
+            state2.camera_velocity.is_finite(),
+            "camera_velocity NaN after near-parallel forwards: {} (dot = {})",
+            state2.camera_velocity,
+            fwd_a.dot(fwd_b)
+        );
+
+        // And the orthogonal case (dot == 0.0, acos == π/2) for completeness.
+        let mut state3 = LODState::new();
+        state3.update_motion(Vec3::ZERO, Vec3::Z, 0.016, 0.1, 1.0);
+        state3.update_motion(Vec3::ZERO, Vec3::X, 0.016, 0.1, 1.0);
+        assert!(state3.camera_velocity.is_finite());
     }
 
     #[test]

@@ -1,51 +1,62 @@
 use serde::{Deserialize, Serialize};
 
+/// Discriminant contract: the integer IDs here are the wire format the WGSL
+/// shaders read from `uniforms.fractal_type`. They MUST match the
+/// `switch fractal_type` arms in `src/shaders/fractal.wgsl` exactly. The
+/// `gpu_discriminant_roundtrip` test in this file pins representative values;
+/// update both the shader and that test together if you renumber.
+///
+/// Serde derives by NAME (settings.yaml stores `"Mandelbrot2D"` etc.), so
+/// renumbering does not break saved settings — but it WILL render the wrong
+/// fractal until the shader is updated.
+#[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum FractalType {
-    // 2D Fractals - Escape Time
-    Mandelbrot2D,
-    Julia2D,
-    Sierpinski2D,
-    SierpinskiTriangle2D,
-    BurningShip2D,
-    Tricorn2D,
-    Phoenix2D,
-    Celtic2D,
-    Newton2D,
-    Lyapunov2D,
-    Nova2D,
-    Magnet2D,
-    Collatz2D,
+    // 2D Fractals - Escape Time (shader IDs 0..=12)
+    Mandelbrot2D = 0,
+    Julia2D = 1,
+    Sierpinski2D = 2,
+    SierpinskiTriangle2D = 3,
+    BurningShip2D = 4,
+    Tricorn2D = 5,
+    Phoenix2D = 6,
+    Celtic2D = 7,
+    Newton2D = 8,
+    Lyapunov2D = 9,
+    Nova2D = 10,
+    Magnet2D = 11,
+    Collatz2D = 12,
 
-    // 3D Fractals
-    Mandelbulb3D,
-    MengerSponge3D,
-    SierpinskiPyramid3D,
-    JuliaSet3D,
-    Mandelbox3D,
-    OctahedralIFS3D,
-    IcosahedralIFS3D,
-    ApollonianGasket3D,
-    Kleinian3D,
-    HybridMandelbulbJulia3D,
-    QuaternionCubic3D,
-    SierpinskiGasket3D,
+    // 3D Fractals (shader IDs 13..=24)
+    Mandelbulb3D = 13,
+    MengerSponge3D = 14,
+    SierpinskiPyramid3D = 15,
+    JuliaSet3D = 16,
+    Mandelbox3D = 17,
+    OctahedralIFS3D = 18,
+    IcosahedralIFS3D = 19,
+    ApollonianGasket3D = 20,
+    Kleinian3D = 21,
+    HybridMandelbulbJulia3D = 22,
+    QuaternionCubic3D = 23,
+    SierpinskiGasket3D = 24,
 
-    // 2D Fractals - Density/Accumulation based
-    Buddhabrot2D,
+    // 2D Fractals - Density/Accumulation based (shader ID 25)
+    Buddhabrot2D = 25,
 
-    // 2D Fractals - Strange Attractors (from xfractint)
-    Hopalong2D,
-    Martin2D,
-    Gingerbreadman2D,
-    Chip2D,
-    Quadruptwo2D,
-    Threeply2D,
+    // 2D Fractals - Strange Attractors, from xfractint (shader IDs 26..=31)
+    Hopalong2D = 26,
+    Martin2D = 27,
+    Gingerbreadman2D = 28,
+    Chip2D = 29,
+    Quadruptwo2D = 30,
+    Threeply2D = 31,
 
-    // 3D Fractals - Strange Attractors
-    Pickover3D,
-    Lorenz3D,
-    Rossler3D,
+    // 3D Fractals - Strange Attractors (shader IDs 35..=37; 32..=34 reserved
+    // for future 2D attractor expansion — do not renumber)
+    Pickover3D = 35,
+    Lorenz3D = 36,
+    Rossler3D = 37,
 }
 
 impl FractalType {
@@ -160,93 +171,114 @@ impl FractalType {
     }
 }
 
+/// GPU wire format: 0 = TwoD, 1 = ThreeD. Matches `uniforms.render_mode`.
+#[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum RenderMode {
-    TwoD,
-    ThreeD,
+    TwoD = 0,
+    ThreeD = 1,
 }
 
+/// GPU wire format: 0 = BlinnPhong, 1 = PBR. Matches `uniforms.shading_model`.
+#[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum ShadingModel {
-    BlinnPhong,
-    PBR,
+    BlinnPhong = 0,
+    PBR = 1,
 }
 
+/// GPU wire format: the discriminant is the value read by the shader from
+/// `uniforms.color_mode`. Sequential 0..=15 — keep in lockstep with the
+/// `switch color_mode` arms in `fractal.wgsl`.
+#[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum ColorMode {
-    Palette,          // Standard palette coloring
-    RaySteps,         // Visualize number of ray marching steps
-    Normals,          // Visualize surface normals
-    OrbitTrapXYZ,     // Color based on XYZ coordinates during iteration
-    OrbitTrapRadial,  // Color based on radial distance during iteration
-    WorldPosition,    // Color based on world position
-    LocalPosition,    // Color based on local/fractal-space position
-    AmbientOcclusion, // Visualize AO only
-    PerChannel,       // Per-channel mapping (custom R/G/B sources)
+    Palette = 0,          // Standard palette coloring
+    RaySteps = 1,         // Visualize number of ray marching steps
+    Normals = 2,          // Visualize surface normals
+    OrbitTrapXYZ = 3,     // Color based on XYZ coordinates during iteration
+    OrbitTrapRadial = 4,  // Color based on radial distance during iteration
+    WorldPosition = 5,    // Color based on world position
+    LocalPosition = 6,    // Color based on local/fractal-space position
+    AmbientOcclusion = 7, // Visualize AO only
+    PerChannel = 8,       // Per-channel mapping (custom R/G/B sources)
     // Debug visualization modes
-    DistanceField,     // Visualize distance estimator values
-    Depth,             // Visualize surface depth from camera
-    Convergence,       // Visualize convergence/escape time (2D fractals)
-    LightingOnly,      // Show only lighting (no fractal coloring)
-    ShadowMap,         // Visualize shadow values
-    CameraDistanceLOD, // Visualize camera distance using LOD zone colors
-    DistanceGrayscale, // Visualize raw distance from camera as grayscale
+    DistanceField = 9,      // Visualize distance estimator values
+    Depth = 10,             // Visualize surface depth from camera
+    Convergence = 11,       // Visualize convergence/escape time (2D fractals)
+    LightingOnly = 12,      // Show only lighting (no fractal coloring)
+    ShadowMap = 13,         // Visualize shadow values
+    CameraDistanceLOD = 14, // Visualize camera distance using LOD zone colors
+    DistanceGrayscale = 15, // Visualize raw distance from camera as grayscale
 }
 
+/// GPU wire format: the discriminant is the value written to
+/// `uniforms.channel_r/g/b`. Sequential 0..=7 — keep in lockstep with the
+/// channel-source switch in `fractal.wgsl`.
+#[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum ChannelSource {
-    Iterations, // Number of iterations/steps
-    Distance,   // Distance to surface
-    PositionX,  // X coordinate
-    PositionY,  // Y coordinate
-    PositionZ,  // Z coordinate
-    Normal,     // Surface normal component
-    AO,         // Ambient occlusion value
-    Constant,   // Fixed value (0.0)
+    Iterations = 0, // Number of iterations/steps
+    Distance = 1,   // Distance to surface
+    PositionX = 2,  // X coordinate
+    PositionY = 3,  // Y coordinate
+    PositionZ = 4,  // Z coordinate
+    Normal = 5,     // Surface normal component
+    AO = 6,         // Ambient occlusion value
+    Constant = 7,   // Fixed value (0.0)
 }
 
+/// GPU wire format: 0 = Linear, 1 = Exponential, 2 = Quadratic. Matches
+/// `uniforms.fog_mode`.
+#[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum FogMode {
-    Linear,      // Linear fog falloff
-    Exponential, // Exponential fog falloff
-    Quadratic,   // Quadratic (exponential squared) fog falloff
+    Linear = 0,      // Linear fog falloff
+    Exponential = 1, // Exponential fog falloff
+    Quadratic = 2,   // Quadratic (exponential squared) fog falloff
 }
 
 /// Procedural palette types that generate colors mathematically
 /// These use cosine-based formulas for smooth, continuous color gradients
+///
+/// GPU wire format: the discriminant (matching the deprecated `shader_index()`
+/// return values) is written to `uniforms.procedural_palette_type`. Sequential
+/// 0..=12 — keep in lockstep with the `switch procedural_palette_type` arms in
+/// `fractal.wgsl`.
+#[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum ProceduralPalette {
     /// No procedural palette - use static color palette
     #[default]
-    None,
+    None = 0,
     /// Fire Storm - RGB phase-shifted cosines (classic Fractint firestrm)
     /// r = (cos(a) + 1) / 2
     /// g = (cos(a + 2π/3) + 1) / 2
     /// b = (cos(a + 4π/3) + 1) / 2
-    Firestrm,
+    Firestrm = 1,
     /// Rainbow - full spectrum HSV-like gradient
-    Rainbow,
+    Rainbow = 2,
     /// Electric Blue - cyan to blue to purple
-    Electric,
+    Electric = 3,
     /// Sunset - warm oranges to purples
-    Sunset,
+    Sunset = 4,
     /// Forest - greens and earth tones
-    Forest,
+    Forest = 5,
     /// Ocean - deep blues to cyan
-    Ocean,
+    Ocean = 6,
     /// Grayscale - simple black to white
-    Grayscale,
+    Grayscale = 7,
     /// Hot - black to red to yellow to white
-    Hot,
+    Hot = 8,
     /// Cool - cyan to magenta gradient
-    Cool,
+    Cool = 9,
     /// Plasma - purple to orange (scientific visualization)
-    Plasma,
+    Plasma = 10,
     /// Viridis - perceptually uniform (scientific visualization)
-    Viridis,
+    Viridis = 11,
     /// Custom - user-defined cosine palette parameters
-    Custom,
+    Custom = 12,
 }
 
 impl ProceduralPalette {
@@ -302,5 +334,63 @@ impl ProceduralPalette {
             ProceduralPalette::Viridis => 11,
             ProceduralPalette::Custom => 12,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// QA-017: Pin the GPU wire-format discriminants for every enum that
+    /// crosses into WGSL. These IDs are the contract with the shader's
+    /// `switch` arms — renumbering must be deliberate and paired with a
+    /// shader edit. The values here were transcribed from the hand-written
+    /// match tables that used to live in `renderer/uniforms.rs` (and the
+    /// `shader_index()` impl for `ProceduralPalette`); they predate
+    /// `#[repr(u32)]` and must not change as long as the shader does.
+    #[test]
+    fn gpu_discriminant_roundtrip() {
+        // FractalType — boundaries, gap crossings, and a representative of
+        // each contiguous block. The enum has intentional gaps (32..=34
+        // reserved for future 2D attractor expansion).
+        assert_eq!(FractalType::Mandelbrot2D as u32, 0); // first 2D escape
+        assert_eq!(FractalType::Collatz2D as u32, 12); // last 2D escape
+        assert_eq!(FractalType::Mandelbulb3D as u32, 13); // first 3D ray-marched
+        assert_eq!(FractalType::SierpinskiGasket3D as u32, 24); // last 3D ray-marched
+        assert_eq!(FractalType::Buddhabrot2D as u32, 25); // density (gap before)
+        assert_eq!(FractalType::Hopalong2D as u32, 26); // first 2D attractor
+        assert_eq!(FractalType::Threeply2D as u32, 31); // last 2D attractor
+        assert_eq!(FractalType::Pickover3D as u32, 35); // first 3D attractor (gap)
+        assert_eq!(FractalType::Rossler3D as u32, 37); // last variant overall
+
+        // RenderMode
+        assert_eq!(RenderMode::TwoD as u32, 0);
+        assert_eq!(RenderMode::ThreeD as u32, 1);
+
+        // ShadingModel
+        assert_eq!(ShadingModel::BlinnPhong as u32, 0);
+        assert_eq!(ShadingModel::PBR as u32, 1);
+
+        // ColorMode — sequential 0..=15
+        assert_eq!(ColorMode::Palette as u32, 0);
+        assert_eq!(ColorMode::PerChannel as u32, 8);
+        assert_eq!(ColorMode::DistanceGrayscale as u32, 15);
+
+        // ChannelSource — sequential 0..=7
+        assert_eq!(ChannelSource::Iterations as u32, 0);
+        assert_eq!(ChannelSource::Constant as u32, 7);
+
+        // FogMode
+        assert_eq!(FogMode::Linear as u32, 0);
+        assert_eq!(FogMode::Quadratic as u32, 2);
+
+        // ProceduralPalette — agrees with `shader_index()` for every variant.
+        assert_eq!(ProceduralPalette::None as u32, 0);
+        assert_eq!(ProceduralPalette::Firestrm as u32, 1);
+        assert_eq!(ProceduralPalette::Custom as u32, 12);
+        for p in ProceduralPalette::ALL {
+            assert_eq!(p.shader_index(), *p as u32);
+        }
+        assert_eq!(ProceduralPalette::None.shader_index(), 0);
     }
 }

@@ -727,7 +727,6 @@ impl PresetGallery {
     }
 
     /// Get a builtin preset by name (for web use)
-    #[allow(dead_code)]
     pub fn get_builtin_preset(name: &str) -> Option<&'static Preset> {
         // Use a static to avoid repeated allocation
         static PRESETS: std::sync::OnceLock<Vec<Preset>> = std::sync::OnceLock::new();

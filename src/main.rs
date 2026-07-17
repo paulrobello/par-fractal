@@ -7,7 +7,8 @@ mod lod;
 // `platform::` traits (ARC-014 constructor dedup uses `PlatformContext` +
 // `Storage`; the `FileDialog` / `Capture` traits and the unused `category`
 // constants await the larger `capture.rs` / `capture_web.rs` dedup noted in
-// AUDIT ARC-014). Silence dead-code until those land.
+// AUDIT ARC-014). QA-020 audit: silenced with a reason, not deleted, because
+// the platform-abstraction layering is intentional infrastructure.
 #[allow(dead_code)]
 mod platform;
 mod renderer;

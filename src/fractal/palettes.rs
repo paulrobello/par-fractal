@@ -738,7 +738,11 @@ impl ColorPalette {
         Self::XF_VOLCANO,
     ];
 
-    /// Create a custom palette from Vec3 colors and a String name
+    /// Create a custom palette from Vec3 colors and a String name.
+    /// QA-020: constructor retained as part of the palette API surface; not
+    /// used by current UI flows (which build custom palettes via `from_pal_file`
+    /// or `from_current`), but deleting it would orphan the only constructor
+    /// that takes raw `[Vec3; 8]` data.
     #[allow(dead_code)]
     pub fn custom(name: String, colors: [Vec3; 8]) -> CustomPalette {
         CustomPalette::new(name, colors)
@@ -785,6 +789,10 @@ impl CustomPalette {
         )
     }
 
+    /// QA-020: constructor for the upcoming "save current palette as custom"
+    /// UI button. Wired into the dialog UI plan but not yet called from the
+    /// panel render path; deleting it would force the next iteration to
+    /// re-derive the Vec3→[[f32;3];8] conversion.
     #[allow(dead_code)]
     pub fn from_current(name: String, palette: &ColorPalette) -> Self {
         Self::new(name, palette.colors)

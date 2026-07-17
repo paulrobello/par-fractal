@@ -1,5 +1,5 @@
 use crate::camera::Camera;
-use crate::fractal::{FractalParams, RenderMode};
+use crate::fractal::FractalParams;
 use bytemuck::{Pod, Zeroable};
 use glam::Mat4;
 
@@ -252,9 +252,12 @@ impl Uniforms {
             _hp_padding: [0.0; 4],
 
             lod_debug_enabled: 0,
-            lod_zone1: 10.0, // Default LOD thresholds
-            lod_zone2: 25.0,
-            lod_zone3: 50.0,
+            // QA-025: shared with `LODConfig::default()` via `DEFAULT_LOD_ZONES`
+            // so the CPU-side defaults and the GPU-side uniform defaults cannot
+            // drift apart.
+            lod_zone1: crate::lod::DEFAULT_LOD_ZONES[0],
+            lod_zone2: crate::lod::DEFAULT_LOD_ZONES[1],
+            lod_zone3: crate::lod::DEFAULT_LOD_ZONES[2],
 
             aspect_ratio: [16.0 / 9.0, 0.0, 0.0, 0.0], // Default aspect ratio
 
@@ -328,53 +331,14 @@ impl Uniforms {
         }
         self.julia_c = params.settings.julia_c;
 
-        self.fractal_type = match params.settings.fractal_type {
-            // 2D fractals (0-12)
-            crate::fractal::FractalType::Mandelbrot2D => 0,
-            crate::fractal::FractalType::Julia2D => 1,
-            crate::fractal::FractalType::Sierpinski2D => 2,
-            crate::fractal::FractalType::SierpinskiTriangle2D => 3,
-            crate::fractal::FractalType::BurningShip2D => 4,
-            crate::fractal::FractalType::Tricorn2D => 5,
-            crate::fractal::FractalType::Phoenix2D => 6,
-            crate::fractal::FractalType::Celtic2D => 7,
-            crate::fractal::FractalType::Newton2D => 8,
-            crate::fractal::FractalType::Lyapunov2D => 9,
-            crate::fractal::FractalType::Nova2D => 10,
-            crate::fractal::FractalType::Magnet2D => 11,
-            crate::fractal::FractalType::Collatz2D => 12,
-            // 2D Density fractals
-            crate::fractal::FractalType::Buddhabrot2D => 25, // Rendered via compute shader, not main shader
-            // 3D fractals (13-25)
-            crate::fractal::FractalType::Mandelbulb3D => 13,
-            crate::fractal::FractalType::MengerSponge3D => 14,
-            crate::fractal::FractalType::SierpinskiPyramid3D => 15,
-            crate::fractal::FractalType::JuliaSet3D => 16,
-            crate::fractal::FractalType::Mandelbox3D => 17,
-            crate::fractal::FractalType::OctahedralIFS3D => 18,
-            crate::fractal::FractalType::IcosahedralIFS3D => 19,
-            crate::fractal::FractalType::ApollonianGasket3D => 20,
-            crate::fractal::FractalType::Kleinian3D => 21,
-            crate::fractal::FractalType::HybridMandelbulbJulia3D => 22,
-            crate::fractal::FractalType::QuaternionCubic3D => 23,
-            crate::fractal::FractalType::SierpinskiGasket3D => 24,
-            // 2D Strange Attractors (26-32)
-            crate::fractal::FractalType::Hopalong2D => 26,
-            crate::fractal::FractalType::Martin2D => 27,
-            crate::fractal::FractalType::Gingerbreadman2D => 28,
-            crate::fractal::FractalType::Chip2D => 29,
-            crate::fractal::FractalType::Quadruptwo2D => 30,
-            crate::fractal::FractalType::Threeply2D => 31,
-            // 3D Strange Attractors (35-37)
-            crate::fractal::FractalType::Pickover3D => 35,
-            crate::fractal::FractalType::Lorenz3D => 36,
-            crate::fractal::FractalType::Rossler3D => 37,
-        };
+        // QA-017: enum→u32 via `#[repr(u32)]` discriminants (see
+        // `fractal/types.rs` and the `gpu_discriminant_roundtrip` test, which
+        // pins the wire-format IDs the shader reads). The match table that
+        // used to live here was the GPU-contract source of truth; the
+        // discriminants now are, and the test guards against drift.
+        self.fractal_type = params.settings.fractal_type as u32;
 
-        self.render_mode = match params.settings.render_mode {
-            RenderMode::TwoD => 0,
-            RenderMode::ThreeD => 1,
-        };
+        self.render_mode = params.settings.render_mode as u32;
 
         self.power = params.settings.power;
         // ARC-008: LOD no longer mutates FractalParams. The user's slider values
@@ -433,64 +397,18 @@ impl Uniforms {
         // shadow_mode: 0=off,1=hard,2=soft; pass through for shader
         self.soft_shadows = params.settings.shadow_mode;
         self.depth_of_field = if params.settings.depth_of_field { 1 } else { 0 };
-        self.shading_model = match params.settings.shading_model {
-            crate::fractal::ShadingModel::BlinnPhong => 0,
-            crate::fractal::ShadingModel::PBR => 1,
-        };
+        self.shading_model = params.settings.shading_model as u32;
 
-        self.color_mode = match params.settings.color_mode {
-            crate::fractal::ColorMode::Palette => 0,
-            crate::fractal::ColorMode::RaySteps => 1,
-            crate::fractal::ColorMode::Normals => 2,
-            crate::fractal::ColorMode::OrbitTrapXYZ => 3,
-            crate::fractal::ColorMode::OrbitTrapRadial => 4,
-            crate::fractal::ColorMode::WorldPosition => 5,
-            crate::fractal::ColorMode::LocalPosition => 6,
-            crate::fractal::ColorMode::AmbientOcclusion => 7,
-            crate::fractal::ColorMode::PerChannel => 8,
-            crate::fractal::ColorMode::DistanceField => 9,
-            crate::fractal::ColorMode::Depth => 10,
-            crate::fractal::ColorMode::Convergence => 11,
-            crate::fractal::ColorMode::LightingOnly => 12,
-            crate::fractal::ColorMode::ShadowMap => 13,
-            crate::fractal::ColorMode::CameraDistanceLOD => 14,
-            crate::fractal::ColorMode::DistanceGrayscale => 15,
-        };
+        self.color_mode = params.settings.color_mode as u32;
 
         self.orbit_trap_scale = params.settings.orbit_trap_scale;
         self.palette_offset = params.settings.palette_offset;
 
-        // Convert channel sources to shader-compatible values
-        self.channel_r = match params.settings.channel_r {
-            crate::fractal::ChannelSource::Iterations => 0,
-            crate::fractal::ChannelSource::Distance => 1,
-            crate::fractal::ChannelSource::PositionX => 2,
-            crate::fractal::ChannelSource::PositionY => 3,
-            crate::fractal::ChannelSource::PositionZ => 4,
-            crate::fractal::ChannelSource::Normal => 5,
-            crate::fractal::ChannelSource::AO => 6,
-            crate::fractal::ChannelSource::Constant => 7,
-        };
-        self.channel_g = match params.settings.channel_g {
-            crate::fractal::ChannelSource::Iterations => 0,
-            crate::fractal::ChannelSource::Distance => 1,
-            crate::fractal::ChannelSource::PositionX => 2,
-            crate::fractal::ChannelSource::PositionY => 3,
-            crate::fractal::ChannelSource::PositionZ => 4,
-            crate::fractal::ChannelSource::Normal => 5,
-            crate::fractal::ChannelSource::AO => 6,
-            crate::fractal::ChannelSource::Constant => 7,
-        };
-        self.channel_b = match params.settings.channel_b {
-            crate::fractal::ChannelSource::Iterations => 0,
-            crate::fractal::ChannelSource::Distance => 1,
-            crate::fractal::ChannelSource::PositionX => 2,
-            crate::fractal::ChannelSource::PositionY => 3,
-            crate::fractal::ChannelSource::PositionZ => 4,
-            crate::fractal::ChannelSource::Normal => 5,
-            crate::fractal::ChannelSource::AO => 6,
-            crate::fractal::ChannelSource::Constant => 7,
-        };
+        // Channel sources — same `as u32` mapping for all three channels
+        // (discriminant contract; see `fractal/types.rs`).
+        self.channel_r = params.settings.channel_r as u32;
+        self.channel_g = params.settings.channel_g as u32;
+        self.channel_b = params.settings.channel_b as u32;
 
         self.roughness = params.settings.roughness;
         self.metallic = params.settings.metallic;
@@ -533,11 +451,7 @@ impl Uniforms {
         self.max_distance = params.settings.max_distance;
 
         self.fog_enabled = if params.settings.fog_enabled { 1 } else { 0 };
-        self.fog_mode = match params.settings.fog_mode {
-            crate::fractal::FogMode::Linear => 0,
-            crate::fractal::FogMode::Exponential => 1,
-            crate::fractal::FogMode::Quadratic => 2,
-        };
+        self.fog_mode = params.settings.fog_mode as u32;
         self.fog_density = params.settings.fog_density;
         self.fog_color = params.settings.fog_color.into();
 

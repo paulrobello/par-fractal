@@ -264,7 +264,7 @@ impl CameraController {
     // Public testing interface
     // These methods are intended for testing and simulation purposes
     /// Current movement speed (world units per second).
-    #[allow(dead_code)]
+    #[allow(dead_code)] // QA-020: read by camera unit tests below; not used in production paths.
     pub fn speed(&self) -> f32 {
         self.speed
     }
@@ -296,18 +296,10 @@ impl CameraController {
             .clamp(-89.0f32.to_radians(), 89.0f32.to_radians());
     }
 
-    /// Returns `true` if any movement key is currently held.
-    #[allow(dead_code)]
-    pub fn is_any_key_pressed(&self) -> bool {
-        self.is_forward_pressed
-            || self.is_backward_pressed
-            || self.is_left_pressed
-            || self.is_right_pressed
-            || self.is_up_pressed
-            || self.is_down_pressed
-    }
-
-    // Setters for testing camera movement simulation
+    // Test-only setters for the held-key flags. These drive the camera-unit
+    // tests in this file and the integration tests in `tests/integration_tests.rs`;
+    // the latter is a separate crate, so the symbols look dead to a native
+    // library build but are live during `cargo test` / `cargo test --tests`.
     #[doc(hidden)]
     #[allow(dead_code)]
     pub fn simulate_forward_press(&mut self, pressed: bool) {

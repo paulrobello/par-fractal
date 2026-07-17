@@ -303,7 +303,16 @@ impl App {
                         .settings
                         .attractor_iterations_per_frame,
                     max_iterations: self.fractal_params.settings.max_iterations,
-                    total_iterations: self.fractal_params.accum.total_iterations as u32,
+                    // QA-022: deliberate u64→u32 wrap. The shader reads this
+                    // purely as an RNG stream offset (it XORs the value into
+                    // the per-pixel seed; see `buddhabrot_compute.wgsl`).
+                    // Auto-pause / progress accounting reads the original
+                    // u64 CPU-side (`accum.total_iterations` below), so the
+                    // wrap does not lose progress information. Masking keeps
+                    // the truncation explicit instead of relying on `as`
+                    // semantics.
+                    total_iterations: (self.fractal_params.accum.total_iterations & 0xFFFF_FFFF)
+                        as u32,
                     clear_accumulation: 0,
                     min_iterations: min_iter,
                     _padding: 0,
@@ -371,7 +380,11 @@ impl App {
                         .settings
                         .attractor_iterations_per_frame,
                     attractor_type: self.fractal_params.settings.fractal_type.attractor_index(),
-                    total_iterations: self.fractal_params.accum.total_iterations as u32,
+                    // QA-022: deliberate u64→u32 wrap; see the matching note in
+                    // the Buddhabrot branch above. `attractor_compute.wgsl`
+                    // uses this solely as an RNG seed offset, not for progress.
+                    total_iterations: (self.fractal_params.accum.total_iterations & 0xFFFF_FFFF)
+                        as u32,
                     clear_accumulation: 0,
                     _padding: [0; 2],
                 };
@@ -401,63 +414,21 @@ impl App {
             }
         }
 
-        // Update accumulation display uniforms with palette from fractal params
+        // Update accumulation display uniforms with palette from fractal params.
+        // QA-024: replaced a 50-line hand-unrolled 8-element copy with
+        // `array::from_fn`. Each slot is `[r, g, b, 1.0]` from the matching
+        // `palette.colors[i]` Vec3 — identical transform to the literal it
+        // replaced.
         let palette_colors = self.fractal_params.settings.palette.colors;
         let display_uniforms = AccumulationDisplayUniforms {
             log_scale: self.fractal_params.settings.attractor_log_scale,
             gamma: 0.6,
             palette_offset: self.fractal_params.settings.palette_offset,
             _padding: 0.0,
-            palette: [
-                [
-                    palette_colors[0].x,
-                    palette_colors[0].y,
-                    palette_colors[0].z,
-                    1.0,
-                ],
-                [
-                    palette_colors[1].x,
-                    palette_colors[1].y,
-                    palette_colors[1].z,
-                    1.0,
-                ],
-                [
-                    palette_colors[2].x,
-                    palette_colors[2].y,
-                    palette_colors[2].z,
-                    1.0,
-                ],
-                [
-                    palette_colors[3].x,
-                    palette_colors[3].y,
-                    palette_colors[3].z,
-                    1.0,
-                ],
-                [
-                    palette_colors[4].x,
-                    palette_colors[4].y,
-                    palette_colors[4].z,
-                    1.0,
-                ],
-                [
-                    palette_colors[5].x,
-                    palette_colors[5].y,
-                    palette_colors[5].z,
-                    1.0,
-                ],
-                [
-                    palette_colors[6].x,
-                    palette_colors[6].y,
-                    palette_colors[6].z,
-                    1.0,
-                ],
-                [
-                    palette_colors[7].x,
-                    palette_colors[7].y,
-                    palette_colors[7].z,
-                    1.0,
-                ],
-            ],
+            palette: std::array::from_fn(|i| {
+                let c = palette_colors[i];
+                [c.x, c.y, c.z, 1.0]
+            }),
         };
         self.renderer.queue.write_buffer(
             &self.renderer.accumulation_display_uniform_buffer,

@@ -53,7 +53,15 @@ impl CommandCategory {
     }
 }
 
-/// Action to execute when a command is triggered
+/// Action to execute when a command is triggered.
+///
+/// QA-020: the `#[allow(dead_code)]` is deliberate. Not every variant is
+/// constructed by the command-registration table yet (e.g. `SetPalette`,
+/// `SetChannelSource`, `SetFogMode` are wired into `CommandAction::execute`
+/// in `ui/command.rs` but no command row constructs them today — they exist
+/// so the command palette can grow without churn). Every variant IS matched
+/// in `execute`, so adding a constructor later needs no shader/wire-format
+/// follow-up. Do not delete "unused" variants without checking that match.
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum CommandAction {
@@ -278,7 +286,10 @@ impl CommandPalette {
         self.filtered_commands.clear();
     }
 
-    /// Toggle the command palette
+    /// Toggle the command palette.
+    /// QA-020: currently driven by `open()`/`close()` directly at the call
+    /// sites (which need to push focus state alongside). Kept for the
+    /// public API and any future keybind that just wants a plain toggle.
     #[allow(dead_code)]
     pub fn toggle(&mut self) {
         if self.open {

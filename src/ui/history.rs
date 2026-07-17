@@ -19,6 +19,9 @@ use crate::fractal::{FractalParams, RenderSettings};
 #[derive(Clone)]
 pub(super) struct HistoryEntry {
     pub(super) settings: RenderSettings,
+    // QA-020: stamp captured for the future history panel (entry age, "5m ago"
+    // labels). The field is written on every push but no UI reads it yet;
+    // deleting it would lose provenance that's expensive to reconstruct.
     #[allow(dead_code)]
     pub(super) timestamp: web_time::Instant,
 }

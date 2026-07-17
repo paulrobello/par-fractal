@@ -29,6 +29,9 @@ impl VideoFormat {
     }
 
     /// ffmpeg codec name used for this format.
+    /// QA-020: not read by the current capture pipeline (the encoder reads
+    /// these arms inline), but exposed for the diagnostic UI / future
+    /// "show encoder command" debug overlay.
     #[allow(dead_code)]
     pub fn codec(&self) -> &str {
         match self {
@@ -39,6 +42,7 @@ impl VideoFormat {
     }
 
     /// ffmpeg pixel format used for the encoded output.
+    /// QA-020: same status as `codec()` — public diagnostic accessor.
     #[allow(dead_code)]
     pub fn pixel_format(&self) -> &str {
         match self {
@@ -49,6 +53,7 @@ impl VideoFormat {
     }
 
     /// Returns `true` if this format is [`VideoFormat::GIF`].
+    /// QA-020: convenience predicate; not used in current paths.
     #[allow(dead_code)]
     pub fn is_gif(&self) -> bool {
         matches!(self, VideoFormat::GIF)

@@ -241,6 +241,10 @@ pub struct UI {
     palette_animation_offset: f32, // Current accumulated offset
     // GPU selection
     pub available_gpus: Vec<super::renderer::GpuInfo>,
+    // QA-020: retained from the GPU-picker dialog. The dialog now surfaces
+    // its choice via `gpu_selection_message` and writes through to settings,
+    // so this field is currently write-only; kept because the upcoming
+    // "remember last-used GPU" UX (AUDIT ARC-014 follow-up) reads it.
     #[allow(dead_code)]
     pub selected_gpu_index: Option<usize>,
     pub gpu_selection_message: Option<String>,
