@@ -56,7 +56,7 @@ impl UI {
                 ui.separator();
                 ui.add_space(4.0);
 
-                ui.collapsing("What's New in v0.8.3", |ui| {
+                ui.collapsing("What's New in v0.9.0", |ui| {
                     ui.label("• Upgraded egui 0.34 → 0.35");
                     ui.label("• Migrated to Rust edition 2024");
                     ui.label("• Updated all dependencies to latest versions");

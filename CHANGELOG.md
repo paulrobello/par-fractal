@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_No changes yet._
+
+## [0.9.0] - 2026-07-17
+
 Full remediation of the 2026-07-16 audit (81 issues across security, architecture, code quality, and documentation). See `git log` for per-commit detail.
 
 ### Security
@@ -17,6 +21,7 @@ Full remediation of the 2026-07-16 audit (81 issues across security, architectur
 - Add a `cargo-audit` CI gate (`.cargo/audit.toml`); sanitize gallery filenames (CWE-22); clamp internal hi-res render resolution (CWE-789); surface a toast when imported presets are clamped
 
 ### Fixed
+- **UI no longer freezes when clicking egui panels** — render-on-demand (ARC-006) parked the event loop based on egui's repaint flag, but egui only updates its pointer state during a render, so after one unresolved click it could never request the repaint it needed to resume (death spiral). Every interactive input event now forces a redraw; idle-sleep is preserved.
 - **Deep-zoom correctness bundle**: high-precision (double-float) now auto-enables at zoom > 1e4 (was 1e6 — two decades late), `tricorn_hp` is reachable (gate `<=4`→`<=5`), `burning_ship_hp` DF `abs` negates both words correctly, and `two_prod` uses a Dekker split so DF no longer collapses to f32 on backends without fused FMA
 - Clamp the `acos` input in LOD motion tracking — fixes permanent NaN-poisoning of the motion EMA mid-session
 - Guard `max_iterations == 0` underflow in the shader; fix the inside-set sentinel (`0.0`→`-1.0`) so a legitimate first-iteration value isn't colored as interior
@@ -330,6 +335,7 @@ Full remediation of the 2026-07-16 audit (81 issues across security, architectur
 - Cross-platform support: Windows (DX12/Vulkan), macOS (Metal), Linux (Vulkan)
 
 <!-- v0.8.2 has no git tag; compare anchors use v0.8.1 as the base. -->
+[0.9.0]: https://github.com/paulrobello/par-fractal/compare/v0.8.3...v0.9.0
 [0.8.3]: https://github.com/paulrobello/par-fractal/compare/v0.8.1...v0.8.3
 [0.8.2]: https://github.com/paulrobello/par-fractal/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/paulrobello/par-fractal/compare/v0.8.0...v0.8.1
