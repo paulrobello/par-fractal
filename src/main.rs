@@ -17,10 +17,10 @@ mod video_recorder;
 
 use app::App;
 use std::env;
-use winit::{
-    event::*,
-    event_loop::{ControlFlow, EventLoop},
-};
+use winit::application::ApplicationHandler;
+use winit::event::WindowEvent;
+use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
+use winit::window::{Window, WindowId};
 
 fn print_help() {
     println!("Par Fractal - GPU Accelerated Fractal Renderer");
@@ -246,64 +246,123 @@ fn main() {
 
     let event_loop = EventLoop::new().unwrap();
 
-    // Load window size preference (default to 960x540 if none saved)
+    // Load window size preference (default to 960x540 if none saved). The
+    // actual window is created inside `AppHandler::resumed` — winit 0.30's
+    // contract requires windows to be created from the active event loop,
+    // which is only available once the loop is running.
     let prefs = fractal::AppPreferences::load();
     let (initial_width, initial_height) = prefs.window_size_or_default();
 
-    let window_attributes = winit::window::Window::default_attributes()
-        .with_title("Par Fractal - GPU Accelerated Fractal Renderer")
-        .with_inner_size(winit::dpi::PhysicalSize::new(initial_width, initial_height));
-    #[allow(deprecated)]
-    let window = event_loop.create_window(window_attributes).unwrap();
-
-    let mut app = pollster::block_on(App::new(
-        window,
+    let mut handler = AppHandler {
         screenshot_delay,
         exit_delay,
         preset_name,
         quality_level,
-    ));
+        initial_window_size: (initial_width, initial_height),
+        app: None,
+    };
 
-    #[allow(deprecated)]
-    event_loop
-        .run(move |event, target| match event {
-            Event::WindowEvent {
-                ref event,
-                window_id,
-            } if window_id == app.window().id() => {
-                if !app.input(event) {
-                    match event {
-                        WindowEvent::CloseRequested => target.exit(),
-                        WindowEvent::Resized(physical_size) => {
-                            app.resize(*physical_size);
-                        }
-                        WindowEvent::RedrawRequested => {
-                            app.update();
-                            app.render();
-                        }
-                        _ => {}
-                    }
-                }
+    event_loop.run_app(&mut handler).unwrap();
+}
+
+/// winit 0.30 `ApplicationHandler` wrapper around [`App`].
+///
+/// Holds the CLI/startup arguments needed to build `App` and owns the `App`
+/// instance as `Option<App>` — `None` until the first `resumed()` fires, where
+/// the window and renderer are created (the winit 0.30 contract: windows must
+/// be created from the `ActiveEventLoop`, which only exists once the loop is
+/// running). `resumed()` is guarded so a second fire (mobile lifecycle / bfcache
+/// restore) is a no-op rather than re-creating the window.
+struct AppHandler {
+    screenshot_delay: Option<f32>,
+    exit_delay: Option<f32>,
+    preset_name: Option<String>,
+    quality_level: Option<usize>,
+    initial_window_size: (u32, u32),
+    app: Option<App>,
+}
+
+impl ApplicationHandler for AppHandler {
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        // `resumed()` can fire multiple times on some platforms (mobile
+        // lifecycle, web bfcache restore). Create the window + renderer once.
+        if self.app.is_some() {
+            return;
+        }
+
+        let window_attributes = Window::default_attributes()
+            .with_title("Par Fractal - GPU Accelerated Fractal Renderer")
+            .with_inner_size(winit::dpi::PhysicalSize::new(
+                self.initial_window_size.0,
+                self.initial_window_size.1,
+            ));
+        let window = match event_loop.create_window(window_attributes) {
+            Ok(w) => w,
+            Err(e) => {
+                eprintln!("Failed to create window: {}", e);
+                event_loop.exit();
+                return;
             }
-            Event::AboutToWait => {
-                // Check if app should exit (from CLI delay option)
-                if app.should_exit() {
-                    target.exit();
+        };
+
+        // `App::new` is async (wgpu device/surface init). Native blocks on it
+        // synchronously here — the standard winit 0.30 + wgpu pattern.
+        let app = pollster::block_on(App::new(
+            window,
+            self.screenshot_delay,
+            self.exit_delay,
+            self.preset_name.clone(),
+            self.quality_level,
+        ));
+        self.app = Some(app);
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        window_id: WindowId,
+        event: WindowEvent,
+    ) {
+        let Some(app) = self.app.as_mut() else {
+            return;
+        };
+        if window_id != app.window().id() {
+            return;
+        }
+        if !app.input(&event) {
+            match event {
+                WindowEvent::CloseRequested => event_loop.exit(),
+                WindowEvent::Resized(physical_size) => {
+                    app.resize(physical_size);
                 }
-                // ARC-006: render-on-demand. Only request a redraw when the
-                // scene changed, an animation source is active (auto-orbit,
-                // palette animation, LOD transition, attractor accumulation,
-                // video recording), or egui wants another frame. Otherwise
-                // park the loop in `ControlFlow::Wait` — the OS wakes us on
-                // the next input/expose event and idle CPU/GPU goes to ~0.
-                // (`Wait` + `request_redraw` is the render-on-demand idiom:
-                // winit schedules exactly one RedrawRequested, then sleeps.)
-                target.set_control_flow(ControlFlow::Wait);
-                if app.should_render_next_frame() {
-                    app.window().request_redraw();
+                WindowEvent::RedrawRequested => {
+                    app.update();
+                    app.render();
                 }
+                _ => {}
             }
-            _ => {}
-        })
-        .unwrap();
+        }
+    }
+
+    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        let Some(app) = self.app.as_mut() else {
+            return;
+        };
+        // Check if app should exit (from CLI delay option)
+        if app.should_exit() {
+            event_loop.exit();
+        }
+        // ARC-006: render-on-demand. Only request a redraw when the
+        // scene changed, an animation source is active (auto-orbit,
+        // palette animation, LOD transition, attractor accumulation,
+        // video recording), or egui wants another frame. Otherwise
+        // park the loop in `ControlFlow::Wait` — the OS wakes us on
+        // the next input/expose event and idle CPU/GPU goes to ~0.
+        // (`Wait` + `request_redraw` is the render-on-demand idiom:
+        // winit schedules exactly one RedrawRequested, then sleeps.)
+        event_loop.set_control_flow(ControlFlow::Wait);
+        if app.should_render_next_frame() {
+            app.window().request_redraw();
+        }
+    }
 }

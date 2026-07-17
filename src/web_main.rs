@@ -1,10 +1,14 @@
 //! Web/WASM entry point for Par Fractal
 
+use std::cell::RefCell;
+use std::rc::Rc;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::*;
-use winit::event::*;
-use winit::event_loop::EventLoop;
+use winit::application::ApplicationHandler;
+use winit::event::WindowEvent;
+use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::platform::web::{EventLoopExtWebSys, WindowAttributesExtWebSys};
+use winit::window::{Window, WindowId};
 
 use crate::app::App;
 
@@ -113,7 +117,7 @@ fn show_error(message: &str) {
 
 /// Main entry point for the web build
 #[wasm_bindgen(start)]
-pub async fn main_web() {
+pub fn main_web() {
     // Set up better panic messages in browser console
     console_error_panic_hook::set_once();
 
@@ -191,25 +195,6 @@ pub async fn main_web() {
         }
     };
 
-    // Create window attached to canvas with explicit size (physical pixels)
-    let window_attrs = winit::window::Window::default_attributes()
-        .with_title("Par Fractal")
-        .with_inner_size(winit::dpi::PhysicalSize::new(
-            physical_width,
-            physical_height,
-        ))
-        .with_canvas(Some(canvas));
-
-    let winit_window = match event_loop.create_window(window_attrs) {
-        Ok(w) => w,
-        Err(e) => {
-            show_error(&format!("Failed to create window: {}", e));
-            return;
-        }
-    };
-
-    log::info!("Window created, initializing app...");
-
     // Parse URL parameters for preset and quality settings
     let (preset_name, quality_level) = parse_url_params();
     if let Some(ref preset) = preset_name {
@@ -225,26 +210,19 @@ pub async fn main_web() {
         log::info!("URL quality parameter: {}", quality_name);
     }
 
-    // Initialize app (async for wgpu)
-    let app = match App::new_async(winit_window, None, None, preset_name, quality_level).await {
-        Ok(app) => {
-            hide_loading();
-            log::info!("App initialized successfully");
-            app
-        }
-        Err(e) => {
-            show_error(&format!("Failed to initialize: {}", e));
-            return;
-        }
-    };
+    // The window + renderer are created inside `WebAppHandler::resumed`, per
+    // the winit 0.30 contract (windows come from `ActiveEventLoop`, which only
+    // exists once the loop is running via `spawn_app`). `App::new_async` is
+    // awaited from a `spawn_local` future there since `resumed()` is sync.
+    let app_cell = Rc::new(RefCell::new(None::<App>));
 
-    // Run event loop (web-compatible non-blocking version)
-    let app = std::rc::Rc::new(std::cell::RefCell::new(app));
-
-    // Set up resize handler for mobile orientation changes and window resizing
+    // Set up resize handler for mobile orientation changes and window resizing.
+    // The closure shares `app_cell` with the handler; until `resumed()`
+    // finishes constructing `App` the cell holds `None` and the resize is a
+    // no-op (the canvas backing store is still updated).
     {
         let window_clone = window.clone();
-        let app_clone = app.clone();
+        let app_cell_clone = app_cell.clone();
 
         let closure = Closure::wrap(Box::new(move || {
             if let Some(canvas_element) = window_clone
@@ -276,12 +254,14 @@ pub async fn main_web() {
                     let _ = canvas_style.set_property("width", &format!("{}px", width));
                     let _ = canvas_style.set_property("height", &format!("{}px", height));
 
-                    // Notify app of resize
-                    let mut app = app_clone.borrow_mut();
-                    app.resize(winit::dpi::PhysicalSize::new(
-                        physical_width,
-                        physical_height,
-                    ));
+                    // Notify app of resize (no-op until App exists)
+                    let mut app = app_cell_clone.borrow_mut();
+                    if let Some(app) = app.as_mut() {
+                        app.resize(winit::dpi::PhysicalSize::new(
+                            physical_width,
+                            physical_height,
+                        ));
+                    }
 
                     log::info!(
                         "Window resized: {}x{} (logical), {}x{} (physical)",
@@ -305,38 +285,125 @@ pub async fn main_web() {
         closure.forget();
     }
 
-    event_loop.spawn(move |event, target| {
-        let mut app = app.borrow_mut();
+    let handler = WebAppHandler {
+        app_cell,
+        canvas: Some(canvas),
+        initial_size: (physical_width, physical_height),
+        preset_name,
+        quality_level,
+    };
 
-        match event {
-            Event::WindowEvent {
-                ref event,
-                window_id,
-            } if window_id == app.window().id() => {
-                if !app.input(event) {
-                    match event {
-                        WindowEvent::CloseRequested => target.exit(),
-                        WindowEvent::Resized(physical_size) => {
-                            app.resize(*physical_size);
-                        }
-                        WindowEvent::RedrawRequested => {
-                            app.update();
-                            app.render();
-                        }
-                        _ => {}
-                    }
-                }
-            }
-            Event::AboutToWait => {
-                // ARC-006: render-on-demand on web. winit's web backend drives
-                // the loop via requestAnimationFrame; gating `request_redraw`
-                // lets the rAF tick skip the scene pass when the scene is
-                // clean and nothing is animating, dropping idle GPU work.
-                if app.should_render_next_frame() {
-                    app.window().request_redraw();
-                }
-            }
-            _ => {}
+    // `spawn_app` consumes the handler and drives it via requestAnimationFrame.
+    event_loop.spawn_app(handler);
+}
+
+/// winit 0.30 `ApplicationHandler` wrapper for the web build.
+///
+/// Owns the DOM canvas plus the startup params and, behind an
+/// `Rc<RefCell<Option<App>>>`, the `App` itself. `App` is `None` until the
+/// first `resumed()` fires; there we create the window from the active event
+/// loop and construct `App` asynchronously via `spawn_local` (the wasm
+/// equivalent of native's `pollster::block_on`, since `resumed()` is sync).
+/// The shared `Rc<RefCell<…>>` lets the external resize/orientation JS closure
+/// reach the `App` once it exists.
+struct WebAppHandler {
+    app_cell: Rc<RefCell<Option<App>>>,
+    canvas: Option<web_sys::HtmlCanvasElement>,
+    initial_size: (u32, u32),
+    preset_name: Option<String>,
+    quality_level: Option<usize>,
+}
+
+impl ApplicationHandler for WebAppHandler {
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        // Web emits `Resumed` on startup and again on bfcache restore; only
+        // build the window + App the first time.
+        if self.app_cell.borrow().is_some() {
+            return;
         }
-    });
+        let Some(canvas) = self.canvas.take() else {
+            show_error("Canvas already consumed by a previous resume");
+            return;
+        };
+
+        let window_attrs = Window::default_attributes()
+            .with_title("Par Fractal")
+            .with_inner_size(winit::dpi::PhysicalSize::new(
+                self.initial_size.0,
+                self.initial_size.1,
+            ))
+            .with_canvas(Some(canvas));
+
+        let winit_window = match event_loop.create_window(window_attrs) {
+            Ok(w) => w,
+            Err(e) => {
+                show_error(&format!("Failed to create window: {}", e));
+                return;
+            }
+        };
+        log::info!("Window created, initializing app...");
+
+        // `App::new_async` drives wgpu init; `resumed()` is sync, so schedule
+        // the future on the wasm event loop. Events arriving before App is
+        // ready see `None` and no-op; the first redraw is requested once
+        // construction completes.
+        let app_cell = self.app_cell.clone();
+        let preset_name = self.preset_name.clone();
+        let quality_level = self.quality_level;
+        wasm_bindgen_futures::spawn_local(async move {
+            match App::new_async(winit_window, None, None, preset_name, quality_level).await {
+                Ok(app) => {
+                    app.window().request_redraw();
+                    hide_loading();
+                    log::info!("App initialized successfully");
+                    *app_cell.borrow_mut() = Some(app);
+                }
+                Err(e) => {
+                    show_error(&format!("Failed to initialize: {}", e));
+                }
+            }
+        });
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        window_id: WindowId,
+        event: WindowEvent,
+    ) {
+        let mut guard = self.app_cell.borrow_mut();
+        let Some(app) = guard.as_mut() else {
+            return;
+        };
+        if window_id != app.window().id() {
+            return;
+        }
+        if !app.input(&event) {
+            match event {
+                WindowEvent::CloseRequested => event_loop.exit(),
+                WindowEvent::Resized(physical_size) => {
+                    app.resize(physical_size);
+                }
+                WindowEvent::RedrawRequested => {
+                    app.update();
+                    app.render();
+                }
+                _ => {}
+            }
+        }
+    }
+
+    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
+        let mut guard = self.app_cell.borrow_mut();
+        let Some(app) = guard.as_mut() else {
+            return;
+        };
+        // ARC-006: render-on-demand on web. winit's web backend drives
+        // the loop via requestAnimationFrame; gating `request_redraw`
+        // lets the rAF tick skip the scene pass when the scene is
+        // clean and nothing is animating, dropping idle GPU work.
+        if app.should_render_next_frame() {
+            app.window().request_redraw();
+        }
+    }
 }
