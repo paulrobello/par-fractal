@@ -161,6 +161,16 @@ impl Renderer {
             .await
             .unwrap();
 
+        // Deep-zoom investigation: surface device-loss and uncaptured wgpu
+        // errors so a silent black/white frame at deep zoom is diagnosed
+        // instead of vanishing. Pure diagnostic — no behavior change.
+        device.set_device_lost_callback(|reason, message| {
+            log::error!("wgpu DEVICE LOST — reason: {reason:?}; message: {message}");
+        });
+        device.on_uncaptured_error(std::sync::Arc::new(|err: wgpu::Error| {
+            log::error!("wgpu uncaptured error: {err:?}");
+        }));
+
         let surface_caps = surface.get_capabilities(&adapter);
         let surface_format = surface_caps
             .formats

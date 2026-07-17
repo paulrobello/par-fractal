@@ -70,6 +70,7 @@ impl App {
         });
 
         // Wait for GPU to finish
+        let poll_start = std::time::Instant::now();
         self.renderer
             .device
             .poll(wgpu::PollType::Wait {
@@ -77,6 +78,7 @@ impl App {
                 timeout: None,
             })
             .ok();
+        log::info!("GPU readback poll took {:?}", poll_start.elapsed());
 
         let Ok(recv_result) = receiver.recv() else {
             log::error!("GPU readback channel closed (device lost?)");
@@ -105,6 +107,29 @@ impl App {
                 for pixel in image_data.chunks_exact_mut(4) {
                     pixel.swap(0, 2); // Swap B and R
                 }
+            }
+
+            // Deep-zoom investigation (harness mode only): a pixel-value
+            // histogram distinguishes a structured frame from a NaN/Inf-flooded
+            // one (all-255 white), which is invisible in the saved PNG.
+            if self.screenshot_path.is_some() {
+                let n = width * height;
+                let (mut white, mut black, mut other, mut sum) = (0u32, 0u32, 0u32, 0u64);
+                for px in image_data.chunks_exact(4) {
+                    match (px[0], px[1], px[2]) {
+                        (255, 255, 255) => white += 1,
+                        (0, 0, 0) => black += 1,
+                        _ => other += 1,
+                    }
+                    sum += (px[0] as u64) + (px[1] as u64) + (px[2] as u64);
+                }
+                log::info!(
+                    "screenshot hist: white {white} ({:.0}%) black {black} ({:.0}%) other {other} ({:.0}%) mean_gray {:.1}",
+                    100.0 * white as f32 / n as f32,
+                    100.0 * black as f32 / n as f32,
+                    100.0 * other as f32 / n as f32,
+                    sum as f32 / (3.0 * n as f32),
+                );
             }
 
             // ENH-007: when a CLI `--screenshot-path` override is set (harness
@@ -217,6 +242,7 @@ impl App {
         });
 
         // Wait for GPU to finish
+        let poll_start = std::time::Instant::now();
         self.renderer
             .device
             .poll(wgpu::PollType::Wait {
@@ -224,6 +250,7 @@ impl App {
                 timeout: None,
             })
             .ok();
+        log::info!("GPU readback poll took {:?}", poll_start.elapsed());
 
         let Ok(recv_result) = receiver.recv() else {
             log::error!("GPU readback channel closed (device lost?)");
@@ -698,6 +725,7 @@ impl App {
         });
 
         // Wait for GPU to finish
+        let poll_start = std::time::Instant::now();
         self.renderer
             .device
             .poll(wgpu::PollType::Wait {
@@ -705,6 +733,7 @@ impl App {
                 timeout: None,
             })
             .ok();
+        log::info!("GPU readback poll took {:?}", poll_start.elapsed());
 
         if receiver.recv()?.is_ok() {
             let data = buffer_slice.get_mapped_range();
