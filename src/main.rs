@@ -35,6 +35,8 @@ fn print_help() {
     println!("  --list-presets           List all available presets and exit");
     println!("  --screenshot-delay <s>   Take a screenshot after N seconds");
     println!("  --exit-delay <s>         Exit application after N seconds");
+    println!("  --screenshot-path <path> Write the screenshot to this exact path (no timestamp)");
+    println!("  --window-size <WxH>      Force the window to WxH physical pixels");
     println!("  --help, -h               Show this help message");
 }
 
@@ -145,6 +147,8 @@ fn main() {
     let mut exit_delay: Option<f32> = None;
     let mut preset_name: Option<String> = None;
     let mut quality_level: Option<usize> = None;
+    let mut screenshot_path: Option<std::path::PathBuf> = None;
+    let mut window_size: Option<(u32, u32)> = None;
 
     let mut i = 1;
     while i < args.len() {
@@ -152,6 +156,48 @@ fn main() {
             "--clear-settings" => {
                 clear_settings();
                 i += 1;
+            }
+            "--screenshot-path" => {
+                if i + 1 < args.len() {
+                    screenshot_path = Some(std::path::PathBuf::from(&args[i + 1]));
+                    i += 2;
+                } else {
+                    eprintln!("--screenshot-path requires a value");
+                    print_help();
+                    return;
+                }
+            }
+            "--window-size" => {
+                if i + 1 < args.len() {
+                    match args[i + 1].split_once('x') {
+                        Some((w, h)) => match (w.parse::<u32>(), h.parse::<u32>()) {
+                            (Ok(w), Ok(h)) if w > 0 && h > 0 => {
+                                window_size = Some((w, h));
+                                i += 2;
+                            }
+                            _ => {
+                                eprintln!(
+                                    "Invalid --window-size '{}' (expected WxH, e.g. 256x256)",
+                                    args[i + 1]
+                                );
+                                print_help();
+                                return;
+                            }
+                        },
+                        None => {
+                            eprintln!(
+                                "Invalid --window-size '{}' (expected WxH, e.g. 256x256)",
+                                args[i + 1]
+                            );
+                            print_help();
+                            return;
+                        }
+                    }
+                } else {
+                    eprintln!("--window-size requires a value (WxH)");
+                    print_help();
+                    return;
+                }
             }
             "--preset" => {
                 if i + 1 < args.len() {
@@ -252,13 +298,17 @@ fn main() {
     // which is only available once the loop is running.
     let prefs = fractal::AppPreferences::load();
     let (initial_width, initial_height) = prefs.window_size_or_default();
+    // ENH-007: `--window-size` overrides the saved preference so the visual-
+    // regression harness gets a fixed capture resolution.
+    let initial_window_size = window_size.unwrap_or((initial_width, initial_height));
 
     let mut handler = AppHandler {
         screenshot_delay,
         exit_delay,
         preset_name,
         quality_level,
-        initial_window_size: (initial_width, initial_height),
+        screenshot_path,
+        initial_window_size,
         app: None,
     };
 
@@ -278,6 +328,7 @@ struct AppHandler {
     exit_delay: Option<f32>,
     preset_name: Option<String>,
     quality_level: Option<usize>,
+    screenshot_path: Option<std::path::PathBuf>,
     initial_window_size: (u32, u32),
     app: Option<App>,
 }
@@ -313,6 +364,7 @@ impl ApplicationHandler for AppHandler {
             self.exit_delay,
             self.preset_name.clone(),
             self.quality_level,
+            self.screenshot_path.clone(),
         ));
         self.app = Some(app);
     }

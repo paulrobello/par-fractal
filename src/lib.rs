@@ -50,6 +50,10 @@ pub mod fractal;
 pub mod lod;
 /// Platform-specific helpers.
 pub mod platform;
+/// CPU reference renderer + double-float mirror for the deep-zoom visual
+/// regression harness (ENH-007). GPU-free f64 ground truth and a byte-for-byte
+/// Rust mirror of the shader's DF math so the precision teeth run in CI.
+pub mod reference;
 /// wgpu device/surface setup, uniform buffers, and the render and
 /// post-processing pipelines.
 pub mod renderer;

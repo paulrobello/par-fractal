@@ -1,0 +1,34 @@
+# ENH-007 visual-regression manifest.
+#
+# One row per line, whitespace-separated, in this exact field order:
+#   id  kind  FractalType  cx  cy  zoom  iters  color_mode  size
+#
+# - `id`            : row id; also the preset name written by `imgdiff gen-preset`.
+# - `kind`          : CPU-reference map (mandelbrot|burning_ship|tricorn) for
+#                     the optional CPU-vs-GPU cross-check (`CROSSCHECK=1`).
+# - `FractalType`   : enum variant the app dispatches on (Mandelbrot2D|…).
+# - `cx cy`         : view center (f64), matches `settings.center_2d`.
+# - `zoom`          : view zoom (f64), matches `settings.zoom_2d`. Above 1e4 the
+#                     shader engages its double-float path.
+# - `iters`         : `settings.max_iterations`.
+# - `color_mode`    : 2 = the 2D shader's grayscale iteration mode (`vec3(t)`),
+#                     time-independent so screenshots are deterministic.
+# - `size`          : capture window size, WxH physical pixels.
+#
+# This is intentionally line-based (not YAML) so `scripts/visual_test.sh` can
+# parse it with a plain `while read` and no `yq`/`python` dependency.
+#
+# SCOPE NOTE: rows are kept at zooms the GPU renders with stable, detailed
+# output. The audit's double-float HP path was found (via this harness's
+# CROSSCHECK mode) to degrade above ~1e5 and render solid black by ~1e7–1e8 —
+# a real deep-zoom GPU rendering failure that is out of scope for ENH-007 (it
+# belongs to the ENH-001 perturbation / progressive-refinement work). Deep-zoom
+# MATH correctness is still guarded by the CI-safe CPU teeth in
+# `tests/reference_math.rs` (DF-vs-f64). Add deeper rows here once that issue
+# is resolved and the goldens can be blessed against correct output.
+#
+# id                    kind          FractalType     cx             cy             zoom  iters  color_mode  size
+mandel-shallow         mandelbrot    Mandelbrot2D    -0.5           0              1     256    2           256x256
+mandel-seahorse-1e5    mandelbrot    Mandelbrot2D    -0.7436438870  0.1318259042   1e5   1000   2           256x256
+tricorn-full           tricorn       Tricorn2D       -0.5           0              1     256    2           256x256
+ship-full              burning_ship  BurningShip2D   -0.5           -0.5           1     256    2           256x256

@@ -15,15 +15,15 @@
 > **Status — verified 2026-07-17 at HEAD `8cdd915` (v0.9.0):** The v0.9.0 audit
 > remediation shipped several ENH *prerequisites* (ARC-002 HP math, ARC-005 bloom gating,
 > ARC-006 render-on-demand, ARC-010 offset tests) but no complete enhancement. Net result:
-> **0 of 8 fully done; 2 partial (ENH-002, ENH-004); 6 not started.** Per-item verdicts
-> with file:line evidence appear under each entry below, and the priority table has a
-> Status column.
+> **1 of 8 fully done (ENH-007); 2 partial (ENH-002, ENH-004); 5 not started.** Per-item
+> verdicts with file:line evidence appear under each entry below, and the priority table
+> has a Status column.
 
 ## Priority order
 
 | ID | Title | Impact | Effort | Depends on | Status (v0.9.0) |
 |----|-------|--------|--------|-----------|-----------------|
-| ENH-007 | Deep-zoom visual regression harness | High (guards every other change) | Low–Medium (~1–2 days) | none — do first | Not started |
+| ENH-007 | Deep-zoom visual regression harness | High (guards every other change) | Low–Medium (~1–2 days) | none — do first | **Done** (CPU teeth + GPU goldens; surfaced a >1e5 HP-rendering failure) |
 | ENH-002 | Progressive refinement + render-on-demand | High | Medium–High (~1 week) | ARC-006/008 fixes | **Partial** — render-on-demand done (ARC-006) |
 | ENH-003 | Dynamic resolution scaling (wire `render_scale`) | High | Medium (~2–3 days) | ARC-007/008 fixes | Not started (render_scale still inert) |
 | ENH-001 | Perturbation-theory infinite zoom | Transformative | Very High (2–4 weeks) | ARC-001/002 bundle, ENH-007 | Not started (HP prereq landed via ARC-002) |
@@ -103,7 +103,26 @@ converts ENH-003/004/005 and LOD tuning from faith to measurement. **Effort**: ~
 
 ### ENH-007 — Deep-zoom visual regression harness
 **Plan**: `docs/fable/ENH-007-visual-regression-harness.md`
-**Status (2026-07-17, v0.9.0):** Not started. The 0.9.0 numeric-core unit suite (114 tests) is not a visual harness — there is no CPU f64 reference renderer, no `tests/golden/` tiles, no screenshot-vs-reference comparison, and no image-diff dependency or CI step.
+**Status (2026-07-17, v0.9.0):** **Done.** Two-layer harness shipped:
+- **CPU teeth (CI-safe, `tests/reference_math.rs` + `src/reference.rs`):** an f64 escape-time
+  reference renderer + a byte-for-byte Rust mirror of the shader's double-float primitives
+  (`two_prod`/`two_sum`/`df_mul`/`df2_square`/abs). Tests pin the EFT property of `two_prod`/
+  `two_sum` (catches FMA-collapse deterministically), known points, a blessed smooth-value
+  drift table, and DF-vs-f64 agreement on 32×32 deep-zoom tiles. Mutation-verified: collapsing
+  `df_mul` to plain f32 fails the Mandelbrot deep-zoom test at ~200× the threshold.
+- **GPU golden layer (local, `scripts/visual_test.sh` / `make visual-test`):** `imgdiff` bin
+  compares the real binary's screenshots against committed `tests/golden/*.png` tiles; new CLI
+  flags `--screenshot-path` / `--window-size` give deterministic captures; `gen-preset` builds
+  row presets via the app's own serializer. Skips cleanly on headless boxes.
+
+**Finding surfaced by the harness (out of scope to fix here):** the GPU's double-float HP path
+renders correctly only up to ~1e5; above that the screenshot degrades (1e6 partial, 1e7–1e8
+solid black) while the CPU f64/DF reference shows the expected structure. This is a real
+deep-zoom GPU rendering failure (correctness or Metal-watchdog reset under the ~10–20× slower
+HP shader) — exactly the bug class this harness exists to catch. It belongs to the ENH-001
+perturbation / ENH-002 progressive-refinement work, so the manifest's goldens are kept at
+zooms the GPU renders with stable detail (≤1e5) and deep-zoom *math* correctness is still
+guarded by the CPU DF-vs-f64 teeth. Re-add deeper golden rows once that issue is resolved.
 
 The audit found four deep-zoom correctness bugs that shipped silently (unreachable hp path, wrong
 DF abs, late threshold, FMA dependence) — precisely the class a screenshot-vs-reference harness

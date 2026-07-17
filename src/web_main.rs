@@ -351,7 +351,7 @@ impl ApplicationHandler for WebAppHandler {
         let preset_name = self.preset_name.clone();
         let quality_level = self.quality_level;
         wasm_bindgen_futures::spawn_local(async move {
-            match App::new_async(winit_window, None, None, preset_name, quality_level).await {
+            match App::new_async(winit_window, None, None, preset_name, quality_level, None).await {
                 Ok(app) => {
                     app.window().request_redraw();
                     hide_loading();

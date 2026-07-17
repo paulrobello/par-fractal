@@ -1048,6 +1048,23 @@ When enabled, LOD zones are visualized in 3D space as colored distance rings aro
 4. Account for WGSL implicit vec3 padding
 5. Verify both structs have identical byte size (864 bytes)
 
+### Visual Regression Harness (ENH-007)
+
+A two-layer harness guards deep-zoom rendering correctness:
+
+- **CPU teeth (`src/reference.rs` + `tests/reference_math.rs`):** an f64 escape-time reference
+  renderer and a byte-for-byte Rust mirror of the WGSL double-float primitives
+  (`two_prod`/`two_sum`/`df_mul`/`df2_square`/abs). Runs under `make test` with no GPU — pins the
+  EFT property of the DF primitives, known points, and DF-vs-f64 agreement on deep-zoom tiles.
+  When the shader's DF math or smooth-coloring changes, update the mirror here to match.
+- **GPU golden layer (`scripts/visual_test.sh`, `make visual-test` / `make visual-bless`):**
+  drives the real binary per row of `tests/golden/manifest.txt` (fixed window via `--window-size`,
+  deterministic path via `--screenshot-path`, `--quality ultra` to pin LOD) and compares PNGs with
+  the `imgdiff` bin. Local-only; skips cleanly on headless boxes (CI relies on the CPU teeth).
+
+The `imgdiff` bin also has `render-ref` (CPU reference → grayscale PNG) and `gen-preset` (build a
+row preset via the app's own serializer) modes used by the harness.
+
 ## Web/WASM Support
 
 Par Fractal supports compilation to WebAssembly (WASM) for running in web browsers.

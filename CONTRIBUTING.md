@@ -51,6 +51,24 @@ Use `--nocapture` to see `println!` output from a failing test:
 cargo test <test_name> -- --nocapture
 ```
 
+### Visual regression (deep-zoom harness, ENH-007)
+
+The CI-safe **CPU teeth** live in `tests/reference_math.rs` (+ `src/reference.rs`): an f64
+reference renderer and a Rust mirror of the shader's double-float math. These run under
+`make test` with no GPU. When changing the shader's DF primitives, smooth-coloring formula, or
+escape semantics, the `render_*_df` / `render` mirrors in `src/reference.rs` must be updated to
+match — the DF-vs-f64 tests will tell you if the mirror drifted.
+
+The **GPU golden-image layer** is local-only (CI has no GPU): `make visual-test` renders each
+row of `tests/golden/manifest.txt` through the real binary and compares against the committed
+`tests/golden/*.png` tiles. When a rendering change legitimately moves the goldens, re-bless
+and include the before/after in the PR:
+
+```bash
+make visual-bless   # rewrites tests/golden/*.png from the current binary
+```
+
+
 ## Code Style
 
 - Run `make fmt` (cargo fmt) before committing.

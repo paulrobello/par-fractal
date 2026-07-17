@@ -7,7 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_No changes yet._
+### Added
+- **Deep-zoom visual-regression harness (ENH-007).** A CPU f64 reference renderer
+  (`src/reference.rs`) plus a byte-for-byte Rust mirror of the shader's double-float
+  math, with CI-safe precision teeth in `tests/reference_math.rs` (DF-vs-f64 on
+  deep-zoom tiles, error-free-transform checks on `two_prod`/`two_sum`, known-point
+  and drift-table pins). A local GPU golden-image layer (`scripts/visual_test.sh`,
+  `make visual-test` / `make visual-bless`) drives the real binary per manifest row
+  and compares PNGs via the new `imgdiff` bin; skips cleanly on headless boxes.
+- CLI flags `--screenshot-path <path>` and `--window-size <WxH>` for deterministic,
+  scriptable captures.
+
+### Changed
+- `capture_screenshot` honors `--screenshot-path` (no timestamp / toast / auto-open
+  in harness mode); interactive behavior is unchanged.
+
+### Known issues
+- The GPU's double-float HP path renders correctly only up to ~1e5 zoom; above that
+  the screenshot degrades to solid black by ~1e7–1e8 (the CPU reference shows the
+  expected structure). Surfaced by this harness; tracked under ENH-001/ENH-002.
 
 ## [0.9.0] - 2026-07-17
 

@@ -60,6 +60,14 @@ name = "par-fractal"
 path = "src/main.rs"
 required-features = ["native"]
 
+# ENH-007: PNG comparison + harness helpers for the visual-regression layer.
+# Native-only: `gen-preset` calls `PresetGallery::save_preset` (filesystem), so
+# it must not build under the `web` feature set.
+[[bin]]
+name = "imgdiff"
+path = "src/bin/imgdiff.rs"
+required-features = ["native"]
+
 [dependencies]
 # Core graphics
 wgpu = "29.0.4"  # Requires egui-wgpu 0.34+

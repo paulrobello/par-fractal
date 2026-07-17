@@ -9,6 +9,7 @@ VERSION := $(shell grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
 .PHONY: help build build-release run run-release test check clean clippy clippy-fix fmt fmt-check \
         install-deps doc checkall pre-commit-install pre-commit-uninstall pre-commit-run \
         pre-commit-update lint deploy release cache-clean typecheck \
+        visual-test visual-bless \
         web-install web-build web-serve web-clean web-deploy
 
 # Default target
@@ -38,6 +39,8 @@ help:
 	@echo "  test               - Run all tests"
 	@echo "  test-verbose       - Run tests with verbose output"
 	@echo "  t                  - Shortcut for test"
+	@echo "  visual-test        - GPU golden-image regression harness (local; ENH-007)"
+	@echo "  visual-bless       - (Re)write golden tiles from current output"
 	@echo ""
 	@echo "Code Quality:"
 	@echo "  fmt                - Format Rust code"
@@ -140,6 +143,24 @@ test:
 test-verbose:
 	@echo "Running tests (verbose)..."
 	cargo test -- --nocapture
+
+# ============================================================================
+# Visual Regression (ENH-007)
+# ============================================================================
+
+# GPU golden-image layer: renders each manifest row through the real binary and
+# compares against committed goldens in tests/golden/. Local-only — skips with a
+# clear message on headless boxes. The CI-safe CPU math teeth live in
+# tests/reference_math.rs and run via plain `make test`.
+visual-test:
+	@echo "Running visual regression harness (GPU layer)…"
+	@bash scripts/visual_test.sh
+
+# (Re)write the golden tiles from the current binary's output. Run after an
+# intentional rendering change and include before/after in the PR.
+visual-bless:
+	@echo "Blessing visual goldens…"
+	@BLESS=1 bash scripts/visual_test.sh
 
 # ============================================================================
 # Code Quality

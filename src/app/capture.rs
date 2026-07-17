@@ -107,37 +107,48 @@ impl App {
                 }
             }
 
-            // Generate filename with fractal type and timestamp
-            let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
-            let fractal_name = self
-                .fractal_params
-                .settings
-                .fractal_type
-                .filename_safe_name();
-            let filename = format!("{}_{}.png", fractal_name, timestamp);
+            // ENH-007: when a CLI `--screenshot-path` override is set (harness
+            // mode), write exactly there with no timestamp, toast, or auto-open
+            // so the visual-regression script gets a deterministic file.
+            // Otherwise generate the interactive `{fractal}_{timestamp}.png`.
+            let out_path: std::path::PathBuf = match &self.screenshot_path {
+                Some(p) => p.clone(),
+                None => {
+                    let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+                    let fractal_name = self
+                        .fractal_params
+                        .settings
+                        .fractal_type
+                        .filename_safe_name();
+                    std::path::PathBuf::from(format!("{}_{}.png", fractal_name, timestamp))
+                }
+            };
 
             // Save as PNG
             if let Some(img) = image::RgbaImage::from_raw(width, height, image_data) {
-                if let Err(e) = img.save(&filename) {
+                if let Err(e) = img.save(&out_path) {
                     log::error!("Failed to save screenshot: {}", e);
                 } else {
-                    log::info!("Screenshot saved to {}", filename);
-                    // Convert to absolute path and show in toast
-                    let abs_path = std::path::Path::new(&filename)
-                        .canonicalize()
-                        .unwrap_or_else(|_| std::path::PathBuf::from(&filename));
+                    log::info!("Screenshot saved to {}", out_path.display());
+                    // Interactive mode only: toast + optional auto-open. Skipped
+                    // for harness (explicit path) runs.
+                    if self.screenshot_path.is_none() {
+                        let abs_path = out_path.canonicalize().unwrap_or_else(|_| out_path.clone());
 
-                    // Auto-open if enabled
-                    if self.ui.auto_open_captures
-                        && let Err(e) = open::that(&abs_path)
-                    {
-                        log::error!("Failed to open screenshot: {}", e);
+                        if self.ui.auto_open_captures
+                            && let Err(e) = open::that(&abs_path)
+                        {
+                            log::error!("Failed to open screenshot: {}", e);
+                        }
+
+                        self.ui.show_toast_with_file(
+                            format!(
+                                "📸 Screenshot saved: {} - Click to open",
+                                out_path.display()
+                            ),
+                            abs_path.to_string_lossy().to_string(),
+                        );
                     }
-
-                    self.ui.show_toast_with_file(
-                        format!("📸 Screenshot saved: {} - Click to open", filename),
-                        abs_path.to_string_lossy().to_string(),
-                    );
                 }
             } else {
                 log::error!("Failed to create image from buffer");

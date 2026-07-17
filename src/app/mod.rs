@@ -67,8 +67,12 @@ pub struct App {
     video_recorder: VideoRecorder,
     screenshot_delay: Option<f32>, // CLI option: take screenshot after N seconds
     exit_delay: Option<f32>,       // CLI option: exit after N seconds
-    screenshot_taken: bool,        // Track if delayed screenshot was taken
-    should_exit: bool,             // Track if app should exit
+    /// ENH-007: CLI override for the screenshot output path. When `Some`, the
+    /// delayed screenshot is written exactly here (no timestamp/auto-open) so
+    /// the visual-regression harness gets a deterministic, predictable file.
+    screenshot_path: Option<std::path::PathBuf>,
+    screenshot_taken: bool, // Track if delayed screenshot was taken
+    should_exit: bool,      // Track if app should exit
     /// ARC-005: tracks whether the bloom output texture currently holds defined
     /// (cleared-to-black) contents. The composite pass samples `bloom_view`
     /// unconditionally, so when bloom is disabled we must record one cheap clear
@@ -115,6 +119,7 @@ impl App {
         exit_delay: Option<f32>,
         preset_name: Option<String>,
         quality_level: Option<usize>,
+        screenshot_path: Option<std::path::PathBuf>,
     ) -> Self {
         Self::init_common(
             window,
@@ -122,6 +127,7 @@ impl App {
             exit_delay,
             preset_name,
             quality_level,
+            screenshot_path,
         )
         .await
     }
@@ -139,6 +145,7 @@ impl App {
         exit_delay: Option<f32>,
         preset_name: Option<String>,
         quality_level: Option<usize>,
+        screenshot_path: Option<std::path::PathBuf>,
     ) -> Result<Self, String> {
         Ok(Self::init_common(
             window,
@@ -146,6 +153,7 @@ impl App {
             exit_delay,
             preset_name,
             quality_level,
+            screenshot_path,
         )
         .await)
     }
@@ -209,6 +217,7 @@ impl App {
         exit_delay: Option<f32>,
         preset_name: Option<String>,
         quality_level: Option<usize>,
+        screenshot_path: Option<std::path::PathBuf>,
     ) -> Self {
         let window = Arc::new(window);
         let size = window.inner_size();
@@ -403,6 +412,7 @@ impl App {
             video_recorder,
             screenshot_delay,
             exit_delay,
+            screenshot_path,
             screenshot_taken: false,
             should_exit: false,
             bloom_texture_cleared: false,
