@@ -347,7 +347,7 @@ impl UI {
 
     pub fn render_lod_debug_overlay(&self, ctx: &Context, params: &FractalParams) {
         // Only show if LOD is enabled and debug visualization is on
-        if !params.lod_config.enabled || !params.lod_config.debug_visualization {
+        if !params.lod.lod_config.enabled || !params.lod.lod_config.debug_visualization {
             return;
         }
 
@@ -373,7 +373,7 @@ impl UI {
                         ui.add_space(8.0);
 
                         // Current LOD Level with large, color-coded display
-                        let (level_name, level_color) = match params.lod_state.current_level {
+                        let (level_name, level_color) = match params.lod.lod_state.current_level {
                             0 => ("ULTRA", egui::Color32::from_rgb(0, 255, 0)),
                             1 => ("HIGH", egui::Color32::from_rgb(100, 255, 100)),
                             2 => ("MEDIUM", egui::Color32::from_rgb(255, 200, 0)),
@@ -391,14 +391,14 @@ impl UI {
                         ui.add_space(4.0);
 
                         // Show transition progress if transitioning
-                        if params.lod_state.transition_progress < 1.0 {
+                        if params.lod.lod_state.transition_progress < 1.0 {
                             ui.horizontal(|ui| {
                                 ui.label(
                                     egui::RichText::new("Transitioning:")
                                         .color(egui::Color32::from_rgb(180, 180, 180))
                                         .size(12.0),
                                 );
-                                let target_name = match params.lod_state.target_level {
+                                let target_name = match params.lod.lod_state.target_level {
                                     0 => "Ultra",
                                     1 => "High",
                                     2 => "Medium",
@@ -423,7 +423,8 @@ impl UI {
                             );
 
                             // Progress bar fill
-                            let fill_width = rect.width() * params.lod_state.transition_progress;
+                            let fill_width =
+                                rect.width() * params.lod.lod_state.transition_progress;
                             ui.painter().rect_filled(
                                 egui::Rect::from_min_size(
                                     rect.min,
@@ -446,7 +447,7 @@ impl UI {
                                     .color(egui::Color32::from_rgb(180, 180, 180))
                                     .size(13.0),
                             );
-                            let strategy_name = match params.lod_config.strategy {
+                            let strategy_name = match params.lod.lod_config.strategy {
                                 crate::lod::LODStrategy::Distance => "Distance",
                                 crate::lod::LODStrategy::Motion => "Motion",
                                 crate::lod::LODStrategy::Performance => "Performance",
@@ -467,7 +468,7 @@ impl UI {
                                     .color(egui::Color32::from_rgb(180, 180, 180))
                                     .size(13.0),
                             );
-                            if params.lod_state.is_moving {
+                            if params.lod.lod_state.is_moving {
                                 ui.label(
                                     egui::RichText::new("MOVING")
                                         .color(egui::Color32::from_rgb(255, 200, 0))
@@ -489,8 +490,8 @@ impl UI {
                                     .color(egui::Color32::from_rgb(180, 180, 180))
                                     .size(13.0),
                             );
-                            let fps = params.lod_state.current_fps;
-                            let target = params.lod_config.target_fps;
+                            let fps = params.lod.lod_state.current_fps;
+                            let target = params.lod.lod_config.target_fps;
                             let fps_color = if fps >= target {
                                 egui::Color32::from_rgb(0, 255, 0)
                             } else if fps >= target * 0.8 {
@@ -507,9 +508,10 @@ impl UI {
                         });
 
                         // Distance (for 3D fractals with Distance or Hybrid strategy)
-                        if params.render_mode == crate::fractal::RenderMode::ThreeD
-                            && (params.lod_config.strategy == crate::lod::LODStrategy::Distance
-                                || params.lod_config.strategy == crate::lod::LODStrategy::Hybrid)
+                        if params.settings.render_mode == crate::fractal::RenderMode::ThreeD
+                            && (params.lod.lod_config.strategy == crate::lod::LODStrategy::Distance
+                                || params.lod.lod_config.strategy
+                                    == crate::lod::LODStrategy::Hybrid)
                         {
                             // Calculate distance to show (note: we don't have camera_pos here,
                             // so we'll show the distance zones instead)
@@ -527,15 +529,24 @@ impl UI {
                             // Show distance zones with color coding
                             let zones = [
                                 (
-                                    format!("Ultra: < {:.1}", params.lod_config.distance_zones[0]),
+                                    format!(
+                                        "Ultra: < {:.1}",
+                                        params.lod.lod_config.distance_zones[0]
+                                    ),
                                     egui::Color32::from_rgb(0, 255, 0),
                                 ),
                                 (
-                                    format!("High: < {:.1}", params.lod_config.distance_zones[1]),
+                                    format!(
+                                        "High: < {:.1}",
+                                        params.lod.lod_config.distance_zones[1]
+                                    ),
                                     egui::Color32::from_rgb(100, 255, 100),
                                 ),
                                 (
-                                    format!("Medium: < {:.1}", params.lod_config.distance_zones[2]),
+                                    format!(
+                                        "Medium: < {:.1}",
+                                        params.lod.lod_config.distance_zones[2]
+                                    ),
                                     egui::Color32::from_rgb(255, 200, 0),
                                 ),
                                 ("Low: Far".to_string(), egui::Color32::from_rgb(255, 100, 0)),

@@ -276,11 +276,14 @@ impl Uniforms {
         self.inv_view_proj = view_proj.inverse().to_cols_array_2d();
         self.camera_pos = camera.position.into();
 
-        self.center = [params.center_2d[0] as f32, params.center_2d[1] as f32];
+        self.center = [
+            params.settings.center_2d[0] as f32,
+            params.settings.center_2d[1] as f32,
+        ];
         // ARC-001: zoom_2d is f64 CPU-side; the GPU uniform stays f32 (casting here at
         // the boundary). The f32 GPU zoom is the remaining precision limiter; the
         // double-float center (hi/lo) is what actually extends the on-GPU ceiling.
-        self.zoom = params.zoom_2d as f32;
+        self.zoom = params.settings.zoom_2d as f32;
         self.aspect_ratio[0] = camera.aspect;
 
         // High-precision center: split f64 into (hi, lo) pair.
@@ -296,13 +299,13 @@ impl Uniforms {
         // ~10–20× slower — drop the constant toward ~1e3 only if perf regresses at
         // moderate zoom and the derived criterion is not yet plumbed.
         const HP_ZOOM_THRESHOLD: f64 = 1e4;
-        let use_high_precision = params.zoom_2d > HP_ZOOM_THRESHOLD;
+        let use_high_precision = params.settings.zoom_2d > HP_ZOOM_THRESHOLD;
         self.high_precision = if use_high_precision { 1 } else { 0 };
 
         // Split center coordinates into double-float pairs
         // hi = value as f32, lo = (value - hi as f64) as f32
-        let center_x = params.center_2d[0];
-        let center_y = params.center_2d[1];
+        let center_x = params.settings.center_2d[0];
+        let center_y = params.settings.center_2d[1];
         self.center_hi = [center_x as f32, center_y as f32];
         self.center_lo = [
             (center_x - self.center_hi[0] as f64) as f32,
@@ -315,16 +318,17 @@ impl Uniforms {
         // paid for) and floored at ≥16 to avoid blank renders at low quality.
         // 2D-only: 3D ray-march cost is dominated by `max_steps`, not iters.
         let q = params.effective_quality();
-        if params.render_mode == crate::fractal::RenderMode::TwoD {
-            let zoom_bonus = (params.zoom_2d.max(1.0).log2() * 15.0) as u32;
-            let scaled = ((params.max_iterations + zoom_bonus) as f32 * q.iteration_scale) as u32;
+        if params.settings.render_mode == crate::fractal::RenderMode::TwoD {
+            let zoom_bonus = (params.settings.zoom_2d.max(1.0).log2() * 15.0) as u32;
+            let scaled =
+                ((params.settings.max_iterations + zoom_bonus) as f32 * q.iteration_scale) as u32;
             self.max_iterations = scaled.max(16);
         } else {
-            self.max_iterations = params.max_iterations;
+            self.max_iterations = params.settings.max_iterations;
         }
-        self.julia_c = params.julia_c;
+        self.julia_c = params.settings.julia_c;
 
-        self.fractal_type = match params.fractal_type {
+        self.fractal_type = match params.settings.fractal_type {
             // 2D fractals (0-12)
             crate::fractal::FractalType::Mandelbrot2D => 0,
             crate::fractal::FractalType::Julia2D => 1,
@@ -367,12 +371,12 @@ impl Uniforms {
             crate::fractal::FractalType::Rossler3D => 37,
         };
 
-        self.render_mode = match params.render_mode {
+        self.render_mode = match params.settings.render_mode {
             RenderMode::TwoD => 0,
             RenderMode::ThreeD => 1,
         };
 
-        self.power = params.power;
+        self.power = params.settings.power;
         // ARC-008: LOD no longer mutates FractalParams. The user's slider values
         // stay authored; we merge with the LOD-active `QualityLevel` here at
         // uniform-build time. Take the *cheaper* direction on every cost axis:
@@ -382,55 +386,59 @@ impl Uniforms {
         //   - larger `ao_step_size`       → coarser AO sampling
         // This is the single place LOD quality influences the GPU.
         // (`q` was computed above, before the 2D iteration scaling.)
-        self.max_steps = params.max_steps.min(q.max_steps);
-        self.min_distance = params.min_distance.max(q.min_distance);
+        self.max_steps = params.settings.max_steps.min(q.max_steps);
+        self.min_distance = params.settings.min_distance.max(q.min_distance);
         // Pass scale parameters directly - each fractal handles them appropriately
-        self.fractal_scale = params.fractal_scale;
-        self.fractal_fold = params.fractal_fold;
-        self.fractal_min_radius = params.fractal_min_radius;
+        self.fractal_scale = params.settings.fractal_scale;
+        self.fractal_fold = params.settings.fractal_fold;
+        self.fractal_min_radius = params.settings.fractal_min_radius;
 
         // Update palette
-        for (i, color) in params.palette.colors.iter().enumerate() {
+        for (i, color) in params.settings.palette.colors.iter().enumerate() {
             self.palette[i] = [color.x, color.y, color.z, 1.0];
         }
 
         // Update procedural palette
-        self.procedural_palette_type = params.procedural_palette.shader_index();
+        self.procedural_palette_type = params.settings.procedural_palette.shader_index();
         self.procedural_brightness = [
-            params.procedural_brightness[0],
-            params.procedural_brightness[1],
-            params.procedural_brightness[2],
+            params.settings.procedural_brightness[0],
+            params.settings.procedural_brightness[1],
+            params.settings.procedural_brightness[2],
             0.0,
         ];
         self.procedural_contrast = [
-            params.procedural_contrast[0],
-            params.procedural_contrast[1],
-            params.procedural_contrast[2],
+            params.settings.procedural_contrast[0],
+            params.settings.procedural_contrast[1],
+            params.settings.procedural_contrast[2],
             0.0,
         ];
         self.procedural_frequency = [
-            params.procedural_frequency[0],
-            params.procedural_frequency[1],
-            params.procedural_frequency[2],
+            params.settings.procedural_frequency[0],
+            params.settings.procedural_frequency[1],
+            params.settings.procedural_frequency[2],
             0.0,
         ];
         self.procedural_phase = [
-            params.procedural_phase[0],
-            params.procedural_phase[1],
-            params.procedural_phase[2],
+            params.settings.procedural_phase[0],
+            params.settings.procedural_phase[1],
+            params.settings.procedural_phase[2],
             0.0,
         ];
 
-        self.ambient_occlusion = if params.ambient_occlusion { 1 } else { 0 };
+        self.ambient_occlusion = if params.settings.ambient_occlusion {
+            1
+        } else {
+            0
+        };
         // shadow_mode: 0=off,1=hard,2=soft; pass through for shader
-        self.soft_shadows = params.shadow_mode;
-        self.depth_of_field = if params.depth_of_field { 1 } else { 0 };
-        self.shading_model = match params.shading_model {
+        self.soft_shadows = params.settings.shadow_mode;
+        self.depth_of_field = if params.settings.depth_of_field { 1 } else { 0 };
+        self.shading_model = match params.settings.shading_model {
             crate::fractal::ShadingModel::BlinnPhong => 0,
             crate::fractal::ShadingModel::PBR => 1,
         };
 
-        self.color_mode = match params.color_mode {
+        self.color_mode = match params.settings.color_mode {
             crate::fractal::ColorMode::Palette => 0,
             crate::fractal::ColorMode::RaySteps => 1,
             crate::fractal::ColorMode::Normals => 2,
@@ -449,11 +457,11 @@ impl Uniforms {
             crate::fractal::ColorMode::DistanceGrayscale => 15,
         };
 
-        self.orbit_trap_scale = params.orbit_trap_scale;
-        self.palette_offset = params.palette_offset;
+        self.orbit_trap_scale = params.settings.orbit_trap_scale;
+        self.palette_offset = params.settings.palette_offset;
 
         // Convert channel sources to shader-compatible values
-        self.channel_r = match params.channel_r {
+        self.channel_r = match params.settings.channel_r {
             crate::fractal::ChannelSource::Iterations => 0,
             crate::fractal::ChannelSource::Distance => 1,
             crate::fractal::ChannelSource::PositionX => 2,
@@ -463,7 +471,7 @@ impl Uniforms {
             crate::fractal::ChannelSource::AO => 6,
             crate::fractal::ChannelSource::Constant => 7,
         };
-        self.channel_g = match params.channel_g {
+        self.channel_g = match params.settings.channel_g {
             crate::fractal::ChannelSource::Iterations => 0,
             crate::fractal::ChannelSource::Distance => 1,
             crate::fractal::ChannelSource::PositionX => 2,
@@ -473,7 +481,7 @@ impl Uniforms {
             crate::fractal::ChannelSource::AO => 6,
             crate::fractal::ChannelSource::Constant => 7,
         };
-        self.channel_b = match params.channel_b {
+        self.channel_b = match params.settings.channel_b {
             crate::fractal::ChannelSource::Iterations => 0,
             crate::fractal::ChannelSource::Distance => 1,
             crate::fractal::ChannelSource::PositionX => 2,
@@ -484,67 +492,80 @@ impl Uniforms {
             crate::fractal::ChannelSource::Constant => 7,
         };
 
-        self.roughness = params.roughness;
-        self.metallic = params.metallic;
-        self.albedo = params.albedo.into();
+        self.roughness = params.settings.roughness;
+        self.metallic = params.settings.metallic;
+        self.albedo = params.settings.albedo.into();
 
-        self.dof_focal_length = params.dof_focal_length;
-        self.dof_aperture = params.dof_aperture;
-        self.dof_samples = params.dof_samples.min(q.dof_samples);
+        self.dof_focal_length = params.settings.dof_focal_length;
+        self.dof_aperture = params.settings.dof_aperture;
+        self.dof_samples = params.settings.dof_samples.min(q.dof_samples);
         self.time = time;
-        self.light_intensity = params.light_intensity;
-        self.ambient_light = params.ambient_light;
-        self.ao_intensity = params.ao_intensity;
-        self.ao_step_size = params.ao_step_size.max(q.ao_step_size);
-        self.shadow_softness = params.shadow_softness;
-        self.shadow_max_distance = params.shadow_max_distance;
-        self.shadow_samples = params.shadow_samples.min(q.shadow_samples);
-        self.shadow_step_factor = params.shadow_step_factor.max(q.shadow_step_factor);
+        self.light_intensity = params.settings.light_intensity;
+        self.ambient_light = params.settings.ambient_light;
+        self.ao_intensity = params.settings.ao_intensity;
+        self.ao_step_size = params.settings.ao_step_size.max(q.ao_step_size);
+        self.shadow_softness = params.settings.shadow_softness;
+        self.shadow_max_distance = params.settings.shadow_max_distance;
+        self.shadow_samples = params.settings.shadow_samples.min(q.shadow_samples);
+        self.shadow_step_factor = params.settings.shadow_step_factor.max(q.shadow_step_factor);
 
-        self.light_azimuth = params.light_azimuth;
-        self.light_elevation = params.light_elevation;
+        self.light_azimuth = params.settings.light_azimuth;
+        self.light_elevation = params.settings.light_elevation;
 
-        self.show_floor = if params.show_floor { 1 } else { 0 };
-        self.floor_height = params.floor_height;
-        self.floor_color1 = params.floor_color1.into();
-        self.floor_color2 = params.floor_color2.into();
-        self.floor_reflections = if params.floor_reflections { 1 } else { 0 };
-        self.floor_reflection_strength = params.floor_reflection_strength;
+        self.show_floor = if params.settings.show_floor { 1 } else { 0 };
+        self.floor_height = params.settings.floor_height;
+        self.floor_color1 = params.settings.floor_color1.into();
+        self.floor_color2 = params.settings.floor_color2.into();
+        self.floor_reflections = if params.settings.floor_reflections {
+            1
+        } else {
+            0
+        };
+        self.floor_reflection_strength = params.settings.floor_reflection_strength;
 
-        self.use_adaptive_step = if params.use_adaptive_step { 1 } else { 0 };
-        self.fixed_step_size = params.fixed_step_size;
-        self.step_multiplier = params.step_multiplier;
-        self.max_distance = params.max_distance;
+        self.use_adaptive_step = if params.settings.use_adaptive_step {
+            1
+        } else {
+            0
+        };
+        self.fixed_step_size = params.settings.fixed_step_size;
+        self.step_multiplier = params.settings.step_multiplier;
+        self.max_distance = params.settings.max_distance;
 
-        self.fog_enabled = if params.fog_enabled { 1 } else { 0 };
-        self.fog_mode = match params.fog_mode {
+        self.fog_enabled = if params.settings.fog_enabled { 1 } else { 0 };
+        self.fog_mode = match params.settings.fog_mode {
             crate::fractal::FogMode::Linear => 0,
             crate::fractal::FogMode::Exponential => 1,
             crate::fractal::FogMode::Quadratic => 2,
         };
-        self.fog_density = params.fog_density;
-        self.fog_color = params.fog_color.into();
+        self.fog_density = params.settings.fog_density;
+        self.fog_color = params.settings.fog_color.into();
 
         // Post-processing
-        self.brightness = params.brightness;
-        self.contrast = params.contrast;
-        self.saturation = params.saturation;
-        self.hue_shift = params.hue_shift;
-        self.vignette_enabled = if params.vignette_enabled { 1 } else { 0 };
-        self.vignette_intensity = params.vignette_intensity;
-        self.vignette_radius = params.vignette_radius;
-        self.bloom_enabled = if params.bloom_enabled { 1 } else { 0 };
-        self.bloom_threshold = params.bloom_threshold;
-        self.bloom_intensity = params.bloom_intensity;
-        self.bloom_radius = params.bloom_radius;
-        self.fxaa_enabled = if params.fxaa_enabled { 1 } else { 0 };
+        self.brightness = params.settings.brightness;
+        self.contrast = params.settings.contrast;
+        self.saturation = params.settings.saturation;
+        self.hue_shift = params.settings.hue_shift;
+        self.vignette_enabled = if params.settings.vignette_enabled {
+            1
+        } else {
+            0
+        };
+        self.vignette_intensity = params.settings.vignette_intensity;
+        self.vignette_radius = params.settings.vignette_radius;
+        self.bloom_enabled = if params.settings.bloom_enabled { 1 } else { 0 };
+        self.bloom_threshold = params.settings.bloom_threshold;
+        self.bloom_intensity = params.settings.bloom_intensity;
+        self.bloom_radius = params.settings.bloom_radius;
+        self.fxaa_enabled = if params.settings.fxaa_enabled { 1 } else { 0 };
 
         // LOD debug visualization
-        let lod_enabled = params.lod_config.enabled && params.lod_config.debug_visualization;
+        let lod_enabled =
+            params.lod.lod_config.enabled && params.lod.lod_config.debug_visualization;
         self.lod_debug_enabled = if lod_enabled { 1 } else { 0 };
-        self.lod_zone1 = params.lod_config.distance_zones[0];
-        self.lod_zone2 = params.lod_config.distance_zones[1];
-        self.lod_zone3 = params.lod_config.distance_zones[2];
+        self.lod_zone1 = params.lod.lod_config.distance_zones[0];
+        self.lod_zone2 = params.lod.lod_config.distance_zones[1];
+        self.lod_zone3 = params.lod.lod_config.distance_zones[2];
     }
 
     /// Creates a new Uniforms struct populated from camera and fractal parameters.

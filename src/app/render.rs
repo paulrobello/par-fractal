@@ -69,10 +69,10 @@ impl App {
                 });
 
         // Check if we should use accumulation mode for strange attractors or Buddhabrot
-        let is_attractor = self.fractal_params.fractal_type.is_2d_attractor();
-        let is_buddhabrot = self.fractal_params.fractal_type.is_buddhabrot();
-        let use_accumulation =
-            self.fractal_params.attractor_accumulation_enabled && (is_attractor || is_buddhabrot);
+        let is_attractor = self.fractal_params.settings.fractal_type.is_2d_attractor();
+        let is_buddhabrot = self.fractal_params.settings.fractal_type.is_buddhabrot();
+        let use_accumulation = self.fractal_params.settings.attractor_accumulation_enabled
+            && (is_attractor || is_buddhabrot);
 
         // Pass 1: fractal pass (accumulation compute chain OR the standard scene render).
         if use_accumulation {
@@ -102,7 +102,7 @@ impl App {
 
                 // ARC-009: select 2D vs 3D pipeline by fractal type. Both
                 // pipelines share one layout and uniform bind group.
-                let pipeline = if self.fractal_params.fractal_type.is_3d() {
+                let pipeline = if self.fractal_params.settings.fractal_type.is_3d() {
                     &self.renderer.pipeline_3d
                 } else {
                     &self.renderer.pipeline_2d
@@ -142,6 +142,7 @@ impl App {
                 {
                     let fractal_name = self
                         .fractal_params
+                        .settings
                         .fractal_type
                         .filename_safe_name()
                         .to_string();
@@ -221,7 +222,7 @@ impl App {
     /// the encoder; this method encodes into that same encoder (the clear
     /// must precede the dispatch in the same command stream — see ARC-012).
     fn dispatch_accumulation(&mut self, encoder: &mut wgpu::CommandEncoder) {
-        let is_buddhabrot = self.fractal_params.fractal_type.is_buddhabrot();
+        let is_buddhabrot = self.fractal_params.settings.fractal_type.is_buddhabrot();
 
         // Check if texture needs recreation (None or wrong size)
         let texture_needs_recreation = match &self.renderer.accumulation_texture {
@@ -240,28 +241,28 @@ impl App {
 
         // Reset iteration counter if texture was just recreated
         if texture_needs_recreation {
-            self.fractal_params.attractor_total_iterations = 0;
+            self.fractal_params.accum.total_iterations = 0;
         }
 
         // Auto-clear when view parameters change (zoom, pan, or attractor params)
-        let view_changed = self.fractal_params.center_2d
-            != self.fractal_params.attractor_last_center
-            || self.fractal_params.zoom_2d != self.fractal_params.attractor_last_zoom
+        let view_changed = self.fractal_params.settings.center_2d
+            != self.fractal_params.accum.last_center
+            || self.fractal_params.settings.zoom_2d != self.fractal_params.accum.last_zoom
             || (!is_buddhabrot
-                && self.fractal_params.julia_c != self.fractal_params.attractor_last_julia_c);
+                && self.fractal_params.settings.julia_c != self.fractal_params.accum.last_julia_c);
 
         if view_changed {
-            self.fractal_params.attractor_pending_clear = true;
-            self.fractal_params.attractor_total_iterations = 0;
-            self.fractal_params.attractor_paused = false; // Resume accumulation on view change
+            self.fractal_params.accum.pending_clear = true;
+            self.fractal_params.accum.total_iterations = 0;
+            self.fractal_params.accum.paused = false; // Resume accumulation on view change
             // Update last values
-            self.fractal_params.attractor_last_center = self.fractal_params.center_2d;
-            self.fractal_params.attractor_last_zoom = self.fractal_params.zoom_2d;
-            self.fractal_params.attractor_last_julia_c = self.fractal_params.julia_c;
+            self.fractal_params.accum.last_center = self.fractal_params.settings.center_2d;
+            self.fractal_params.accum.last_zoom = self.fractal_params.settings.zoom_2d;
+            self.fractal_params.accum.last_julia_c = self.fractal_params.settings.julia_c;
         }
 
         // Handle clear request
-        if self.fractal_params.attractor_pending_clear {
+        if self.fractal_params.accum.pending_clear {
             if is_buddhabrot {
                 // Clear Buddhabrot buffer
                 if let Some(ref buffer) = self.renderer.buddhabrot_accumulation_buffer {
@@ -277,29 +278,32 @@ impl App {
                     );
                 }
             }
-            self.fractal_params.attractor_pending_clear = false;
-            self.fractal_params.attractor_total_iterations = 0;
+            self.fractal_params.accum.pending_clear = false;
+            self.fractal_params.accum.total_iterations = 0;
         }
 
         // Dispatch appropriate compute shader based on fractal type (only if not paused)
-        if !self.fractal_params.attractor_paused && is_buddhabrot {
+        if !self.fractal_params.accum.paused && is_buddhabrot {
             // Update Buddhabrot compute uniforms
             if let Some(ref mut compute) = self.renderer.buddhabrot_compute {
                 // Filter trajectories by minimum iteration count
                 // Short trajectories (outer glow) vs long trajectories (Buddha interior)
                 // Higher min = more Buddha detail, lower = more outer structure
-                let min_iter = (self.fractal_params.max_iterations / 10).max(20);
+                let min_iter = (self.fractal_params.settings.max_iterations / 10).max(20);
                 compute.uniforms = BuddhabrotComputeUniforms {
-                    center_x: self.fractal_params.center_2d[0] as f32,
-                    center_y: self.fractal_params.center_2d[1] as f32,
-                    zoom: self.fractal_params.zoom_2d as f32,
+                    center_x: self.fractal_params.settings.center_2d[0] as f32,
+                    center_y: self.fractal_params.settings.center_2d[1] as f32,
+                    zoom: self.fractal_params.settings.zoom_2d as f32,
                     aspect_ratio: self.renderer.size.width as f32
                         / self.renderer.size.height as f32,
                     width: self.renderer.size.width,
                     height: self.renderer.size.height,
-                    iterations_per_frame: self.fractal_params.attractor_iterations_per_frame,
-                    max_iterations: self.fractal_params.max_iterations,
-                    total_iterations: self.fractal_params.attractor_total_iterations as u32,
+                    iterations_per_frame: self
+                        .fractal_params
+                        .settings
+                        .attractor_iterations_per_frame,
+                    max_iterations: self.fractal_params.settings.max_iterations,
+                    total_iterations: self.fractal_params.accum.total_iterations as u32,
                     clear_accumulation: 0,
                     min_iterations: min_iter,
                     _padding: 0,
@@ -310,7 +314,7 @@ impl App {
                 if let Some(ref buffer) = self.renderer.buddhabrot_accumulation_buffer {
                     // Each workgroup (256 threads) tests multiple samples
                     let num_workgroups =
-                        (self.fractal_params.attractor_iterations_per_frame / 256).max(1);
+                        (self.fractal_params.settings.attractor_iterations_per_frame / 256).max(1);
                     compute.dispatch(encoder, &buffer.compute_bind_group, num_workgroups);
 
                     // Copy from atomic buffer to texture for display
@@ -337,34 +341,37 @@ impl App {
                 }
 
                 // Update total iterations counter
-                self.fractal_params.attractor_total_iterations +=
-                    self.fractal_params.attractor_iterations_per_frame as u64;
+                self.fractal_params.accum.total_iterations +=
+                    self.fractal_params.settings.attractor_iterations_per_frame as u64;
 
                 // Auto-pause when max iterations reached
-                if self.fractal_params.attractor_total_iterations
-                    >= self.fractal_params.attractor_max_iterations
+                if self.fractal_params.accum.total_iterations
+                    >= self.fractal_params.accum.max_iterations
                 {
-                    self.fractal_params.attractor_paused = true;
+                    self.fractal_params.accum.paused = true;
                 }
             }
-        } else if !self.fractal_params.attractor_paused {
+        } else if !self.fractal_params.accum.paused {
             // Update attractor compute uniforms (only if not paused)
             if let Some(ref mut compute) = self.renderer.attractor_compute {
                 compute.uniforms = AttractorComputeUniforms {
-                    param_a: self.fractal_params.julia_c[0],
-                    param_b: self.fractal_params.julia_c[1],
+                    param_a: self.fractal_params.settings.julia_c[0],
+                    param_b: self.fractal_params.settings.julia_c[1],
                     param_c: 0.0, // Could expose more params
                     param_d: 0.0,
-                    center_x: self.fractal_params.center_2d[0] as f32,
-                    center_y: self.fractal_params.center_2d[1] as f32,
-                    zoom: self.fractal_params.zoom_2d as f32,
+                    center_x: self.fractal_params.settings.center_2d[0] as f32,
+                    center_y: self.fractal_params.settings.center_2d[1] as f32,
+                    zoom: self.fractal_params.settings.zoom_2d as f32,
                     aspect_ratio: self.renderer.size.width as f32
                         / self.renderer.size.height as f32,
                     width: self.renderer.size.width,
                     height: self.renderer.size.height,
-                    iterations_per_frame: self.fractal_params.attractor_iterations_per_frame,
-                    attractor_type: self.fractal_params.fractal_type.attractor_index(),
-                    total_iterations: self.fractal_params.attractor_total_iterations as u32,
+                    iterations_per_frame: self
+                        .fractal_params
+                        .settings
+                        .attractor_iterations_per_frame,
+                    attractor_type: self.fractal_params.settings.fractal_type.attractor_index(),
+                    total_iterations: self.fractal_params.accum.total_iterations as u32,
                     clear_accumulation: 0,
                     _padding: [0; 2],
                 };
@@ -377,29 +384,29 @@ impl App {
                     // We want ~iterations_per_frame total, so dispatch (iterations / 256) / per_thread
                     // Simplify: dispatch enough to cover all iterations
                     let num_workgroups =
-                        (self.fractal_params.attractor_iterations_per_frame / 256).max(1);
+                        (self.fractal_params.settings.attractor_iterations_per_frame / 256).max(1);
                     compute.dispatch(encoder, &accum_tex.compute_bind_group, num_workgroups);
                 }
 
                 // Update total iterations counter
-                self.fractal_params.attractor_total_iterations +=
-                    self.fractal_params.attractor_iterations_per_frame as u64;
+                self.fractal_params.accum.total_iterations +=
+                    self.fractal_params.settings.attractor_iterations_per_frame as u64;
 
                 // Auto-pause when max iterations reached
-                if self.fractal_params.attractor_total_iterations
-                    >= self.fractal_params.attractor_max_iterations
+                if self.fractal_params.accum.total_iterations
+                    >= self.fractal_params.accum.max_iterations
                 {
-                    self.fractal_params.attractor_paused = true;
+                    self.fractal_params.accum.paused = true;
                 }
             }
         }
 
         // Update accumulation display uniforms with palette from fractal params
-        let palette_colors = self.fractal_params.palette.colors;
+        let palette_colors = self.fractal_params.settings.palette.colors;
         let display_uniforms = AccumulationDisplayUniforms {
-            log_scale: self.fractal_params.attractor_log_scale,
+            log_scale: self.fractal_params.settings.attractor_log_scale,
             gamma: 0.6,
-            palette_offset: self.fractal_params.palette_offset,
+            palette_offset: self.fractal_params.settings.palette_offset,
             _padding: 0.0,
             palette: [
                 [
@@ -512,7 +519,7 @@ impl App {
         // ARC-005: the three full-res Rgba16Float passes are pure waste when
         // bloom is disabled (the default) or when accumulation mode skips the
         // composite pass entirely. Gate them on `bloom_enabled && !use_accumulation`.
-        let bloom_active = self.fractal_params.bloom_enabled && !use_accumulation;
+        let bloom_active = self.fractal_params.settings.bloom_enabled && !use_accumulation;
         if bloom_active {
             // Pass 2: Extract bright pixels
             {
@@ -702,7 +709,7 @@ impl App {
                 // For accumulation mode, copy directly from scene to screen (skip composite/bloom)
                 render_pass.set_pipeline(&self.renderer.copy_pipeline);
                 render_pass.set_bind_group(0, &self.renderer.scene_bind_group, &[]);
-            } else if self.fractal_params.fxaa_enabled {
+            } else if self.fractal_params.settings.fxaa_enabled {
                 // Apply FXAA anti-aliasing to composite texture
                 render_pass.set_pipeline(&self.renderer.fxaa_pipeline);
                 render_pass.set_bind_group(0, &self.renderer.composite_final_bind_group, &[]);
@@ -806,7 +813,7 @@ impl App {
                 ctx,
                 self.camera.position,
                 self.camera.target,
-                &self.fractal_params.lod_config.distance_zones,
+                &self.fractal_params.lod.lod_config.distance_zones,
             );
             self.ui.render_performance_overlay(ctx, self.current_fps);
             #[cfg(not(target_arch = "wasm32"))]
@@ -991,16 +998,16 @@ impl App {
                 self.camera_controller
                     .point_at_target(self.camera.position, self.camera.target);
             }
-            self.fractal_params.camera_fov = bookmark.fov;
+            self.fractal_params.settings.camera_fov = bookmark.fov;
         }
 
         if reset_requested {
             self.fractal_params = FractalParams::default();
             // Reset camera to default position and settings
             self.camera.reset_to_default();
-            self.camera.fovy = self.fractal_params.camera_fov;
+            self.camera.fovy = self.fractal_params.settings.camera_fov;
             self.camera_controller
-                .set_speed(self.fractal_params.camera_speed);
+                .set_speed(self.fractal_params.settings.camera_speed);
             // Sync controller with reset camera position
             self.camera_controller
                 .point_at_target(self.camera.position, self.camera.target);
@@ -1009,7 +1016,7 @@ impl App {
 
         if reset_camera_requested {
             self.camera.reset_to_default();
-            self.camera.fovy = self.fractal_params.camera_fov;
+            self.camera.fovy = self.fractal_params.settings.camera_fov;
             // Sync controller with reset camera position
             self.camera_controller
                 .point_at_target(self.camera.position, self.camera.target);
@@ -1040,7 +1047,11 @@ impl App {
             if start_recording {
                 // Generate filename with fractal type and timestamp
                 let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
-                let fractal_name = self.fractal_params.fractal_type.filename_safe_name();
+                let fractal_name = self
+                    .fractal_params
+                    .settings
+                    .fractal_type
+                    .filename_safe_name();
                 let filename = format!(
                     "{}_{}.{}",
                     fractal_name,
@@ -1098,9 +1109,9 @@ impl App {
             self.settings_need_save = true;
 
             // Update camera parameters from fractal_params
-            self.camera.fovy = self.fractal_params.camera_fov;
+            self.camera.fovy = self.fractal_params.settings.camera_fov;
             self.camera_controller
-                .set_speed(self.fractal_params.camera_speed);
+                .set_speed(self.fractal_params.settings.camera_speed);
         }
     }
 }

@@ -109,7 +109,11 @@ impl App {
 
             // Generate filename with fractal type and timestamp
             let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
-            let fractal_name = self.fractal_params.fractal_type.filename_safe_name();
+            let fractal_name = self
+                .fractal_params
+                .settings
+                .fractal_type
+                .filename_safe_name();
             let filename = format!("{}_{}.png", fractal_name, timestamp);
 
             // Save as PNG
@@ -429,8 +433,12 @@ impl App {
 
         // Pass 1: Render fractal to scene texture
         // For strange attractors and Buddhabrot with accumulation, use the accumulation display pipeline
-        let use_accumulation = self.fractal_params.attractor_accumulation_enabled
-            && self.fractal_params.fractal_type.uses_accumulation()
+        let use_accumulation = self.fractal_params.settings.attractor_accumulation_enabled
+            && self
+                .fractal_params
+                .settings
+                .fractal_type
+                .uses_accumulation()
             && self.renderer.accumulation_display_bind_group.is_some();
 
         {
@@ -468,7 +476,7 @@ impl App {
             } else {
                 // Standard fractal rendering
                 // ARC-009: select 2D vs 3D pipeline by fractal type.
-                let pipeline = if self.fractal_params.fractal_type.is_3d() {
+                let pipeline = if self.fractal_params.settings.fractal_type.is_3d() {
                     &self.renderer.pipeline_3d
                 } else {
                     &self.renderer.pipeline_2d
@@ -708,7 +716,11 @@ impl App {
 
             // Generate filename with fractal type, resolution, and timestamp
             let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
-            let fractal_name = self.fractal_params.fractal_type.filename_safe_name();
+            let fractal_name = self
+                .fractal_params
+                .settings
+                .fractal_type
+                .filename_safe_name();
             let filename = format!("{}_{}x{}_{}.png", fractal_name, width, height, timestamp);
 
             // Save as PNG

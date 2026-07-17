@@ -372,7 +372,7 @@ pub fn render_high_resolution_web(
             multiview_mask: None,
         });
         // ARC-009: select 2D vs 3D pipeline by fractal type.
-        let pipeline = if fractal_params.fractal_type.is_3d() {
+        let pipeline = if fractal_params.settings.fractal_type.is_3d() {
             &renderer.pipeline_3d
         } else {
             &renderer.pipeline_2d

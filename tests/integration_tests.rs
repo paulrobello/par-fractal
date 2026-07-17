@@ -1,6 +1,6 @@
 use par_fractal::{
-    Camera, CameraController, ColorPalette, FractalParams, FractalType, RenderMode, ShadingModel,
-    UI,
+    Camera, CameraController, ColorPalette, FractalParams, FractalType, RenderMode, RenderSettings,
+    ShadingModel, UI,
 };
 
 #[test]
@@ -10,7 +10,7 @@ fn test_fractal_and_camera_integration() {
 
     // Switch to 3D mode
     params.switch_fractal(FractalType::Mandelbulb3D);
-    assert_eq!(params.render_mode, RenderMode::ThreeD);
+    assert_eq!(params.settings.render_mode, RenderMode::ThreeD);
 
     // Camera should be initialized properly
     assert_eq!(camera.aspect, 1280.0 / 720.0);
@@ -25,35 +25,35 @@ fn test_complete_fractal_workflow() {
     let mut params = FractalParams::default();
 
     // Start with Mandelbrot
-    assert_eq!(params.fractal_type, FractalType::Mandelbrot2D);
-    assert_eq!(params.render_mode, RenderMode::TwoD);
+    assert_eq!(params.settings.fractal_type, FractalType::Mandelbrot2D);
+    assert_eq!(params.settings.render_mode, RenderMode::TwoD);
 
     // Change palette
-    let original_palette = params.palette.name;
+    let original_palette = params.settings.palette.name;
     params.next_palette();
-    assert_ne!(params.palette.name, original_palette);
+    assert_ne!(params.settings.palette.name, original_palette);
 
     // Switch to Julia
     params.switch_fractal(FractalType::Julia2D);
-    assert_eq!(params.fractal_type, FractalType::Julia2D);
-    assert_eq!(params.render_mode, RenderMode::TwoD);
+    assert_eq!(params.settings.fractal_type, FractalType::Julia2D);
+    assert_eq!(params.settings.render_mode, RenderMode::TwoD);
 
     // Modify Julia parameters
-    params.julia_c = [-0.8, 0.156];
-    assert_eq!(params.julia_c, [-0.8, 0.156]);
+    params.settings.julia_c = [-0.8, 0.156];
+    assert_eq!(params.settings.julia_c, [-0.8, 0.156]);
 
     // Switch to 3D
     params.switch_fractal(FractalType::Mandelbulb3D);
-    assert_eq!(params.render_mode, RenderMode::ThreeD);
+    assert_eq!(params.settings.render_mode, RenderMode::ThreeD);
 
     // Enable effects
-    params.ambient_occlusion = true;
-    params.shadow_mode = 2; // Soft shadows
-    params.depth_of_field = true;
+    params.settings.ambient_occlusion = true;
+    params.settings.shadow_mode = 2; // Soft shadows
+    params.settings.depth_of_field = true;
 
-    assert!(params.ambient_occlusion);
-    assert_eq!(params.shadow_mode, 2); // Soft shadows enabled
-    assert!(params.depth_of_field);
+    assert!(params.settings.ambient_occlusion);
+    assert_eq!(params.settings.shadow_mode, 2); // Soft shadows enabled
+    assert!(params.settings.depth_of_field);
 }
 
 #[test]
@@ -86,17 +86,17 @@ fn test_palette_cycle_integration() {
     // Test cycling through all palettes
     let num_palettes = ColorPalette::ALL.len();
     for i in 0..num_palettes {
-        assert_eq!(params.palette_index, i);
+        assert_eq!(params.settings.palette_index, i);
         params.next_palette();
     }
 
     // Should wrap around
-    assert_eq!(params.palette_index, 0);
+    assert_eq!(params.settings.palette_index, 0);
 
     // Test backward cycling
     for i in (0..num_palettes).rev() {
         params.prev_palette();
-        assert_eq!(params.palette_index, i);
+        assert_eq!(params.settings.palette_index, i);
     }
 }
 
@@ -106,38 +106,41 @@ fn test_shading_model_switching() {
     params.switch_fractal(FractalType::Mandelbulb3D);
 
     // Start with PBR (default)
-    assert_eq!(params.shading_model, ShadingModel::PBR);
+    assert_eq!(params.settings.shading_model, ShadingModel::PBR);
 
     // Switch to Blinn-Phong
-    params.shading_model = ShadingModel::BlinnPhong;
-    assert_eq!(params.shading_model, ShadingModel::BlinnPhong);
+    params.settings.shading_model = ShadingModel::BlinnPhong;
+    assert_eq!(params.settings.shading_model, ShadingModel::BlinnPhong);
 
     // Modify PBR parameters
-    params.roughness = 0.7;
-    params.metallic = 0.9;
-    assert_eq!(params.roughness, 0.7);
-    assert_eq!(params.metallic, 0.9);
+    params.settings.roughness = 0.7;
+    params.settings.metallic = 0.9;
+    assert_eq!(params.settings.roughness, 0.7);
+    assert_eq!(params.settings.metallic, 0.9);
 
     // Switch back
-    params.shading_model = ShadingModel::BlinnPhong;
-    assert_eq!(params.shading_model, ShadingModel::BlinnPhong);
+    params.settings.shading_model = ShadingModel::BlinnPhong;
+    assert_eq!(params.settings.shading_model, ShadingModel::BlinnPhong);
 }
 
 #[test]
 fn test_2d_fractal_parameters() {
     let mut params = FractalParams {
-        zoom_2d: 2.0,
+        settings: RenderSettings {
+            zoom_2d: 2.0,
+            ..Default::default()
+        },
         ..Default::default()
     };
-    assert_eq!(params.zoom_2d, 2.0);
+    assert_eq!(params.settings.zoom_2d, 2.0);
 
     // Test panning
-    params.center_2d = [0.5, -0.3];
-    assert_eq!(params.center_2d, [0.5, -0.3]);
+    params.settings.center_2d = [0.5, -0.3];
+    assert_eq!(params.settings.center_2d, [0.5, -0.3]);
 
     // Test iterations
-    params.max_iterations = 512;
-    assert_eq!(params.max_iterations, 512);
+    params.settings.max_iterations = 512;
+    assert_eq!(params.settings.max_iterations, 512);
 }
 
 #[test]
@@ -146,14 +149,14 @@ fn test_3d_fractal_parameters() {
     params.switch_fractal(FractalType::Mandelbulb3D);
 
     // Test power
-    params.power = 12.0;
-    assert_eq!(params.power, 12.0);
+    params.settings.power = 12.0;
+    assert_eq!(params.settings.power, 12.0);
 
     // Test ray marching parameters
-    params.max_steps = 256;
-    params.min_distance = 0.0001;
-    assert_eq!(params.max_steps, 256);
-    assert_eq!(params.min_distance, 0.0001);
+    params.settings.max_steps = 256;
+    params.settings.min_distance = 0.0001;
+    assert_eq!(params.settings.max_steps, 256);
+    assert_eq!(params.settings.min_distance, 0.0001);
 }
 
 #[test]
@@ -161,13 +164,13 @@ fn test_depth_of_field_parameters() {
     let mut params = FractalParams::default();
     params.switch_fractal(FractalType::Mandelbulb3D);
 
-    params.depth_of_field = true;
-    params.dof_focal_length = 10.0;
-    params.dof_aperture = 0.5;
+    params.settings.depth_of_field = true;
+    params.settings.dof_focal_length = 10.0;
+    params.settings.dof_aperture = 0.5;
 
-    assert!(params.depth_of_field);
-    assert_eq!(params.dof_focal_length, 10.0);
-    assert_eq!(params.dof_aperture, 0.5);
+    assert!(params.settings.depth_of_field);
+    assert_eq!(params.settings.dof_focal_length, 10.0);
+    assert_eq!(params.settings.dof_aperture, 0.5);
 }
 
 #[test]
@@ -192,7 +195,7 @@ fn test_all_fractal_types_switchable() {
 
     for fractal_type in fractal_types {
         params.switch_fractal(fractal_type);
-        assert_eq!(params.fractal_type, fractal_type);
+        assert_eq!(params.settings.fractal_type, fractal_type);
 
         // Check that render mode is correctly set
         match fractal_type {
@@ -216,7 +219,7 @@ fn test_all_fractal_types_switchable() {
             | FractalType::Quadruptwo2D
             | FractalType::Threeply2D
             | FractalType::Buddhabrot2D => {
-                assert_eq!(params.render_mode, RenderMode::TwoD);
+                assert_eq!(params.settings.render_mode, RenderMode::TwoD);
             }
             FractalType::Mandelbulb3D
             | FractalType::MengerSponge3D
@@ -233,7 +236,7 @@ fn test_all_fractal_types_switchable() {
             | FractalType::Pickover3D
             | FractalType::Lorenz3D
             | FractalType::Rossler3D => {
-                assert_eq!(params.render_mode, RenderMode::ThreeD);
+                assert_eq!(params.settings.render_mode, RenderMode::ThreeD);
             }
         }
     }
@@ -325,24 +328,24 @@ fn test_palette_color_validity_all_palettes() {
 fn test_material_property_constraints() {
     let mut params = FractalParams::default();
     params.switch_fractal(FractalType::Mandelbulb3D);
-    params.shading_model = ShadingModel::PBR;
+    params.settings.shading_model = ShadingModel::PBR;
 
     // Test boundary values
-    params.roughness = 0.0;
-    params.metallic = 0.0;
-    assert_eq!(params.roughness, 0.0);
-    assert_eq!(params.metallic, 0.0);
+    params.settings.roughness = 0.0;
+    params.settings.metallic = 0.0;
+    assert_eq!(params.settings.roughness, 0.0);
+    assert_eq!(params.settings.metallic, 0.0);
 
-    params.roughness = 1.0;
-    params.metallic = 1.0;
-    assert_eq!(params.roughness, 1.0);
-    assert_eq!(params.metallic, 1.0);
+    params.settings.roughness = 1.0;
+    params.settings.metallic = 1.0;
+    assert_eq!(params.settings.roughness, 1.0);
+    assert_eq!(params.settings.metallic, 1.0);
 
     // Test mid values
-    params.roughness = 0.5;
-    params.metallic = 0.5;
-    assert_eq!(params.roughness, 0.5);
-    assert_eq!(params.metallic, 0.5);
+    params.settings.roughness = 0.5;
+    params.settings.metallic = 0.5;
+    assert_eq!(params.settings.roughness, 0.5);
+    assert_eq!(params.settings.metallic, 0.5);
 }
 
 #[test]
@@ -350,15 +353,15 @@ fn test_fractal_state_consistency() {
     let params = FractalParams::default();
 
     // Check that all default values are valid
-    assert!(params.zoom_2d > 0.0);
-    assert!(params.max_iterations > 0);
-    assert!(params.power > 0.0);
-    assert!(params.max_steps > 0);
-    assert!(params.min_distance > 0.0);
-    assert!(params.dof_focal_length > 0.0);
-    assert!(params.dof_aperture > 0.0);
-    assert!(params.roughness >= 0.0 && params.roughness <= 1.0);
-    assert!(params.metallic >= 0.0 && params.metallic <= 1.0);
+    assert!(params.settings.zoom_2d > 0.0);
+    assert!(params.settings.max_iterations > 0);
+    assert!(params.settings.power > 0.0);
+    assert!(params.settings.max_steps > 0);
+    assert!(params.settings.min_distance > 0.0);
+    assert!(params.settings.dof_focal_length > 0.0);
+    assert!(params.settings.dof_aperture > 0.0);
+    assert!(params.settings.roughness >= 0.0 && params.settings.roughness <= 1.0);
+    assert!(params.settings.metallic >= 0.0 && params.settings.metallic <= 1.0);
 }
 
 #[test]
@@ -367,15 +370,15 @@ fn test_render_mode_consistency() {
 
     // 2D fractals should always be in 2D mode
     params.switch_fractal(FractalType::Mandelbrot2D);
-    assert_eq!(params.render_mode, RenderMode::TwoD);
+    assert_eq!(params.settings.render_mode, RenderMode::TwoD);
 
     params.switch_fractal(FractalType::Julia2D);
-    assert_eq!(params.render_mode, RenderMode::TwoD);
+    assert_eq!(params.settings.render_mode, RenderMode::TwoD);
 
     // 3D fractals should always be in 3D mode
     params.switch_fractal(FractalType::Mandelbulb3D);
-    assert_eq!(params.render_mode, RenderMode::ThreeD);
+    assert_eq!(params.settings.render_mode, RenderMode::ThreeD);
 
     params.switch_fractal(FractalType::MengerSponge3D);
-    assert_eq!(params.render_mode, RenderMode::ThreeD);
+    assert_eq!(params.settings.render_mode, RenderMode::ThreeD);
 }

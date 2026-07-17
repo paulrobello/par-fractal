@@ -13,7 +13,7 @@ pub use toast::Toast;
 use crate::command_palette::CommandPalette;
 use crate::fractal::{
     BookmarkGallery, CameraBookmark, CustomPalette, CustomPaletteGallery, FractalParams,
-    FractalType, Preset, PresetCategory, PresetGallery, ShadingModel, UIState,
+    FractalType, Preset, PresetCategory, PresetGallery, RenderSettings, ShadingModel, UIState,
 };
 use egui::Context;
 use glam::Vec3;
@@ -216,7 +216,9 @@ pub struct UI {
     history: std::collections::VecDeque<HistoryEntry>,
     history_index: usize,
     max_history_size: usize,
-    last_saved_params: Option<FractalParams>,
+    /// ARC-015: history tracks `RenderSettings` snapshots only — transient
+    /// LOD/accumulation state is not part of the undo contract.
+    last_saved_settings: Option<RenderSettings>,
     // Camera bookmarks
     bookmark_name: String,
     bookmarks: Vec<String>,
@@ -279,7 +281,7 @@ impl UI {
             history: std::collections::VecDeque::new(),
             history_index: 0,
             max_history_size: 50,
-            last_saved_params: None,
+            last_saved_settings: None,
             bookmark_name: String::new(),
             bookmarks: BookmarkGallery::list_bookmarks().unwrap_or_default(),
             last_bookmark_list_update: web_time::Instant::now(),
@@ -460,16 +462,19 @@ impl UI {
                     if ui.add_enabled(self.can_undo(), egui::Button::new("↶ Undo"))
                         .on_hover_text("Undo last parameter change (Ctrl+Z)")
                         .clicked()
-                        && let Some(prev_params) = self.undo() {
-                            *params = prev_params;
+                        && let Some(prev_settings) = self.undo() {
+                            // ARC-015: only authored RenderSettings rolls back;
+                            // params.lod (FPS deque) and params.accum (counters,
+                            // pending-clear) are left untouched on undo/redo.
+                            params.settings = prev_settings;
                             changed = true;
                             from_history = true;  // Don't save to history
                         }
                     if ui.add_enabled(self.can_redo(), egui::Button::new("↷ Redo"))
                         .on_hover_text("Redo parameter change (Ctrl+Y)")
                         .clicked()
-                        && let Some(next_params) = self.redo() {
-                            *params = next_params;
+                        && let Some(next_settings) = self.redo() {
+                            params.settings = next_settings;
                             changed = true;
                             from_history = true;  // Don't save to history
                         }
@@ -513,46 +518,46 @@ impl UI {
                 let response = egui::CollapsingHeader::new("Fractal Type")
                     .default_open(self.ui_state.fractal_type_open)
                     .show(ui, |ui| {
-                        let old_type = params.fractal_type;
+                        let old_type = params.settings.fractal_type;
                         ui.label("2D Fractals:");
                         ui.horizontal(|ui| {
-                            ui.selectable_value(&mut params.fractal_type, FractalType::Mandelbrot2D, "Mandelbrot")
+                            ui.selectable_value(&mut params.settings.fractal_type, FractalType::Mandelbrot2D, "Mandelbrot")
                                 .on_hover_text("Classic Mandelbrot set - infinite detail fractal [1]");
-                            ui.selectable_value(&mut params.fractal_type, FractalType::Julia2D, "Julia")
+                            ui.selectable_value(&mut params.settings.fractal_type, FractalType::Julia2D, "Julia")
                                 .on_hover_text("Julia set - beautiful variations with complex parameter [2]");
                         });
                         ui.horizontal(|ui| {
-                            ui.selectable_value(&mut params.fractal_type, FractalType::Sierpinski2D, "Sierpinski Carpet")
+                            ui.selectable_value(&mut params.settings.fractal_type, FractalType::Sierpinski2D, "Sierpinski Carpet")
                                 .on_hover_text("Sierpinski carpet - recursive square pattern [3]");
-                            ui.selectable_value(&mut params.fractal_type, FractalType::SierpinskiTriangle2D, "Sierpinski Triangle")
+                            ui.selectable_value(&mut params.settings.fractal_type, FractalType::SierpinskiTriangle2D, "Sierpinski Triangle")
                                 .on_hover_text("Sierpinski triangle - classic recursive triangle pattern");
                         });
                         ui.horizontal(|ui| {
-                            ui.selectable_value(&mut params.fractal_type, FractalType::BurningShip2D, "Burning Ship")
+                            ui.selectable_value(&mut params.settings.fractal_type, FractalType::BurningShip2D, "Burning Ship")
                                 .on_hover_text("Burning Ship fractal - variant with absolute values [4]");
-                            ui.selectable_value(&mut params.fractal_type, FractalType::Tricorn2D, "Tricorn")
+                            ui.selectable_value(&mut params.settings.fractal_type, FractalType::Tricorn2D, "Tricorn")
                                 .on_hover_text("Tricorn - Mandelbrot with conjugate iteration [5]");
                         });
                         ui.horizontal(|ui| {
-                            ui.selectable_value(&mut params.fractal_type, FractalType::Phoenix2D, "Phoenix")
+                            ui.selectable_value(&mut params.settings.fractal_type, FractalType::Phoenix2D, "Phoenix")
                                 .on_hover_text("Phoenix fractal - dynamic iteration algorithm [6]");
-                            ui.selectable_value(&mut params.fractal_type, FractalType::Celtic2D, "Celtic")
+                            ui.selectable_value(&mut params.settings.fractal_type, FractalType::Celtic2D, "Celtic")
                                 .on_hover_text("Celtic fractal - alternative complex iteration [7]");
                         });
                         ui.horizontal(|ui| {
-                            ui.selectable_value(&mut params.fractal_type, FractalType::Newton2D, "Newton")
+                            ui.selectable_value(&mut params.settings.fractal_type, FractalType::Newton2D, "Newton")
                                 .on_hover_text("Newton fractal - polynomial root-finding visualization [8]");
-                            ui.selectable_value(&mut params.fractal_type, FractalType::Lyapunov2D, "Lyapunov")
+                            ui.selectable_value(&mut params.settings.fractal_type, FractalType::Lyapunov2D, "Lyapunov")
                                 .on_hover_text("Lyapunov fractal - stability diagram patterns [9]");
                         });
                         ui.horizontal(|ui| {
-                            ui.selectable_value(&mut params.fractal_type, FractalType::Nova2D, "Nova")
+                            ui.selectable_value(&mut params.settings.fractal_type, FractalType::Nova2D, "Nova")
                                 .on_hover_text("Nova fractal - Newton-Mandelbrot hybrid [0]");
-                            ui.selectable_value(&mut params.fractal_type, FractalType::Magnet2D, "Magnet")
+                            ui.selectable_value(&mut params.settings.fractal_type, FractalType::Magnet2D, "Magnet")
                                 .on_hover_text("Magnet Type 1 - physics-inspired fractal");
                         });
                         ui.horizontal(|ui| {
-                            ui.selectable_value(&mut params.fractal_type, FractalType::Collatz2D, "Collatz")
+                            ui.selectable_value(&mut params.settings.fractal_type, FractalType::Collatz2D, "Collatz")
                                 .on_hover_text("Collatz fractal - based on Collatz conjecture");
                         });
 
@@ -560,12 +565,12 @@ impl UI {
                         ui.label("2D Density Fractals:");
                         // Buddhabrot needs accumulation mode enabled
                         {
-                            let selected = params.fractal_type == FractalType::Buddhabrot2D;
+                            let selected = params.settings.fractal_type == FractalType::Buddhabrot2D;
                             if ui.selectable_label(selected, "Buddhabrot").on_hover_text("Buddhabrot - Mandelbrot escape trajectory density visualization (discovered by Melinda Green, 1993)").clicked() {
-                                params.fractal_type = FractalType::Buddhabrot2D;
-                                params.attractor_accumulation_enabled = true;
-                                params.attractor_pending_clear = true;
-                                params.attractor_total_iterations = 0;
+                                params.settings.fractal_type = FractalType::Buddhabrot2D;
+                                params.settings.attractor_accumulation_enabled = true;
+                                params.accum.pending_clear = true;
+                                params.accum.total_iterations = 0;
                                 changed = true;
                             }
                         }
@@ -574,12 +579,12 @@ impl UI {
                         ui.label("2D Strange Attractors:");
                         // Helper macro-like closure to create attractor buttons that auto-enable accumulation
                         let mut attractor_button = |ui: &mut egui::Ui, fractal: FractalType, label: &str, hover: &str| {
-                            let selected = params.fractal_type == fractal;
+                            let selected = params.settings.fractal_type == fractal;
                             if ui.selectable_label(selected, label).on_hover_text(hover).clicked() {
-                                params.fractal_type = fractal;
-                                params.attractor_accumulation_enabled = true;
-                                params.attractor_pending_clear = true;
-                                params.attractor_total_iterations = 0;
+                                params.settings.fractal_type = fractal;
+                                params.settings.attractor_accumulation_enabled = true;
+                                params.accum.pending_clear = true;
+                                params.accum.total_iterations = 0;
                                 changed = true;
                             }
                         };
@@ -599,39 +604,39 @@ impl UI {
                         ui.separator();
                         ui.label("3D Fractals:");
                         ui.horizontal(|ui| {
-                            ui.selectable_value(&mut params.fractal_type, FractalType::Mandelbulb3D, "Mandelbulb")
+                            ui.selectable_value(&mut params.settings.fractal_type, FractalType::Mandelbulb3D, "Mandelbulb")
                                 .on_hover_text("3D Mandelbrot with adjustable power [F1]");
-                            ui.selectable_value(&mut params.fractal_type, FractalType::MengerSponge3D, "Menger Sponge")
+                            ui.selectable_value(&mut params.settings.fractal_type, FractalType::MengerSponge3D, "Menger Sponge")
                                 .on_hover_text("Recursive cubic structure with infinite holes [F2]");
                         });
                         ui.horizontal(|ui| {
-                            ui.selectable_value(&mut params.fractal_type, FractalType::SierpinskiPyramid3D, "Sierpinski Pyramid")
+                            ui.selectable_value(&mut params.settings.fractal_type, FractalType::SierpinskiPyramid3D, "Sierpinski Pyramid")
                                 .on_hover_text("3D Sierpinski pyramid - recursive tetrahedron [F3]");
-                            ui.selectable_value(&mut params.fractal_type, FractalType::SierpinskiGasket3D, "Sierpinski Gasket")
+                            ui.selectable_value(&mut params.settings.fractal_type, FractalType::SierpinskiGasket3D, "Sierpinski Gasket")
                                 .on_hover_text("3D Sierpinski gasket - sphere packing structure");
                         });
                         ui.horizontal(|ui| {
-                            ui.selectable_value(&mut params.fractal_type, FractalType::JuliaSet3D, "Julia 3D")
+                            ui.selectable_value(&mut params.settings.fractal_type, FractalType::JuliaSet3D, "Julia 3D")
                                 .on_hover_text("3D Julia set with quaternion math [F4]");
-                            ui.selectable_value(&mut params.fractal_type, FractalType::Mandelbox3D, "Mandelbox")
+                            ui.selectable_value(&mut params.settings.fractal_type, FractalType::Mandelbox3D, "Mandelbox")
                                 .on_hover_text("Cubic folding fractal with sharp edges [F5]");
                         });
                         ui.horizontal(|ui| {
-                            ui.selectable_value(&mut params.fractal_type, FractalType::OctahedralIFS3D, "Octahedron IFS")
+                            ui.selectable_value(&mut params.settings.fractal_type, FractalType::OctahedralIFS3D, "Octahedron IFS")
                                 .on_hover_text("Kaleidoscopic IFS with 8-fold symmetry [F6]");
-                            ui.selectable_value(&mut params.fractal_type, FractalType::IcosahedralIFS3D, "Icosahedron IFS")
+                            ui.selectable_value(&mut params.settings.fractal_type, FractalType::IcosahedralIFS3D, "Icosahedron IFS")
                                 .on_hover_text("Kaleidoscopic IFS with 20-fold symmetry [F7]");
                         });
                         ui.horizontal(|ui| {
-                            ui.selectable_value(&mut params.fractal_type, FractalType::ApollonianGasket3D, "Apollonian Gasket")
+                            ui.selectable_value(&mut params.settings.fractal_type, FractalType::ApollonianGasket3D, "Apollonian Gasket")
                                 .on_hover_text("Beautiful sphere-packing fractal [F8]");
-                            ui.selectable_value(&mut params.fractal_type, FractalType::Kleinian3D, "Kleinian")
+                            ui.selectable_value(&mut params.settings.fractal_type, FractalType::Kleinian3D, "Kleinian")
                                 .on_hover_text("Kleinian group fractal [F9]");
                         });
                         ui.horizontal(|ui| {
-                            ui.selectable_value(&mut params.fractal_type, FractalType::HybridMandelbulbJulia3D, "Hybrid Bulb-Julia")
+                            ui.selectable_value(&mut params.settings.fractal_type, FractalType::HybridMandelbulbJulia3D, "Hybrid Bulb-Julia")
                                 .on_hover_text("Mandelbulb and Julia set hybrid [F10]");
-                            ui.selectable_value(&mut params.fractal_type, FractalType::QuaternionCubic3D, "Quaternion Cubic")
+                            ui.selectable_value(&mut params.settings.fractal_type, FractalType::QuaternionCubic3D, "Quaternion Cubic")
                                 .on_hover_text("Cubic quaternion Julia set (z³+c)");
                         });
 
@@ -639,8 +644,8 @@ impl UI {
                         // is too expensive (causes GPU timeout). Requires different rendering
                         // approach (instanced points or volumetric). See todos.md.
 
-                        if old_type != params.fractal_type {
-                            params.switch_fractal(params.fractal_type);
+                        if old_type != params.settings.fractal_type {
+                            params.switch_fractal(params.settings.fractal_type);
                             changed = true;
                         }
                     });
@@ -881,13 +886,13 @@ impl UI {
                                         // a pre/post comparison at the import site.
                                         let raw = preset.settings.clone();
                                         let clamped = FractalParams::from_settings(raw.clone());
-                                        let was_clamped = raw.max_iterations != clamped.max_iterations
-                                            || raw.max_steps != clamped.max_steps
+                                        let was_clamped = raw.max_iterations != clamped.settings.max_iterations
+                                            || raw.max_steps != clamped.settings.max_steps
                                             || raw.attractor_iterations_per_frame
-                                                != clamped.attractor_iterations_per_frame
-                                            || raw.shadow_samples != clamped.shadow_samples
-                                            || raw.dof_samples != clamped.dof_samples
-                                            || raw.zoom_2d != clamped.zoom_2d;
+                                                != clamped.settings.attractor_iterations_per_frame
+                                            || raw.shadow_samples != clamped.settings.shadow_samples
+                                            || raw.dof_samples != clamped.settings.dof_samples
+                                            || raw.zoom_2d != clamped.settings.zoom_2d;
                                         if was_clamped {
                                             self.show_toast(
                                                 "Preset values out of range were clamped"
@@ -911,7 +916,7 @@ impl UI {
                         ui.label("Color Mode:")
                             .on_hover_text("Choose how colors are applied to the fractal");
                         changed |= egui::ComboBox::from_id_salt("color_mode")
-                            .selected_text(match params.color_mode {
+                            .selected_text(match params.settings.color_mode {
                                 crate::fractal::ColorMode::Palette => "Palette",
                                 crate::fractal::ColorMode::RaySteps => "Ray Steps / Iterations",
                                 crate::fractal::ColorMode::Normals => "Normals (3D)",
@@ -931,38 +936,38 @@ impl UI {
                             })
                             .show_ui(ui, |ui| {
                                 let mut changed_local = false;
-                                changed_local |= ui.selectable_value(&mut params.color_mode, crate::fractal::ColorMode::Palette, "Palette").changed();
-                                changed_local |= ui.selectable_value(&mut params.color_mode, crate::fractal::ColorMode::RaySteps, "Ray Steps / Iterations").changed();
-                                changed_local |= ui.selectable_value(&mut params.color_mode, crate::fractal::ColorMode::Normals, "Normals (3D)").changed();
-                                changed_local |= ui.selectable_value(&mut params.color_mode, crate::fractal::ColorMode::OrbitTrapXYZ, "Orbit Trap XYZ").changed();
-                                changed_local |= ui.selectable_value(&mut params.color_mode, crate::fractal::ColorMode::OrbitTrapRadial, "Orbit Trap Radial").changed();
-                                changed_local |= ui.selectable_value(&mut params.color_mode, crate::fractal::ColorMode::WorldPosition, "World Position").changed();
-                                changed_local |= ui.selectable_value(&mut params.color_mode, crate::fractal::ColorMode::LocalPosition, "Local Position").changed();
-                                changed_local |= ui.selectable_value(&mut params.color_mode, crate::fractal::ColorMode::AmbientOcclusion, "Ambient Occlusion (3D)").changed();
-                                changed_local |= ui.selectable_value(&mut params.color_mode, crate::fractal::ColorMode::PerChannel, "Per-Channel (Custom RGB)")
+                                changed_local |= ui.selectable_value(&mut params.settings.color_mode, crate::fractal::ColorMode::Palette, "Palette").changed();
+                                changed_local |= ui.selectable_value(&mut params.settings.color_mode, crate::fractal::ColorMode::RaySteps, "Ray Steps / Iterations").changed();
+                                changed_local |= ui.selectable_value(&mut params.settings.color_mode, crate::fractal::ColorMode::Normals, "Normals (3D)").changed();
+                                changed_local |= ui.selectable_value(&mut params.settings.color_mode, crate::fractal::ColorMode::OrbitTrapXYZ, "Orbit Trap XYZ").changed();
+                                changed_local |= ui.selectable_value(&mut params.settings.color_mode, crate::fractal::ColorMode::OrbitTrapRadial, "Orbit Trap Radial").changed();
+                                changed_local |= ui.selectable_value(&mut params.settings.color_mode, crate::fractal::ColorMode::WorldPosition, "World Position").changed();
+                                changed_local |= ui.selectable_value(&mut params.settings.color_mode, crate::fractal::ColorMode::LocalPosition, "Local Position").changed();
+                                changed_local |= ui.selectable_value(&mut params.settings.color_mode, crate::fractal::ColorMode::AmbientOcclusion, "Ambient Occlusion (3D)").changed();
+                                changed_local |= ui.selectable_value(&mut params.settings.color_mode, crate::fractal::ColorMode::PerChannel, "Per-Channel (Custom RGB)")
                                     .on_hover_text("Map different data sources to R, G, and B channels independently")
                                     .changed();
                                 ui.separator();
                                 ui.label("Debug Modes:");
-                                changed_local |= ui.selectable_value(&mut params.color_mode, crate::fractal::ColorMode::DistanceField, "🔍 Distance Field")
+                                changed_local |= ui.selectable_value(&mut params.settings.color_mode, crate::fractal::ColorMode::DistanceField, "🔍 Distance Field")
                                     .on_hover_text("Visualize distance field complexity - shows ray marching step density")
                                     .changed();
-                                changed_local |= ui.selectable_value(&mut params.color_mode, crate::fractal::ColorMode::Depth, "🔍 Depth")
+                                changed_local |= ui.selectable_value(&mut params.settings.color_mode, crate::fractal::ColorMode::Depth, "🔍 Depth")
                                     .on_hover_text("Visualize distance from camera")
                                     .changed();
-                                changed_local |= ui.selectable_value(&mut params.color_mode, crate::fractal::ColorMode::Convergence, "🔍 Convergence")
+                                changed_local |= ui.selectable_value(&mut params.settings.color_mode, crate::fractal::ColorMode::Convergence, "🔍 Convergence")
                                     .on_hover_text("Visualize escape time / convergence speed")
                                     .changed();
-                                changed_local |= ui.selectable_value(&mut params.color_mode, crate::fractal::ColorMode::LightingOnly, "🔍 Lighting Only")
+                                changed_local |= ui.selectable_value(&mut params.settings.color_mode, crate::fractal::ColorMode::LightingOnly, "🔍 Lighting Only")
                                     .on_hover_text("Show only lighting without fractal coloring")
                                     .changed();
-                                changed_local |= ui.selectable_value(&mut params.color_mode, crate::fractal::ColorMode::ShadowMap, "🔍 Shadow Map")
+                                changed_local |= ui.selectable_value(&mut params.settings.color_mode, crate::fractal::ColorMode::ShadowMap, "🔍 Shadow Map")
                                     .on_hover_text("Visualize shadow values (3D)")
                                     .changed();
-                                changed_local |= ui.selectable_value(&mut params.color_mode, crate::fractal::ColorMode::CameraDistanceLOD, "🔍 Camera Distance LOD")
+                                changed_local |= ui.selectable_value(&mut params.settings.color_mode, crate::fractal::ColorMode::CameraDistanceLOD, "🔍 Camera Distance LOD")
                                     .on_hover_text("Visualize distance from camera using LOD zone colors (3D)")
                                     .changed();
-                                changed_local |= ui.selectable_value(&mut params.color_mode, crate::fractal::ColorMode::DistanceGrayscale, "🔍 Distance Grayscale")
+                                changed_local |= ui.selectable_value(&mut params.settings.color_mode, crate::fractal::ColorMode::DistanceGrayscale, "🔍 Distance Grayscale")
                                     .on_hover_text("Visualize raw distance from camera as brightness (3D)")
                                     .changed();
                                 changed_local
@@ -970,7 +975,7 @@ impl UI {
                             .inner.unwrap_or(false);
 
                         // Show color key for debug visualization modes
-                        match params.color_mode {
+                        match params.settings.color_mode {
                             crate::fractal::ColorMode::DistanceField => {
                                 ui.separator();
                                 ui.label("🔍 Color Key - Distance Field:");
@@ -1082,25 +1087,25 @@ impl UI {
                         }
 
                         // Show palette controls for modes that use the palette
-                        if params.color_mode == crate::fractal::ColorMode::Palette ||
-                           params.color_mode == crate::fractal::ColorMode::OrbitTrapXYZ ||
-                           params.color_mode == crate::fractal::ColorMode::OrbitTrapRadial {
+                        if params.settings.color_mode == crate::fractal::ColorMode::Palette ||
+                           params.settings.color_mode == crate::fractal::ColorMode::OrbitTrapXYZ ||
+                           params.settings.color_mode == crate::fractal::ColorMode::OrbitTrapRadial {
                             ui.separator();
                             // Procedural Palette Selection
                             ui.label("Procedural Palette:")
                                 .on_hover_text("Choose a mathematically-generated palette for smooth gradients");
                             changed |= egui::ComboBox::from_id_salt("procedural_palette")
-                                .selected_text(params.procedural_palette.name())
+                                .selected_text(params.settings.procedural_palette.name())
                                 .show_ui(ui, |ui| {
                                     let mut ch = false;
                                     ch |= ui.selectable_value(
-                                        &mut params.procedural_palette,
+                                        &mut params.settings.procedural_palette,
                                         crate::fractal::ProceduralPalette::None,
                                         "None (Static)"
                                     ).on_hover_text("Use the static color palette below").changed();
                                     for palette in crate::fractal::ProceduralPalette::ALL {
                                         ch |= ui.selectable_value(
-                                            &mut params.procedural_palette,
+                                            &mut params.settings.procedural_palette,
                                             *palette,
                                             palette.name()
                                         ).changed();
@@ -1110,11 +1115,11 @@ impl UI {
                                 .inner.unwrap_or(false);
 
                             // Show procedural palette preview (generate 8 sample colors)
-                            if params.procedural_palette != crate::fractal::ProceduralPalette::None {
+                            if params.settings.procedural_palette != crate::fractal::ProceduralPalette::None {
                                 ui.horizontal(|ui| {
                                     for i in 0..8 {
                                         let t = i as f32 / 7.0;
-                                        let color = get_procedural_preview_color(params.procedural_palette, t, &params.procedural_brightness, &params.procedural_contrast, &params.procedural_frequency, &params.procedural_phase);
+                                        let color = get_procedural_preview_color(params.settings.procedural_palette, t, &params.settings.procedural_brightness, &params.settings.procedural_contrast, &params.settings.procedural_frequency, &params.settings.procedural_phase);
                                         let color32 = egui::Color32::from_rgb(
                                             (color[0] * 255.0) as u8,
                                             (color[1] * 255.0) as u8,
@@ -1129,63 +1134,63 @@ impl UI {
                                 });
 
                                 // Custom palette parameters when Custom is selected
-                                if params.procedural_palette == crate::fractal::ProceduralPalette::Custom {
+                                if params.settings.procedural_palette == crate::fractal::ProceduralPalette::Custom {
                                     ui.separator();
                                     ui.label("Custom Palette Parameters:")
                                         .on_hover_text("Adjust cosine palette formula: color = a + b * cos(2π * (c * t + d))");
 
                                     ui.horizontal(|ui| {
                                         ui.label("Brightness:");
-                                        changed |= ui.add(egui::DragValue::new(&mut params.procedural_brightness[0]).speed(0.01).range(0.0..=1.0).prefix("R: ")).changed();
-                                        changed |= ui.add(egui::DragValue::new(&mut params.procedural_brightness[1]).speed(0.01).range(0.0..=1.0).prefix("G: ")).changed();
-                                        changed |= ui.add(egui::DragValue::new(&mut params.procedural_brightness[2]).speed(0.01).range(0.0..=1.0).prefix("B: ")).changed();
+                                        changed |= ui.add(egui::DragValue::new(&mut params.settings.procedural_brightness[0]).speed(0.01).range(0.0..=1.0).prefix("R: ")).changed();
+                                        changed |= ui.add(egui::DragValue::new(&mut params.settings.procedural_brightness[1]).speed(0.01).range(0.0..=1.0).prefix("G: ")).changed();
+                                        changed |= ui.add(egui::DragValue::new(&mut params.settings.procedural_brightness[2]).speed(0.01).range(0.0..=1.0).prefix("B: ")).changed();
                                     });
 
                                     ui.horizontal(|ui| {
                                         ui.label("Contrast:");
-                                        changed |= ui.add(egui::DragValue::new(&mut params.procedural_contrast[0]).speed(0.01).range(0.0..=1.0).prefix("R: ")).changed();
-                                        changed |= ui.add(egui::DragValue::new(&mut params.procedural_contrast[1]).speed(0.01).range(0.0..=1.0).prefix("G: ")).changed();
-                                        changed |= ui.add(egui::DragValue::new(&mut params.procedural_contrast[2]).speed(0.01).range(0.0..=1.0).prefix("B: ")).changed();
+                                        changed |= ui.add(egui::DragValue::new(&mut params.settings.procedural_contrast[0]).speed(0.01).range(0.0..=1.0).prefix("R: ")).changed();
+                                        changed |= ui.add(egui::DragValue::new(&mut params.settings.procedural_contrast[1]).speed(0.01).range(0.0..=1.0).prefix("G: ")).changed();
+                                        changed |= ui.add(egui::DragValue::new(&mut params.settings.procedural_contrast[2]).speed(0.01).range(0.0..=1.0).prefix("B: ")).changed();
                                     });
 
                                     ui.horizontal(|ui| {
                                         ui.label("Frequency:");
-                                        changed |= ui.add(egui::DragValue::new(&mut params.procedural_frequency[0]).speed(0.01).range(0.0..=5.0).prefix("R: ")).changed();
-                                        changed |= ui.add(egui::DragValue::new(&mut params.procedural_frequency[1]).speed(0.01).range(0.0..=5.0).prefix("G: ")).changed();
-                                        changed |= ui.add(egui::DragValue::new(&mut params.procedural_frequency[2]).speed(0.01).range(0.0..=5.0).prefix("B: ")).changed();
+                                        changed |= ui.add(egui::DragValue::new(&mut params.settings.procedural_frequency[0]).speed(0.01).range(0.0..=5.0).prefix("R: ")).changed();
+                                        changed |= ui.add(egui::DragValue::new(&mut params.settings.procedural_frequency[1]).speed(0.01).range(0.0..=5.0).prefix("G: ")).changed();
+                                        changed |= ui.add(egui::DragValue::new(&mut params.settings.procedural_frequency[2]).speed(0.01).range(0.0..=5.0).prefix("B: ")).changed();
                                     });
 
                                     ui.horizontal(|ui| {
                                         ui.label("Phase:");
-                                        changed |= ui.add(egui::DragValue::new(&mut params.procedural_phase[0]).speed(0.01).range(0.0..=1.0).prefix("R: ")).changed();
-                                        changed |= ui.add(egui::DragValue::new(&mut params.procedural_phase[1]).speed(0.01).range(0.0..=1.0).prefix("G: ")).changed();
-                                        changed |= ui.add(egui::DragValue::new(&mut params.procedural_phase[2]).speed(0.01).range(0.0..=1.0).prefix("B: ")).changed();
+                                        changed |= ui.add(egui::DragValue::new(&mut params.settings.procedural_phase[0]).speed(0.01).range(0.0..=1.0).prefix("R: ")).changed();
+                                        changed |= ui.add(egui::DragValue::new(&mut params.settings.procedural_phase[1]).speed(0.01).range(0.0..=1.0).prefix("G: ")).changed();
+                                        changed |= ui.add(egui::DragValue::new(&mut params.settings.procedural_phase[2]).speed(0.01).range(0.0..=1.0).prefix("B: ")).changed();
                                     });
                                 }
                             }
 
                             // Static Palette Selection (only shown when not using procedural)
-                            if params.procedural_palette == crate::fractal::ProceduralPalette::None {
+                            if params.settings.procedural_palette == crate::fractal::ProceduralPalette::None {
                                 ui.separator();
                                 ui.label("Static Palette:")
                                     .on_hover_text("Choose from built-in color palettes [P to cycle]");
                                 ui.horizontal(|ui| {
                                     if ui.button("◀ Previous").on_hover_text("Switch to previous palette").clicked() {
                                         params.prev_palette();
-                                        self.show_toast(format!("Palette: {}", params.palette.name));
+                                        self.show_toast(format!("Palette: {}", params.settings.palette.name));
                                         changed = true;
                                     }
-                                    ui.label(params.palette.name);
+                                    ui.label(params.settings.palette.name);
                                     if ui.button("Next ▶").on_hover_text("Switch to next palette [P]").clicked() {
                                         params.next_palette();
-                                        self.show_toast(format!("Palette: {}", params.palette.name));
+                                        self.show_toast(format!("Palette: {}", params.settings.palette.name));
                                         changed = true;
                                     }
                                 });
 
                                 // Show palette colors
                                 ui.horizontal(|ui| {
-                                    for color in &params.palette.colors {
+                                    for color in &params.settings.palette.colors {
                                         let color32 = egui::Color32::from_rgb(
                                             (color.x * 255.0) as u8,
                                             (color.y * 255.0) as u8,
@@ -1225,17 +1230,17 @@ impl UI {
                             }
 
                             // Show orbit trap scale slider for orbit trap modes
-                            if params.color_mode == crate::fractal::ColorMode::OrbitTrapXYZ ||
-                               params.color_mode == crate::fractal::ColorMode::OrbitTrapRadial {
+                            if params.settings.color_mode == crate::fractal::ColorMode::OrbitTrapXYZ ||
+                               params.settings.color_mode == crate::fractal::ColorMode::OrbitTrapRadial {
                                 ui.separator();
-                                changed |= ui.add(egui::Slider::new(&mut params.orbit_trap_scale, 0.1..=5.0)
+                                changed |= ui.add(egui::Slider::new(&mut params.settings.orbit_trap_scale, 0.1..=5.0)
                                     .text("Orbit Trap Scale"))
                                     .on_hover_text("Scale factor for orbit trap coloring - affects color variation")
                                     .changed();
                             }
 
                             // Per-Channel Controls
-                            if params.color_mode == crate::fractal::ColorMode::PerChannel {
+                            if params.settings.color_mode == crate::fractal::ColorMode::PerChannel {
                                 ui.separator();
                                 ui.label("Channel Mapping:")
                                     .on_hover_text("Map different data sources to R, G, and B channels");
@@ -1244,17 +1249,17 @@ impl UI {
                                 ui.horizontal(|ui| {
                                     ui.label("R:");
                                     changed |= egui::ComboBox::from_id_salt("channel_r")
-                                        .selected_text(format!("{:?}", params.channel_r))
+                                        .selected_text(format!("{:?}", params.settings.channel_r))
                                         .show_ui(ui, |ui| {
                                             let mut ch = false;
-                                            ch |= ui.selectable_value(&mut params.channel_r, crate::fractal::ChannelSource::Iterations, "Iterations").changed();
-                                            ch |= ui.selectable_value(&mut params.channel_r, crate::fractal::ChannelSource::Distance, "Distance").changed();
-                                            ch |= ui.selectable_value(&mut params.channel_r, crate::fractal::ChannelSource::PositionX, "Position X").changed();
-                                            ch |= ui.selectable_value(&mut params.channel_r, crate::fractal::ChannelSource::PositionY, "Position Y").changed();
-                                            ch |= ui.selectable_value(&mut params.channel_r, crate::fractal::ChannelSource::PositionZ, "Position Z").changed();
-                                            ch |= ui.selectable_value(&mut params.channel_r, crate::fractal::ChannelSource::Normal, "Normal").changed();
-                                            ch |= ui.selectable_value(&mut params.channel_r, crate::fractal::ChannelSource::AO, "AO").changed();
-                                            ch |= ui.selectable_value(&mut params.channel_r, crate::fractal::ChannelSource::Constant, "Constant (0)").changed();
+                                            ch |= ui.selectable_value(&mut params.settings.channel_r, crate::fractal::ChannelSource::Iterations, "Iterations").changed();
+                                            ch |= ui.selectable_value(&mut params.settings.channel_r, crate::fractal::ChannelSource::Distance, "Distance").changed();
+                                            ch |= ui.selectable_value(&mut params.settings.channel_r, crate::fractal::ChannelSource::PositionX, "Position X").changed();
+                                            ch |= ui.selectable_value(&mut params.settings.channel_r, crate::fractal::ChannelSource::PositionY, "Position Y").changed();
+                                            ch |= ui.selectable_value(&mut params.settings.channel_r, crate::fractal::ChannelSource::PositionZ, "Position Z").changed();
+                                            ch |= ui.selectable_value(&mut params.settings.channel_r, crate::fractal::ChannelSource::Normal, "Normal").changed();
+                                            ch |= ui.selectable_value(&mut params.settings.channel_r, crate::fractal::ChannelSource::AO, "AO").changed();
+                                            ch |= ui.selectable_value(&mut params.settings.channel_r, crate::fractal::ChannelSource::Constant, "Constant (0)").changed();
                                             ch
                                         })
                                         .inner.unwrap_or(false);
@@ -1264,17 +1269,17 @@ impl UI {
                                 ui.horizontal(|ui| {
                                     ui.label("G:");
                                     changed |= egui::ComboBox::from_id_salt("channel_g")
-                                        .selected_text(format!("{:?}", params.channel_g))
+                                        .selected_text(format!("{:?}", params.settings.channel_g))
                                         .show_ui(ui, |ui| {
                                             let mut ch = false;
-                                            ch |= ui.selectable_value(&mut params.channel_g, crate::fractal::ChannelSource::Iterations, "Iterations").changed();
-                                            ch |= ui.selectable_value(&mut params.channel_g, crate::fractal::ChannelSource::Distance, "Distance").changed();
-                                            ch |= ui.selectable_value(&mut params.channel_g, crate::fractal::ChannelSource::PositionX, "Position X").changed();
-                                            ch |= ui.selectable_value(&mut params.channel_g, crate::fractal::ChannelSource::PositionY, "Position Y").changed();
-                                            ch |= ui.selectable_value(&mut params.channel_g, crate::fractal::ChannelSource::PositionZ, "Position Z").changed();
-                                            ch |= ui.selectable_value(&mut params.channel_g, crate::fractal::ChannelSource::Normal, "Normal").changed();
-                                            ch |= ui.selectable_value(&mut params.channel_g, crate::fractal::ChannelSource::AO, "AO").changed();
-                                            ch |= ui.selectable_value(&mut params.channel_g, crate::fractal::ChannelSource::Constant, "Constant (0)").changed();
+                                            ch |= ui.selectable_value(&mut params.settings.channel_g, crate::fractal::ChannelSource::Iterations, "Iterations").changed();
+                                            ch |= ui.selectable_value(&mut params.settings.channel_g, crate::fractal::ChannelSource::Distance, "Distance").changed();
+                                            ch |= ui.selectable_value(&mut params.settings.channel_g, crate::fractal::ChannelSource::PositionX, "Position X").changed();
+                                            ch |= ui.selectable_value(&mut params.settings.channel_g, crate::fractal::ChannelSource::PositionY, "Position Y").changed();
+                                            ch |= ui.selectable_value(&mut params.settings.channel_g, crate::fractal::ChannelSource::PositionZ, "Position Z").changed();
+                                            ch |= ui.selectable_value(&mut params.settings.channel_g, crate::fractal::ChannelSource::Normal, "Normal").changed();
+                                            ch |= ui.selectable_value(&mut params.settings.channel_g, crate::fractal::ChannelSource::AO, "AO").changed();
+                                            ch |= ui.selectable_value(&mut params.settings.channel_g, crate::fractal::ChannelSource::Constant, "Constant (0)").changed();
                                             ch
                                         })
                                         .inner.unwrap_or(false);
@@ -1284,17 +1289,17 @@ impl UI {
                                 ui.horizontal(|ui| {
                                     ui.label("B:");
                                     changed |= egui::ComboBox::from_id_salt("channel_b")
-                                        .selected_text(format!("{:?}", params.channel_b))
+                                        .selected_text(format!("{:?}", params.settings.channel_b))
                                         .show_ui(ui, |ui| {
                                             let mut ch = false;
-                                            ch |= ui.selectable_value(&mut params.channel_b, crate::fractal::ChannelSource::Iterations, "Iterations").changed();
-                                            ch |= ui.selectable_value(&mut params.channel_b, crate::fractal::ChannelSource::Distance, "Distance").changed();
-                                            ch |= ui.selectable_value(&mut params.channel_b, crate::fractal::ChannelSource::PositionX, "Position X").changed();
-                                            ch |= ui.selectable_value(&mut params.channel_b, crate::fractal::ChannelSource::PositionY, "Position Y").changed();
-                                            ch |= ui.selectable_value(&mut params.channel_b, crate::fractal::ChannelSource::PositionZ, "Position Z").changed();
-                                            ch |= ui.selectable_value(&mut params.channel_b, crate::fractal::ChannelSource::Normal, "Normal").changed();
-                                            ch |= ui.selectable_value(&mut params.channel_b, crate::fractal::ChannelSource::AO, "AO").changed();
-                                            ch |= ui.selectable_value(&mut params.channel_b, crate::fractal::ChannelSource::Constant, "Constant (0)").changed();
+                                            ch |= ui.selectable_value(&mut params.settings.channel_b, crate::fractal::ChannelSource::Iterations, "Iterations").changed();
+                                            ch |= ui.selectable_value(&mut params.settings.channel_b, crate::fractal::ChannelSource::Distance, "Distance").changed();
+                                            ch |= ui.selectable_value(&mut params.settings.channel_b, crate::fractal::ChannelSource::PositionX, "Position X").changed();
+                                            ch |= ui.selectable_value(&mut params.settings.channel_b, crate::fractal::ChannelSource::PositionY, "Position Y").changed();
+                                            ch |= ui.selectable_value(&mut params.settings.channel_b, crate::fractal::ChannelSource::PositionZ, "Position Z").changed();
+                                            ch |= ui.selectable_value(&mut params.settings.channel_b, crate::fractal::ChannelSource::Normal, "Normal").changed();
+                                            ch |= ui.selectable_value(&mut params.settings.channel_b, crate::fractal::ChannelSource::AO, "AO").changed();
+                                            ch |= ui.selectable_value(&mut params.settings.channel_b, crate::fractal::ChannelSource::Constant, "Constant (0)").changed();
                                             ch
                                         })
                                         .inner.unwrap_or(false);
@@ -1379,7 +1384,7 @@ impl UI {
                                         .on_hover_text("Copy colors from the currently selected palette")
                                         .clicked() {
                                         for i in 0..8 {
-                                            self.custom_palette_colors[i] = params.palette.colors[i].to_array();
+                                            self.custom_palette_colors[i] = params.settings.palette.colors[i].to_array();
                                         }
                                     }
                                 });
@@ -1462,7 +1467,7 @@ impl UI {
                                                         && let Ok(custom_palette) = CustomPaletteGallery::load_palette(palette_name) {
                                                             // Apply the custom palette to the current params
                                                             let (_name, colors) = custom_palette.to_color_palette();
-                                                            params.palette.colors = colors;
+                                                            params.settings.palette.colors = colors;
                                                             changed = true;
                                                         }
                                                     if ui.small_button("🗑")
@@ -1488,7 +1493,7 @@ impl UI {
                     });
                 self.ui_state.color_viz_open = response.openness > 0.0;
 
-                match params.render_mode {
+                match params.settings.render_mode {
                     crate::fractal::RenderMode::TwoD => {
                         let response = egui::CollapsingHeader::new("2D Parameters")
                             .default_open(self.ui_state.params_2d_open)
@@ -1496,13 +1501,13 @@ impl UI {
                                 // Hide iterations slider for Collatz (doesn't affect it)
                                 // Hide max iterations for strange attractors (they use accumulation mode)
                                 // Buddhabrot needs higher range for max iterations
-                                if params.fractal_type != FractalType::Collatz2D && !params.fractal_type.is_2d_attractor() {
-                                    let max_iter_range = if params.fractal_type.is_buddhabrot() {
+                                if params.settings.fractal_type != FractalType::Collatz2D && !params.settings.fractal_type.is_2d_attractor() {
+                                    let max_iter_range = if params.settings.fractal_type.is_buddhabrot() {
                                         1..=10000 // Buddhabrot needs higher iterations for detail
                                     } else {
                                         1..=1024
                                     };
-                                    changed |= ui.add(egui::Slider::new(&mut params.max_iterations, max_iter_range)
+                                    changed |= ui.add(egui::Slider::new(&mut params.settings.max_iterations, max_iter_range)
                                         .text("Max Iterations")
                                         .logarithmic(true))
                                         .on_hover_text("Number of iterations before considering a point escaped\nHigher = more detail but slower")
@@ -1510,7 +1515,7 @@ impl UI {
                                 }
 
                                 // Power control for escape-time fractals
-                                if matches!(params.fractal_type,
+                                if matches!(params.settings.fractal_type,
                                     FractalType::Mandelbrot2D |
                                     FractalType::Julia2D |
                                     FractalType::BurningShip2D |
@@ -1518,51 +1523,51 @@ impl UI {
                                     FractalType::Phoenix2D |
                                     FractalType::Celtic2D
                                 ) {
-                                    changed |= ui.add(egui::Slider::new(&mut params.power, -32.0..=32.0)
+                                    changed |= ui.add(egui::Slider::new(&mut params.settings.power, -32.0..=32.0)
                                         .step_by(0.1)
                                         .text("Power"))
                                         .on_hover_text("Exponent in z^n + c formula\n2 = classic, 3+ = multi-fold symmetry\nNegative values create inverse fractals")
                                         .changed();
                                 }
 
-                                if params.fractal_type == FractalType::Julia2D {
+                                if params.settings.fractal_type == FractalType::Julia2D {
                                     ui.label("Julia Constant (C):")
                                         .on_hover_text("The complex constant used in Julia set formula");
-                                    changed |= ui.add(egui::Slider::new(&mut params.julia_c[0], -2.0..=2.0)
+                                    changed |= ui.add(egui::Slider::new(&mut params.settings.julia_c[0], -2.0..=2.0)
                                         .text("Real"))
                                         .on_hover_text("Real component of Julia constant")
                                         .changed();
-                                    changed |= ui.add(egui::Slider::new(&mut params.julia_c[1], -2.0..=2.0)
+                                    changed |= ui.add(egui::Slider::new(&mut params.settings.julia_c[1], -2.0..=2.0)
                                         .text("Imaginary"))
                                         .on_hover_text("Imaginary component of Julia constant")
                                         .changed();
                                 }
 
-                                ui.label(format!("Center: ({:.6}, {:.6})", params.center_2d[0], params.center_2d[1]))
+                                ui.label(format!("Center: ({:.6}, {:.6})", params.settings.center_2d[0], params.settings.center_2d[1]))
                                     .on_hover_text("Current view center (drag to pan)");
-                                ui.label(format!("Zoom: {:.4}", params.zoom_2d))
+                                ui.label(format!("Zoom: {:.4}", params.settings.zoom_2d))
                                     .on_hover_text("Current zoom level (scroll to zoom)");
                                 if ui.button("Reset View").on_hover_text("Reset center and zoom [R]").clicked() {
-                                    params.center_2d = [0.0, 0.0];
-                                    params.zoom_2d = 1.0;
+                                    params.settings.center_2d = [0.0, 0.0];
+                                    params.settings.zoom_2d = 1.0;
                                     changed = true;
                                 }
 
                                 // Accumulation controls for strange attractors and Buddhabrot
-                                if params.fractal_type.uses_accumulation() {
+                                if params.settings.fractal_type.uses_accumulation() {
                                     // Ensure accumulation is always enabled for these fractal types
-                                    params.attractor_accumulation_enabled = true;
+                                    params.settings.attractor_accumulation_enabled = true;
 
                                     ui.separator();
                                     ui.label("🎯 Accumulation Settings");
 
-                                    changed |= ui.add(egui::Slider::new(&mut params.attractor_iterations_per_frame, 1_000..=500_000)
+                                    changed |= ui.add(egui::Slider::new(&mut params.settings.attractor_iterations_per_frame, 1_000..=500_000)
                                         .text("Iterations/Frame")
                                         .logarithmic(true))
                                         .on_hover_text("Number of orbit iterations per frame\nLower = better FPS, Higher = faster accumulation")
                                         .changed();
 
-                                    changed |= ui.add(egui::Slider::new(&mut params.attractor_log_scale, 0.5..=6.0)
+                                    changed |= ui.add(egui::Slider::new(&mut params.settings.attractor_log_scale, 0.5..=6.0)
                                         .text("Density Scale"))
                                         .on_hover_text("Controls saturation point (hits needed for white)\n0.5 = ~30 hits, 1.0 = ~100, 2.0 = ~1000, 3.0 = ~10k, 4.0 = ~100k")
                                         .changed();
@@ -1581,29 +1586,29 @@ impl UI {
                                     };
 
                                     ui.label(format!("Total: {} / {}",
-                                        format_with_commas(params.attractor_total_iterations),
-                                        format_with_commas(params.attractor_max_iterations)));
+                                        format_with_commas(params.accum.total_iterations),
+                                        format_with_commas(params.accum.max_iterations)));
 
                                     ui.horizontal(|ui| {
                                         ui.label("Max:");
-                                        let mut max_millions = (params.attractor_max_iterations / 1_000_000) as u32;
+                                        let mut max_millions = (params.accum.max_iterations / 1_000_000) as u32;
                                         if ui.add(egui::DragValue::new(&mut max_millions)
                                             .range(1..=100)
                                             .suffix("M"))
                                             .on_hover_text("Maximum iterations before auto-pause (in millions)")
                                             .changed() {
-                                            params.attractor_max_iterations = max_millions as u64 * 1_000_000;
+                                            params.accum.max_iterations = max_millions as u64 * 1_000_000;
                                         }
                                     });
 
                                     ui.horizontal(|ui| {
-                                        let pause_text = if params.attractor_paused { "▶ Resume" } else { "⏸ Pause" };
+                                        let pause_text = if params.accum.paused { "▶ Resume" } else { "⏸ Pause" };
                                         if ui.button(pause_text).on_hover_text("Pause/resume accumulation").clicked() {
-                                            params.attractor_paused = !params.attractor_paused;
+                                            params.accum.paused = !params.accum.paused;
                                         }
                                         if ui.button("Clear").on_hover_text("Reset accumulated density").clicked() {
-                                            params.attractor_pending_clear = true;
-                                            params.attractor_total_iterations = 0;
+                                            params.accum.pending_clear = true;
+                                            params.accum.total_iterations = 0;
                                             changed = true;
                                         }
                                     });
@@ -1612,25 +1617,25 @@ impl UI {
                                     ui.separator();
                                     ui.label("🔧 Attractor Parameters");
 
-                                    match params.fractal_type {
+                                    match params.settings.fractal_type {
                                         FractalType::Hopalong2D => {
                                             // Hopalong: a, b, c parameters (range 0-10 typical)
-                                            changed |= ui.add(egui::Slider::new(&mut params.julia_c[0], -10.0..=10.0)
+                                            changed |= ui.add(egui::Slider::new(&mut params.settings.julia_c[0], -10.0..=10.0)
                                                 .text("a"))
                                                 .on_hover_text("Hopalong parameter a")
                                                 .changed();
-                                            changed |= ui.add(egui::Slider::new(&mut params.julia_c[1], -10.0..=10.0)
+                                            changed |= ui.add(egui::Slider::new(&mut params.settings.julia_c[1], -10.0..=10.0)
                                                 .text("b"))
                                                 .on_hover_text("Hopalong parameter b")
                                                 .changed();
-                                            changed |= ui.add(egui::Slider::new(&mut params.power, -10.0..=10.0)
+                                            changed |= ui.add(egui::Slider::new(&mut params.settings.power, -10.0..=10.0)
                                                 .text("c"))
                                                 .on_hover_text("Hopalong parameter c")
                                                 .changed();
                                         }
                                         FractalType::Martin2D => {
                                             // Martin: just parameter a
-                                            changed |= ui.add(egui::Slider::new(&mut params.julia_c[0], -10.0..=10.0)
+                                            changed |= ui.add(egui::Slider::new(&mut params.settings.julia_c[0], -10.0..=10.0)
                                                 .text("a"))
                                                 .on_hover_text("Martin parameter a (pi produces classic pattern)")
                                                 .changed();
@@ -1640,45 +1645,45 @@ impl UI {
                                         }
                                         FractalType::Chip2D => {
                                             // Chip: a, b, c parameters
-                                            changed |= ui.add(egui::Slider::new(&mut params.julia_c[0], -100.0..=100.0)
+                                            changed |= ui.add(egui::Slider::new(&mut params.settings.julia_c[0], -100.0..=100.0)
                                                 .text("a"))
                                                 .on_hover_text("Chip parameter a")
                                                 .changed();
-                                            changed |= ui.add(egui::Slider::new(&mut params.julia_c[1], -100.0..=100.0)
+                                            changed |= ui.add(egui::Slider::new(&mut params.settings.julia_c[1], -100.0..=100.0)
                                                 .text("b"))
                                                 .on_hover_text("Chip parameter b")
                                                 .changed();
-                                            changed |= ui.add(egui::Slider::new(&mut params.power, -100.0..=100.0)
+                                            changed |= ui.add(egui::Slider::new(&mut params.settings.power, -100.0..=100.0)
                                                 .text("c"))
                                                 .on_hover_text("Chip parameter c")
                                                 .changed();
                                         }
                                         FractalType::Quadruptwo2D => {
                                             // Quadruptwo: a, b, c parameters
-                                            changed |= ui.add(egui::Slider::new(&mut params.julia_c[0], -100.0..=100.0)
+                                            changed |= ui.add(egui::Slider::new(&mut params.settings.julia_c[0], -100.0..=100.0)
                                                 .text("a"))
                                                 .on_hover_text("Quadruptwo parameter a (default: 34)")
                                                 .changed();
-                                            changed |= ui.add(egui::Slider::new(&mut params.julia_c[1], -100.0..=100.0)
+                                            changed |= ui.add(egui::Slider::new(&mut params.settings.julia_c[1], -100.0..=100.0)
                                                 .text("b"))
                                                 .on_hover_text("Quadruptwo parameter b (default: 1)")
                                                 .changed();
-                                            changed |= ui.add(egui::Slider::new(&mut params.power, -100.0..=100.0)
+                                            changed |= ui.add(egui::Slider::new(&mut params.settings.power, -100.0..=100.0)
                                                 .text("c"))
                                                 .on_hover_text("Quadruptwo parameter c (default: 5)")
                                                 .changed();
                                         }
                                         FractalType::Threeply2D => {
                                             // Threeply: a, b, c parameters
-                                            changed |= ui.add(egui::Slider::new(&mut params.julia_c[0], -100.0..=100.0)
+                                            changed |= ui.add(egui::Slider::new(&mut params.settings.julia_c[0], -100.0..=100.0)
                                                 .text("a"))
                                                 .on_hover_text("Threeply parameter a (default: -55)")
                                                 .changed();
-                                            changed |= ui.add(egui::Slider::new(&mut params.julia_c[1], -100.0..=100.0)
+                                            changed |= ui.add(egui::Slider::new(&mut params.settings.julia_c[1], -100.0..=100.0)
                                                 .text("b"))
                                                 .on_hover_text("Threeply parameter b (default: -1)")
                                                 .changed();
-                                            changed |= ui.add(egui::Slider::new(&mut params.power, -100.0..=100.0)
+                                            changed |= ui.add(egui::Slider::new(&mut params.settings.power, -100.0..=100.0)
                                                 .text("c"))
                                                 .on_hover_text("Threeply parameter c (default: -42)")
                                                 .changed();
@@ -1688,9 +1693,9 @@ impl UI {
 
                                     // Reset to defaults button
                                     if ui.button("Reset Parameters").on_hover_text("Reset attractor parameters to defaults").clicked() {
-                                        params.switch_fractal(params.fractal_type);
-                                        params.attractor_pending_clear = true;
-                                        params.attractor_total_iterations = 0;
+                                        params.switch_fractal(params.settings.fractal_type);
+                                        params.accum.pending_clear = true;
+                                        params.accum.total_iterations = 0;
                                         changed = true;
                                     }
                                 }
@@ -1704,52 +1709,52 @@ impl UI {
                                 // Scale control for all 3D fractals
                                 ui.label("Fractal Shape:")
                                     .on_hover_text("Control the size and proportions of the fractal");
-                                changed |= ui.add(egui::Slider::new(&mut params.fractal_scale, 0.5..=5.0)
+                                changed |= ui.add(egui::Slider::new(&mut params.settings.fractal_scale, 0.5..=5.0)
                                     .text("Scale"))
                                     .on_hover_text("Overall size of the fractal structure")
                                     .changed();
 
                                 // Mandelbulb-specific parameters
-                                if params.fractal_type == FractalType::Mandelbulb3D {
-                                    changed |= ui.add(egui::Slider::new(&mut params.power, 2.0..=16.0)
+                                if params.settings.fractal_type == FractalType::Mandelbulb3D {
+                                    changed |= ui.add(egui::Slider::new(&mut params.settings.power, 2.0..=16.0)
                                         .text("Power"))
                                         .on_hover_text("Mandelbulb power (8 is classic, higher = more detail)")
                                         .changed();
                                 }
 
                                 // Julia 3D-specific parameters
-                                if params.fractal_type == FractalType::JuliaSet3D {
+                                if params.settings.fractal_type == FractalType::JuliaSet3D {
                                     ui.label("Julia Constant (C):")
                                         .on_hover_text("Quaternion constant for 3D Julia set");
-                                    changed |= ui.add(egui::Slider::new(&mut params.julia_c[0], -2.0..=2.0)
+                                    changed |= ui.add(egui::Slider::new(&mut params.settings.julia_c[0], -2.0..=2.0)
                                         .text("Real"))
                                         .on_hover_text("Real component of quaternion constant")
                                         .changed();
-                                    changed |= ui.add(egui::Slider::new(&mut params.julia_c[1], -2.0..=2.0)
+                                    changed |= ui.add(egui::Slider::new(&mut params.settings.julia_c[1], -2.0..=2.0)
                                         .text("Imaginary"))
                                         .on_hover_text("Imaginary component of quaternion constant")
                                         .changed();
                                 }
 
                                 // Iterations control for specific 3D fractals
-                                if matches!(params.fractal_type,
+                                if matches!(params.settings.fractal_type,
                                     FractalType::MengerSponge3D |
                                     FractalType::SierpinskiPyramid3D) {
-                                    changed |= ui.add(egui::Slider::new(&mut params.max_iterations, 1..=20)
+                                    changed |= ui.add(egui::Slider::new(&mut params.settings.max_iterations, 1..=20)
                                         .text("Iterations"))
                                         .on_hover_text("Recursion depth (higher = more detail and smaller features)")
                                         .changed();
                                 }
 
-                                if params.fractal_type == FractalType::QuaternionCubic3D {
-                                    changed |= ui.add(egui::Slider::new(&mut params.max_iterations, 1..=64)
+                                if params.settings.fractal_type == FractalType::QuaternionCubic3D {
+                                    changed |= ui.add(egui::Slider::new(&mut params.settings.max_iterations, 1..=64)
                                         .text("Iterations"))
                                         .on_hover_text("Number of quaternion iterations (higher = more detail, slower)")
                                         .changed();
                                 }
 
                                 // Advanced fractal shape controls
-                                if matches!(params.fractal_type,
+                                if matches!(params.settings.fractal_type,
                                     FractalType::Mandelbox3D |
                                     FractalType::OctahedralIFS3D |
                                     FractalType::IcosahedralIFS3D |
@@ -1757,16 +1762,16 @@ impl UI {
                                     ui.separator();
                                     ui.label("Advanced Shape:")
                                         .on_hover_text("Fine-tune fractal geometry with folding parameters");
-                                    changed |= ui.add(egui::Slider::new(&mut params.fractal_fold, 0.1..=3.0)
+                                    changed |= ui.add(egui::Slider::new(&mut params.settings.fractal_fold, 0.1..=3.0)
                                         .text("Fold"))
                                         .on_hover_text("Fold strength - affects how space is bent")
                                         .changed();
 
                                     // Min Radius for fractals with sphere folding
-                                    if matches!(params.fractal_type,
+                                    if matches!(params.settings.fractal_type,
                                         FractalType::Mandelbox3D |
                                         FractalType::ApollonianGasket3D) {
-                                        changed |= ui.add(egui::Slider::new(&mut params.fractal_min_radius, 0.1..=2.0)
+                                        changed |= ui.add(egui::Slider::new(&mut params.settings.fractal_min_radius, 0.1..=2.0)
                                             .text("Min Radius"))
                                             .on_hover_text("Minimum sphere folding radius - affects inner details")
                                             .changed();
@@ -1778,34 +1783,34 @@ impl UI {
                         let response = egui::CollapsingHeader::new("Ray Marching")
                             .default_open(self.ui_state.ray_marching_open)
                             .show(ui, |ui| {
-                                changed |= ui.checkbox(&mut params.use_adaptive_step, "Adaptive Step Size")
+                                changed |= ui.checkbox(&mut params.settings.use_adaptive_step, "Adaptive Step Size")
                                     .on_hover_text("Use distance field for step size (recommended)\nDisable for fixed steps")
                                     .changed();
 
-                                if params.use_adaptive_step {
-                                    changed |= ui.add(egui::Slider::new(&mut params.step_multiplier, 0.1..=2.0)
+                                if params.settings.use_adaptive_step {
+                                    changed |= ui.add(egui::Slider::new(&mut params.settings.step_multiplier, 0.1..=2.0)
                                         .text("Step Multiplier"))
                                         .on_hover_text("Adaptive step multiplier - lower = more accurate but slower")
                                         .changed();
                                 } else {
-                                    changed |= ui.add(egui::Slider::new(&mut params.fixed_step_size, 0.01..=0.5)
+                                    changed |= ui.add(egui::Slider::new(&mut params.settings.fixed_step_size, 0.01..=0.5)
                                         .text("Fixed Step Size"))
                                         .on_hover_text("Fixed step size in world units - smaller = more accurate")
                                         .changed();
                                 }
 
-                                changed |= ui.add(egui::Slider::new(&mut params.max_steps, 32..=512)
+                                changed |= ui.add(egui::Slider::new(&mut params.settings.max_steps, 32..=512)
                                     .text("Max Steps"))
                                     .on_hover_text("Maximum ray marching steps - higher = better quality but slower")
                                     .changed();
 
-                                changed |= ui.add(egui::Slider::new(&mut params.min_distance, 0.0001..=0.01)
+                                changed |= ui.add(egui::Slider::new(&mut params.settings.min_distance, 0.0001..=0.01)
                                     .text("Min Distance")
                                     .logarithmic(true))
                                     .on_hover_text("Distance threshold for surface hit detection\nSmaller = finer details")
                                     .changed();
 
-                                changed |= ui.add(egui::Slider::new(&mut params.max_distance, 10.0..=200.0)
+                                changed |= ui.add(egui::Slider::new(&mut params.settings.max_distance, 10.0..=200.0)
                                     .text("Max Distance"))
                                     .on_hover_text("Maximum ray marching distance before giving up")
                                     .changed();
@@ -1815,7 +1820,7 @@ impl UI {
                         let response = egui::CollapsingHeader::new("Camera")
                             .default_open(self.ui_state.camera_open)
                             .show(ui, |ui| {
-                                changed |= ui.add(egui::Slider::new(&mut params.camera_speed, 0.1..=10.0)
+                                changed |= ui.add(egui::Slider::new(&mut params.settings.camera_speed, 0.1..=10.0)
                                     .text("Movement Speed"))
                                     .on_hover_text("Camera movement speed for WASD controls")
                                     .changed();
@@ -1826,25 +1831,25 @@ impl UI {
                                     if ui.small_button("Slow")
                                         .on_hover_text("Set camera speed to 1.0")
                                         .clicked() {
-                                        params.camera_speed = 1.0;
+                                        params.settings.camera_speed = 1.0;
                                         changed = true;
                                     }
                                     if ui.small_button("Normal")
                                         .on_hover_text("Set camera speed to 3.0")
                                         .clicked() {
-                                        params.camera_speed = 3.0;
+                                        params.settings.camera_speed = 3.0;
                                         changed = true;
                                     }
                                     if ui.small_button("Fast")
                                         .on_hover_text("Set camera speed to 6.0")
                                         .clicked() {
-                                        params.camera_speed = 6.0;
+                                        params.settings.camera_speed = 6.0;
                                         changed = true;
                                     }
                                 });
 
                                 ui.add_space(5.0);
-                                changed |= ui.add(egui::Slider::new(&mut params.camera_fov, 20.0..=120.0)
+                                changed |= ui.add(egui::Slider::new(&mut params.settings.camera_fov, 20.0..=120.0)
                                     .text("Field of View (FOV)"))
                                     .on_hover_text("Camera field of view in degrees\n45° = normal, higher = wide angle")
                                     .changed();
@@ -1855,19 +1860,19 @@ impl UI {
                                     if ui.small_button("Wide")
                                         .on_hover_text("Set FOV to 90° (wide angle)")
                                         .clicked() {
-                                        params.camera_fov = 90.0;
+                                        params.settings.camera_fov = 90.0;
                                         changed = true;
                                     }
                                     if ui.small_button("Normal")
                                         .on_hover_text("Set FOV to 45° (normal)")
                                         .clicked() {
-                                        params.camera_fov = 45.0;
+                                        params.settings.camera_fov = 45.0;
                                         changed = true;
                                     }
                                     if ui.small_button("Tele")
                                         .on_hover_text("Set FOV to 30° (telephoto/zoomed)")
                                         .clicked() {
-                                        params.camera_fov = 30.0;
+                                        params.settings.camera_fov = 30.0;
                                         changed = true;
                                     }
                                 });
@@ -1875,11 +1880,11 @@ impl UI {
                                 ui.separator();
                                 ui.label("Auto Orbit:")
                                     .on_hover_text("Automatically rotate camera around the fractal [O]");
-                                changed |= ui.checkbox(&mut params.auto_orbit, "Enable Auto Orbit")
+                                changed |= ui.checkbox(&mut params.settings.auto_orbit, "Enable Auto Orbit")
                                     .on_hover_text("Toggle auto-orbit mode [O]")
                                     .changed();
-                                if params.auto_orbit {
-                                    changed |= ui.add(egui::Slider::new(&mut params.orbit_speed, 0.1..=3.0)
+                                if params.settings.auto_orbit {
+                                    changed |= ui.add(egui::Slider::new(&mut params.settings.orbit_speed, 0.1..=3.0)
                                         .text("Orbit Speed"))
                                         .on_hover_text("Rotation speed in auto-orbit mode [ and ] to adjust")
                                         .changed();
@@ -1924,7 +1929,7 @@ impl UI {
                                         self.bookmark_name.clone(),
                                         camera_pos,
                                         camera_target,
-                                        params.camera_fov,
+                                        params.settings.camera_fov,
                                     );
 
                                     // Sanitize filename
@@ -1987,22 +1992,22 @@ impl UI {
                         let response = egui::CollapsingHeader::new("Shading")
                             .default_open(self.ui_state.shading_open)
                             .show(ui, |ui| {
-                                changed |= ui.radio_value(&mut params.shading_model, ShadingModel::BlinnPhong, "Blinn-Phong")
+                                changed |= ui.radio_value(&mut params.settings.shading_model, ShadingModel::BlinnPhong, "Blinn-Phong")
                                     .on_hover_text("Classic Blinn-Phong shading - fast and simple")
                                     .changed();
-                                changed |= ui.radio_value(&mut params.shading_model, ShadingModel::PBR, "PBR")
+                                changed |= ui.radio_value(&mut params.settings.shading_model, ShadingModel::PBR, "PBR")
                                     .on_hover_text("Physically Based Rendering - more realistic materials")
                                     .changed();
 
-                                if params.shading_model == ShadingModel::PBR {
+                                if params.settings.shading_model == ShadingModel::PBR {
                                     ui.separator();
                                     ui.label("Material Properties:")
                                         .on_hover_text("Control surface appearance with PBR");
-                                    changed |= ui.add(egui::Slider::new(&mut params.roughness, 0.0..=1.0)
+                                    changed |= ui.add(egui::Slider::new(&mut params.settings.roughness, 0.0..=1.0)
                                         .text("Roughness"))
                                         .on_hover_text("Surface roughness: 0 = smooth/shiny, 1 = rough/matte")
                                         .changed();
-                                    changed |= ui.add(egui::Slider::new(&mut params.metallic, 0.0..=1.0)
+                                    changed |= ui.add(egui::Slider::new(&mut params.settings.metallic, 0.0..=1.0)
                                         .text("Metallic"))
                                         .on_hover_text("Metalness: 0 = dielectric, 1 = metal")
                                         .changed();
@@ -2015,11 +2020,11 @@ impl UI {
                             .show(ui, |ui| {
                                 ui.label("Light Settings:")
                                     .on_hover_text("Configure lighting intensity and ambience");
-                                changed |= ui.add(egui::Slider::new(&mut params.light_intensity, 0.5..=10.0)
+                                changed |= ui.add(egui::Slider::new(&mut params.settings.light_intensity, 0.5..=10.0)
                                     .text("Light Intensity"))
                                     .on_hover_text("Brightness of the main directional light")
                                     .changed();
-                                changed |= ui.add(egui::Slider::new(&mut params.ambient_light, 0.0..=1.0)
+                                changed |= ui.add(egui::Slider::new(&mut params.settings.ambient_light, 0.0..=1.0)
                                     .text("Ambient Light"))
                                     .on_hover_text("Base illumination level - prevents pure black shadows")
                                     .changed();
@@ -2027,11 +2032,11 @@ impl UI {
                                 ui.separator();
                                 ui.label("Light Direction:")
                                     .on_hover_text("Control the direction of the main light");
-                                changed |= ui.add(egui::Slider::new(&mut params.light_azimuth, 0.0..=360.0)
+                                changed |= ui.add(egui::Slider::new(&mut params.settings.light_azimuth, 0.0..=360.0)
                                     .text("Azimuth"))
                                     .on_hover_text("Horizontal angle of the light (0-360°)")
                                     .changed();
-                                changed |= ui.add(egui::Slider::new(&mut params.light_elevation, 5.0..=90.0)
+                                changed |= ui.add(egui::Slider::new(&mut params.settings.light_elevation, 5.0..=90.0)
                                     .text("Elevation"))
                                     .on_hover_text("Vertical angle of the light (5-90°, where 90° is directly above)")
                                     .changed();
@@ -2043,45 +2048,45 @@ impl UI {
                                     ui.label("Shadows [B]:");
                                     let shadow_names = ["Off", "Hard", "Soft"];
                                     egui::ComboBox::from_id_salt("shadow_mode")
-                                        .selected_text(shadow_names[params.shadow_mode as usize])
+                                        .selected_text(shadow_names[params.settings.shadow_mode as usize])
                                         .show_ui(ui, |ui| {
                                             for (i, name) in shadow_names.iter().enumerate() {
-                                                if ui.selectable_value(&mut params.shadow_mode, i as u32, *name).changed() {
+                                                if ui.selectable_value(&mut params.settings.shadow_mode, i as u32, *name).changed() {
                                                     changed = true;
                                                 }
                                             }
                                         });
                                 });
-                                if params.shadow_mode > 0 {
-                                    changed |= ui.add(egui::Slider::new(&mut params.shadow_max_distance, 1.0..=20.0)
+                                if params.settings.shadow_mode > 0 {
+                                    changed |= ui.add(egui::Slider::new(&mut params.settings.shadow_max_distance, 1.0..=20.0)
                                         .text("Shadow Distance"))
                                         .on_hover_text("Maximum distance for shadow ray marching")
                                         .changed();
-                                    changed |= ui.add(egui::Slider::new(&mut params.shadow_samples, 32..=256)
+                                    changed |= ui.add(egui::Slider::new(&mut params.settings.shadow_samples, 32..=256)
                                         .text("Shadow Samples"))
                                         .on_hover_text("Number of ray marching steps for shadows - higher = more accurate but slower")
                                         .changed();
-                                    changed |= ui.add(egui::Slider::new(&mut params.shadow_step_factor, 0.3..=1.0)
+                                    changed |= ui.add(egui::Slider::new(&mut params.settings.shadow_step_factor, 0.3..=1.0)
                                         .text("Shadow Accuracy"))
                                         .on_hover_text("Step size factor for shadow rays - lower = more accurate but slower (0.6 is good default)")
                                         .changed();
                                 }
-                                if params.shadow_mode == 2 {
-                                    changed |= ui.add(egui::Slider::new(&mut params.shadow_softness, 1.0..=32.0)
+                                if params.settings.shadow_mode == 2 {
+                                    changed |= ui.add(egui::Slider::new(&mut params.settings.shadow_softness, 1.0..=32.0)
                                         .text("Shadow Softness"))
                                         .on_hover_text("Shadow penumbra softness - higher = softer edges")
                                         .changed();
                                 }
 
-                                changed |= ui.checkbox(&mut params.ambient_occlusion, "Ambient Occlusion")
+                                changed |= ui.checkbox(&mut params.settings.ambient_occlusion, "Ambient Occlusion")
                                     .on_hover_text("Enable ambient occlusion for contact shadows [L]")
                                     .changed();
-                                if params.ambient_occlusion {
-                                    changed |= ui.add(egui::Slider::new(&mut params.ao_intensity, 0.0..=10.0)
+                                if params.settings.ambient_occlusion {
+                                    changed |= ui.add(egui::Slider::new(&mut params.settings.ao_intensity, 0.0..=10.0)
                                         .text("AO Intensity"))
                                         .on_hover_text("Strength of ambient occlusion darkening")
                                         .changed();
-                                    changed |= ui.add(egui::Slider::new(&mut params.ao_step_size, 0.01..=0.5)
+                                    changed |= ui.add(egui::Slider::new(&mut params.settings.ao_step_size, 0.01..=0.5)
                                         .text("AO Step Size"))
                                         .on_hover_text("Step size for AO sampling - smaller = finer detail")
                                         .changed();
@@ -2092,64 +2097,64 @@ impl UI {
                         let response = egui::CollapsingHeader::new("Effects")
                             .default_open(self.ui_state.effects_open)
                             .show(ui, |ui| {
-                                changed |= ui.checkbox(&mut params.depth_of_field, "Depth of Field")
+                                changed |= ui.checkbox(&mut params.settings.depth_of_field, "Depth of Field")
                                     .on_hover_text("Blur based on distance from focus [T]")
                                     .changed();
 
-                                if params.depth_of_field {
-                                    changed |= ui.add(egui::Slider::new(&mut params.dof_focal_length, 1.0..=20.0)
+                                if params.settings.depth_of_field {
+                                    changed |= ui.add(egui::Slider::new(&mut params.settings.dof_focal_length, 1.0..=20.0)
                                         .text("Focal Length"))
                                         .on_hover_text("Distance to the focus plane - objects at this distance are sharp")
                                         .changed();
-                                    changed |= ui.add(egui::Slider::new(&mut params.dof_aperture, 0.01..=1.0)
+                                    changed |= ui.add(egui::Slider::new(&mut params.settings.dof_aperture, 0.01..=1.0)
                                         .text("Aperture"))
                                         .on_hover_text("Aperture size - larger = more blur, smaller = sharper")
                                         .changed();
-                                    changed |= ui.add(egui::Slider::new(&mut params.dof_samples, 1..=16)
+                                    changed |= ui.add(egui::Slider::new(&mut params.settings.dof_samples, 1..=16)
                                         .text("Samples (quality vs speed)"))
                                         .on_hover_text("Number of samples per pixel - higher = smoother but slower")
                                         .changed();
                                 }
 
                                 ui.separator();
-                                changed |= ui.checkbox(&mut params.fog_enabled, "Fog")
+                                changed |= ui.checkbox(&mut params.settings.fog_enabled, "Fog")
                                     .on_hover_text("Add atmospheric fog effect")
                                     .changed();
 
-                                if params.fog_enabled {
+                                if params.settings.fog_enabled {
                                     changed |= egui::ComboBox::from_id_salt("fog_mode")
-                                        .selected_text(match params.fog_mode {
+                                        .selected_text(match params.settings.fog_mode {
                                             crate::fractal::FogMode::Linear => "Linear",
                                             crate::fractal::FogMode::Exponential => "Exponential",
                                             crate::fractal::FogMode::Quadratic => "Quadratic",
                                         })
                                         .show_ui(ui, |ui| {
                                             let mut changed_local = false;
-                                            changed_local |= ui.selectable_value(&mut params.fog_mode, crate::fractal::FogMode::Linear, "Linear")
+                                            changed_local |= ui.selectable_value(&mut params.settings.fog_mode, crate::fractal::FogMode::Linear, "Linear")
                                                 .on_hover_text("Linear fog falloff")
                                                 .changed();
-                                            changed_local |= ui.selectable_value(&mut params.fog_mode, crate::fractal::FogMode::Exponential, "Exponential")
+                                            changed_local |= ui.selectable_value(&mut params.settings.fog_mode, crate::fractal::FogMode::Exponential, "Exponential")
                                                 .on_hover_text("Exponential fog falloff - more realistic")
                                                 .changed();
-                                            changed_local |= ui.selectable_value(&mut params.fog_mode, crate::fractal::FogMode::Quadratic, "Quadratic")
+                                            changed_local |= ui.selectable_value(&mut params.settings.fog_mode, crate::fractal::FogMode::Quadratic, "Quadratic")
                                                 .on_hover_text("Quadratic fog falloff - dense atmosphere")
                                                 .changed();
                                             changed_local
                                         })
                                         .inner.unwrap_or(false);
 
-                                    changed |= ui.add(egui::Slider::new(&mut params.fog_density, 0.0..=0.2)
+                                    changed |= ui.add(egui::Slider::new(&mut params.settings.fog_density, 0.0..=0.2)
                                         .text("Fog Density"))
                                         .on_hover_text("How thick the fog is - higher = denser")
                                         .changed();
 
                                     ui.label("Fog Color:")
                                         .on_hover_text("Color of the fog");
-                                    let mut fog_color = [params.fog_color.x, params.fog_color.y, params.fog_color.z];
+                                    let mut fog_color = [params.settings.fog_color.x, params.settings.fog_color.y, params.settings.fog_color.z];
                                     if ui.color_edit_button_rgb(&mut fog_color)
                                         .on_hover_text("Click to change fog color")
                                         .changed() {
-                                        params.fog_color = glam::Vec3::from_array(fog_color);
+                                        params.settings.fog_color = glam::Vec3::from_array(fog_color);
                                         changed = true;
                                     }
                                 }
@@ -2162,19 +2167,19 @@ impl UI {
                                 // Color Grading
                                 ui.label("Color Grading:")
                                     .on_hover_text("Adjust the overall look and color of the image");
-                                changed |= ui.add(egui::Slider::new(&mut params.brightness, 0.0..=2.0)
+                                changed |= ui.add(egui::Slider::new(&mut params.settings.brightness, 0.0..=2.0)
                                     .text("Brightness"))
                                     .on_hover_text("Overall image brightness (1.0 = normal)")
                                     .changed();
-                                changed |= ui.add(egui::Slider::new(&mut params.contrast, 0.0..=2.0)
+                                changed |= ui.add(egui::Slider::new(&mut params.settings.contrast, 0.0..=2.0)
                                     .text("Contrast"))
                                     .on_hover_text("Contrast between light and dark areas (1.0 = normal)")
                                     .changed();
-                                changed |= ui.add(egui::Slider::new(&mut params.saturation, 0.0..=2.0)
+                                changed |= ui.add(egui::Slider::new(&mut params.settings.saturation, 0.0..=2.0)
                                     .text("Saturation"))
                                     .on_hover_text("Color intensity (0.0 = grayscale, 1.0 = normal, 2.0 = vivid)")
                                     .changed();
-                                changed |= ui.add(egui::Slider::new(&mut params.hue_shift, -1.0..=1.0)
+                                changed |= ui.add(egui::Slider::new(&mut params.settings.hue_shift, -1.0..=1.0)
                                     .text("Hue Shift"))
                                     .on_hover_text("Shift colors around the color wheel (-1.0 to 1.0)")
                                     .changed();
@@ -2182,15 +2187,15 @@ impl UI {
                                 ui.separator();
 
                                 // Vignette
-                                changed |= ui.checkbox(&mut params.vignette_enabled, "Vignette")
+                                changed |= ui.checkbox(&mut params.settings.vignette_enabled, "Vignette")
                                     .on_hover_text("Darken the edges of the image")
                                     .changed();
-                                if params.vignette_enabled {
-                                    changed |= ui.add(egui::Slider::new(&mut params.vignette_intensity, 0.0..=1.0)
+                                if params.settings.vignette_enabled {
+                                    changed |= ui.add(egui::Slider::new(&mut params.settings.vignette_intensity, 0.0..=1.0)
                                         .text("Vignette Intensity"))
                                         .on_hover_text("How dark the edges become (0.0 = no effect, 1.0 = very dark)")
                                         .changed();
-                                    changed |= ui.add(egui::Slider::new(&mut params.vignette_radius, 0.1..=2.0)
+                                    changed |= ui.add(egui::Slider::new(&mut params.settings.vignette_radius, 0.1..=2.0)
                                         .text("Vignette Radius"))
                                         .on_hover_text("Size of the vignette effect (smaller = larger dark area)")
                                         .changed();
@@ -2199,15 +2204,15 @@ impl UI {
                                 ui.separator();
 
                                 // Bloom
-                                changed |= ui.checkbox(&mut params.bloom_enabled, "Bloom")
+                                changed |= ui.checkbox(&mut params.settings.bloom_enabled, "Bloom")
                                     .on_hover_text("Glow effect around bright areas - extracts and blurs bright pixels using multi-pass rendering")
                                     .changed();
-                                if params.bloom_enabled {
-                                    changed |= ui.add(egui::Slider::new(&mut params.bloom_threshold, 0.0..=1.0)
+                                if params.settings.bloom_enabled {
+                                    changed |= ui.add(egui::Slider::new(&mut params.settings.bloom_threshold, 0.0..=1.0)
                                         .text("Threshold"))
                                         .on_hover_text("Minimum brightness for bloom (0.0 = all pixels, 1.0 = only brightest)")
                                         .changed();
-                                    changed |= ui.add(egui::Slider::new(&mut params.bloom_intensity, 0.0..=2.0)
+                                    changed |= ui.add(egui::Slider::new(&mut params.settings.bloom_intensity, 0.0..=2.0)
                                         .text("Intensity"))
                                         .on_hover_text("Strength of the bloom glow (0.3-0.8 recommended)")
                                         .changed();
@@ -2216,7 +2221,7 @@ impl UI {
                                 ui.separator();
 
                                 // FXAA Anti-aliasing
-                                changed |= ui.checkbox(&mut params.fxaa_enabled, "FXAA Anti-aliasing")
+                                changed |= ui.checkbox(&mut params.settings.fxaa_enabled, "FXAA Anti-aliasing")
                                     .on_hover_text("Fast approximate anti-aliasing to smooth jagged edges")
                                     .changed();
                             });
@@ -2225,12 +2230,12 @@ impl UI {
                         let response = egui::CollapsingHeader::new("Floor")
                             .default_open(self.ui_state.floor_open)
                             .show(ui, |ui| {
-                                changed |= ui.checkbox(&mut params.show_floor, "Show Floor")
+                                changed |= ui.checkbox(&mut params.settings.show_floor, "Show Floor")
                                     .on_hover_text("Display checkered floor plane [G]")
                                     .changed();
 
-                                if params.show_floor {
-                                    changed |= ui.add(egui::Slider::new(&mut params.floor_height, -10.0..=10.0)
+                                if params.settings.show_floor {
+                                    changed |= ui.add(egui::Slider::new(&mut params.settings.floor_height, -10.0..=10.0)
                                         .text("Floor Height"))
                                         .on_hover_text("Vertical position of the floor plane")
                                         .changed();
@@ -2239,29 +2244,29 @@ impl UI {
                                     ui.label("Floor Colors:")
                                         .on_hover_text("Checkerboard pattern colors");
 
-                                    let mut color1 = [params.floor_color1.x, params.floor_color1.y, params.floor_color1.z];
+                                    let mut color1 = [params.settings.floor_color1.x, params.settings.floor_color1.y, params.settings.floor_color1.z];
                                     if ui.color_edit_button_rgb(&mut color1)
                                         .on_hover_text("First checkerboard color")
                                         .changed() {
-                                        params.floor_color1 = glam::Vec3::from_array(color1);
+                                        params.settings.floor_color1 = glam::Vec3::from_array(color1);
                                         changed = true;
                                     }
 
-                                    let mut color2 = [params.floor_color2.x, params.floor_color2.y, params.floor_color2.z];
+                                    let mut color2 = [params.settings.floor_color2.x, params.settings.floor_color2.y, params.settings.floor_color2.z];
                                     if ui.color_edit_button_rgb(&mut color2)
                                         .on_hover_text("Second checkerboard color")
                                         .changed() {
-                                        params.floor_color2 = glam::Vec3::from_array(color2);
+                                        params.settings.floor_color2 = glam::Vec3::from_array(color2);
                                         changed = true;
                                     }
 
                                     ui.separator();
-                                    changed |= ui.checkbox(&mut params.floor_reflections, "Floor Reflections")
+                                    changed |= ui.checkbox(&mut params.settings.floor_reflections, "Floor Reflections")
                                         .on_hover_text("Enable screen-space reflections on the floor - reflects the fractal onto the floor surface with Fresnel effect")
                                         .changed();
 
-                                    if params.floor_reflections {
-                                        changed |= ui.add(egui::Slider::new(&mut params.floor_reflection_strength, 0.0..=1.0)
+                                    if params.settings.floor_reflections {
+                                        changed |= ui.add(egui::Slider::new(&mut params.settings.floor_reflection_strength, 0.0..=1.0)
                                             .text("Reflection Strength"))
                                             .on_hover_text("Adjust reflection intensity: 0.0 = no reflections, 0.5 = moderate, 1.0 = maximum reflections")
                                             .changed();
@@ -2280,37 +2285,37 @@ impl UI {
                                 ui.separator();
 
                                 // Main Controls
-                                changed |= ui.checkbox(&mut params.lod_config.enabled, "Enable LOD System")
+                                changed |= ui.checkbox(&mut params.lod.lod_config.enabled, "Enable LOD System")
                                     .on_hover_text("Enable adaptive quality adjustment (disabled by default)")
                                     .changed();
 
-                                if params.lod_config.enabled {
+                                if params.lod.lod_config.enabled {
                                     ui.separator();
 
                                     // Profile Selection
                                     ui.label("Profile:");
                                     let profile_changed = egui::ComboBox::from_id_salt("lod_profile")
-                                        .selected_text(params.lod_config.profile_name())
+                                        .selected_text(params.lod.lod_config.profile_name())
                                         .show_ui(ui, |ui| {
                                             use crate::lod::LODProfile;
                                             let mut changed_local = false;
 
-                                            changed_local |= ui.selectable_value(&mut params.lod_config.profile, LODProfile::Balanced, "Balanced")
+                                            changed_local |= ui.selectable_value(&mut params.lod.lod_config.profile, LODProfile::Balanced, "Balanced")
                                                 .on_hover_text("Good mix of quality and performance (default)")
                                                 .changed();
-                                            changed_local |= ui.selectable_value(&mut params.lod_config.profile, LODProfile::QualityFirst, "Quality First")
+                                            changed_local |= ui.selectable_value(&mut params.lod.lod_config.profile, LODProfile::QualityFirst, "Quality First")
                                                 .on_hover_text("Prioritize visual quality, less aggressive LOD")
                                                 .changed();
-                                            changed_local |= ui.selectable_value(&mut params.lod_config.profile, LODProfile::PerformanceFirst, "Performance First")
+                                            changed_local |= ui.selectable_value(&mut params.lod.lod_config.profile, LODProfile::PerformanceFirst, "Performance First")
                                                 .on_hover_text("Prioritize performance, aggressive LOD")
                                                 .changed();
-                                            changed_local |= ui.selectable_value(&mut params.lod_config.profile, LODProfile::DistanceOnly, "Distance Only")
+                                            changed_local |= ui.selectable_value(&mut params.lod.lod_config.profile, LODProfile::DistanceOnly, "Distance Only")
                                                 .on_hover_text("Only use distance-based LOD")
                                                 .changed();
-                                            changed_local |= ui.selectable_value(&mut params.lod_config.profile, LODProfile::MotionOnly, "Motion Only")
+                                            changed_local |= ui.selectable_value(&mut params.lod.lod_config.profile, LODProfile::MotionOnly, "Motion Only")
                                                 .on_hover_text("Only reduce quality during camera movement")
                                                 .changed();
-                                            changed_local |= ui.selectable_value(&mut params.lod_config.profile, LODProfile::Custom, "Custom")
+                                            changed_local |= ui.selectable_value(&mut params.lod.lod_config.profile, LODProfile::Custom, "Custom")
                                                 .on_hover_text("User-defined configuration")
                                                 .changed();
 
@@ -2319,8 +2324,8 @@ impl UI {
                                         .inner.unwrap_or(false);
 
                                     // Apply profile if changed
-                                    if profile_changed && params.lod_config.profile != crate::lod::LODProfile::Custom {
-                                        params.lod_config.apply_profile(params.lod_config.profile);
+                                    if profile_changed && params.lod.lod_config.profile != crate::lod::LODProfile::Custom {
+                                        params.lod.lod_config.apply_profile(params.lod.lod_config.profile);
                                         changed = true;
                                     }
                                     changed |= profile_changed;
@@ -2330,7 +2335,7 @@ impl UI {
                                     // Strategy Selection
                                     ui.label("Strategy:");
                                     changed |= egui::ComboBox::from_id_salt("lod_strategy")
-                                        .selected_text(match params.lod_config.strategy {
+                                        .selected_text(match params.lod.lod_config.strategy {
                                             crate::lod::LODStrategy::Distance => "Distance-based",
                                             crate::lod::LODStrategy::Motion => "Motion-based",
                                             crate::lod::LODStrategy::Performance => "Performance-based",
@@ -2338,16 +2343,16 @@ impl UI {
                                         })
                                         .show_ui(ui, |ui| {
                                             let mut changed_local = false;
-                                            changed_local |= ui.selectable_value(&mut params.lod_config.strategy, crate::lod::LODStrategy::Distance, "Distance-based")
+                                            changed_local |= ui.selectable_value(&mut params.lod.lod_config.strategy, crate::lod::LODStrategy::Distance, "Distance-based")
                                                 .on_hover_text("Reduce quality based on distance from camera")
                                                 .changed();
-                                            changed_local |= ui.selectable_value(&mut params.lod_config.strategy, crate::lod::LODStrategy::Motion, "Motion-based")
+                                            changed_local |= ui.selectable_value(&mut params.lod.lod_config.strategy, crate::lod::LODStrategy::Motion, "Motion-based")
                                                 .on_hover_text("Reduce quality during camera movement")
                                                 .changed();
-                                            changed_local |= ui.selectable_value(&mut params.lod_config.strategy, crate::lod::LODStrategy::Performance, "Performance-based")
+                                            changed_local |= ui.selectable_value(&mut params.lod.lod_config.strategy, crate::lod::LODStrategy::Performance, "Performance-based")
                                                 .on_hover_text("Adjust quality to maintain target FPS")
                                                 .changed();
-                                            changed_local |= ui.selectable_value(&mut params.lod_config.strategy, crate::lod::LODStrategy::Hybrid, "Hybrid (All)")
+                                            changed_local |= ui.selectable_value(&mut params.lod.lod_config.strategy, crate::lod::LODStrategy::Hybrid, "Hybrid (All)")
                                                 .on_hover_text("Intelligently combine all strategies")
                                                 .changed();
                                             changed_local
@@ -2355,21 +2360,21 @@ impl UI {
                                         .inner.unwrap_or(false);
 
                                     // Target FPS
-                                    changed |= ui.add(egui::Slider::new(&mut params.lod_config.target_fps, 30.0..=120.0)
+                                    changed |= ui.add(egui::Slider::new(&mut params.lod.lod_config.target_fps, 30.0..=120.0)
                                         .text("Target FPS"))
                                         .on_hover_text("Target framerate for performance-based LOD")
                                         .changed();
 
                                     // Debug Visualization
-                                    changed |= ui.checkbox(&mut params.lod_config.debug_visualization, "Debug Visualization")
+                                    changed |= ui.checkbox(&mut params.lod.lod_config.debug_visualization, "Debug Visualization")
                                         .on_hover_text("Show current LOD level and performance metrics")
                                         .changed();
 
                                     ui.separator();
 
                                     // Distance-based Controls
-                                    if params.lod_config.strategy == crate::lod::LODStrategy::Distance ||
-                                       params.lod_config.strategy == crate::lod::LODStrategy::Hybrid {
+                                    if params.lod.lod_config.strategy == crate::lod::LODStrategy::Distance ||
+                                       params.lod.lod_config.strategy == crate::lod::LODStrategy::Hybrid {
                                         ui.collapsing("Distance Zones", |ui| {
                                             ui.label("Define distance thresholds for quality levels:")
                                                 .on_hover_text("Closer = higher quality, farther = lower quality");
@@ -2380,7 +2385,7 @@ impl UI {
                                             ui.horizontal(|ui| {
                                                 let (rect, _) = ui.allocate_exact_size(egui::vec2(12.0, 12.0), egui::Sense::hover());
                                                 ui.painter().rect_filled(rect, 2.0, egui::Color32::from_rgb(0, 255, 0));
-                                                changed |= ui.add(egui::Slider::new(&mut params.lod_config.distance_zones[0], 1.0..=50.0)
+                                                changed |= ui.add(egui::Slider::new(&mut params.lod.lod_config.distance_zones[0], 1.0..=50.0)
                                                     .text("Near -> Mid"))
                                                     .on_hover_text("Distance where quality drops from Ultra to High")
                                                     .changed();
@@ -2390,7 +2395,7 @@ impl UI {
                                             ui.horizontal(|ui| {
                                                 let (rect, _) = ui.allocate_exact_size(egui::vec2(12.0, 12.0), egui::Sense::hover());
                                                 ui.painter().rect_filled(rect, 2.0, egui::Color32::from_rgb(100, 255, 100));
-                                                changed |= ui.add(egui::Slider::new(&mut params.lod_config.distance_zones[1], 10.0..=100.0)
+                                                changed |= ui.add(egui::Slider::new(&mut params.lod.lod_config.distance_zones[1], 10.0..=100.0)
                                                     .text("Mid -> Far"))
                                                     .on_hover_text("Distance where quality drops from High to Medium")
                                                     .changed();
@@ -2400,7 +2405,7 @@ impl UI {
                                             ui.horizontal(|ui| {
                                                 let (rect, _) = ui.allocate_exact_size(egui::vec2(12.0, 12.0), egui::Sense::hover());
                                                 ui.painter().rect_filled(rect, 2.0, egui::Color32::from_rgb(255, 200, 0));
-                                                changed |= ui.add(egui::Slider::new(&mut params.lod_config.distance_zones[2], 25.0..=150.0)
+                                                changed |= ui.add(egui::Slider::new(&mut params.lod.lod_config.distance_zones[2], 25.0..=150.0)
                                                     .text("Far -> Distant"))
                                                     .on_hover_text("Distance where quality drops from Medium to Low")
                                                     .changed();
@@ -2414,32 +2419,32 @@ impl UI {
                                             });
 
                                             // Ensure zones are ordered correctly
-                                            if params.lod_config.distance_zones[0] > params.lod_config.distance_zones[1] {
-                                                params.lod_config.distance_zones[0] = params.lod_config.distance_zones[1];
+                                            if params.lod.lod_config.distance_zones[0] > params.lod.lod_config.distance_zones[1] {
+                                                params.lod.lod_config.distance_zones[0] = params.lod.lod_config.distance_zones[1];
                                                 changed = true;
                                             }
-                                            if params.lod_config.distance_zones[1] > params.lod_config.distance_zones[2] {
-                                                params.lod_config.distance_zones[1] = params.lod_config.distance_zones[2];
+                                            if params.lod.lod_config.distance_zones[1] > params.lod.lod_config.distance_zones[2] {
+                                                params.lod.lod_config.distance_zones[1] = params.lod.lod_config.distance_zones[2];
                                                 changed = true;
                                             }
                                         });
                                     }
 
                                     // Motion-based Controls
-                                    if params.lod_config.strategy == crate::lod::LODStrategy::Motion ||
-                                       params.lod_config.strategy == crate::lod::LODStrategy::Hybrid {
+                                    if params.lod.lod_config.strategy == crate::lod::LODStrategy::Motion ||
+                                       params.lod.lod_config.strategy == crate::lod::LODStrategy::Hybrid {
                                         ui.collapsing("Motion Settings", |ui| {
-                                            changed |= ui.add(egui::Slider::new(&mut params.lod_config.motion_sensitivity, 0.0..=5.0)
+                                            changed |= ui.add(egui::Slider::new(&mut params.lod.lod_config.motion_sensitivity, 0.0..=5.0)
                                                 .text("Motion Sensitivity"))
                                                 .on_hover_text("Higher = more sensitive to camera movement (1.0 = normal)")
                                                 .changed();
 
-                                            changed |= ui.add(egui::Slider::new(&mut params.lod_config.motion_threshold, 0.01..=1.0)
+                                            changed |= ui.add(egui::Slider::new(&mut params.lod.lod_config.motion_threshold, 0.01..=1.0)
                                                 .text("Motion Threshold"))
                                                 .on_hover_text("Minimum velocity to trigger quality reduction")
                                                 .changed();
 
-                                            changed |= ui.add(egui::Slider::new(&mut params.lod_config.restore_delay, 0.1..=2.0)
+                                            changed |= ui.add(egui::Slider::new(&mut params.lod.lod_config.restore_delay, 0.1..=2.0)
                                                 .text("Restore Delay"))
                                                 .on_hover_text("Seconds to wait after stopping before restoring quality")
                                                 .changed();
@@ -2452,25 +2457,25 @@ impl UI {
                                             if ui.button("Ultra")
                                                 .on_hover_text("Maximum quality preset")
                                                 .clicked() {
-                                                params.lod_config.quality_presets[0] = crate::lod::QualityLevel::ultra();
+                                                params.lod.lod_config.quality_presets[0] = crate::lod::QualityLevel::ultra();
                                                 changed = true;
                                             }
                                             if ui.button("High")
                                                 .on_hover_text("High quality preset")
                                                 .clicked() {
-                                                params.lod_config.quality_presets[1] = crate::lod::QualityLevel::high();
+                                                params.lod.lod_config.quality_presets[1] = crate::lod::QualityLevel::high();
                                                 changed = true;
                                             }
                                             if ui.button("Medium")
                                                 .on_hover_text("Medium quality preset")
                                                 .clicked() {
-                                                params.lod_config.quality_presets[2] = crate::lod::QualityLevel::medium();
+                                                params.lod.lod_config.quality_presets[2] = crate::lod::QualityLevel::medium();
                                                 changed = true;
                                             }
                                             if ui.button("Low")
                                                 .on_hover_text("Low quality preset")
                                                 .clicked() {
-                                                params.lod_config.quality_presets[3] = crate::lod::QualityLevel::low();
+                                                params.lod.lod_config.quality_presets[3] = crate::lod::QualityLevel::low();
                                                 changed = true;
                                             }
                                         });
@@ -2479,7 +2484,7 @@ impl UI {
                                             if ui.button("Reset All to Defaults")
                                                 .on_hover_text("Reset all quality presets to default values")
                                                 .clicked() {
-                                                params.lod_config.quality_presets = [
+                                                params.lod.lod_config.quality_presets = [
                                                     crate::lod::QualityLevel::ultra(),
                                                     crate::lod::QualityLevel::high(),
                                                     crate::lod::QualityLevel::medium(),
@@ -2495,7 +2500,7 @@ impl UI {
                                         ui.label("Edit Quality Levels:")
                                             .on_hover_text("Fine-tune each quality preset");
 
-                                        for (i, preset) in params.lod_config.quality_presets.iter_mut().enumerate() {
+                                        for (i, preset) in params.lod.lod_config.quality_presets.iter_mut().enumerate() {
                                             let level_name = match i {
                                                 0 => "Ultra",
                                                 1 => "High",
@@ -2547,24 +2552,24 @@ impl UI {
 
                                     // Advanced Settings
                                     ui.collapsing("Advanced", |ui| {
-                                        changed |= ui.checkbox(&mut params.lod_config.smooth_transitions, "Smooth Transitions")
+                                        changed |= ui.checkbox(&mut params.lod.lod_config.smooth_transitions, "Smooth Transitions")
                                             .on_hover_text("Interpolate between quality levels for seamless changes")
                                             .changed();
 
-                                        if params.lod_config.smooth_transitions {
-                                            changed |= ui.add(egui::Slider::new(&mut params.lod_config.transition_duration, 0.0..=1.0)
+                                        if params.lod.lod_config.smooth_transitions {
+                                            changed |= ui.add(egui::Slider::new(&mut params.lod.lod_config.transition_duration, 0.0..=1.0)
                                                 .text("Transition Duration"))
                                                 .on_hover_text("Time to transition between quality levels (seconds)")
                                                 .changed();
                                         }
 
-                                        changed |= ui.checkbox(&mut params.lod_config.aggressive_mode, "Aggressive Mode")
+                                        changed |= ui.checkbox(&mut params.lod.lod_config.aggressive_mode, "Aggressive Mode")
                                             .on_hover_text("More aggressive quality reduction for better performance")
                                             .changed();
 
                                         ui.label("Minimum Quality Level:");
                                         changed |= egui::ComboBox::from_id_salt("min_quality_level")
-                                            .selected_text(match params.lod_config.min_quality_level {
+                                            .selected_text(match params.lod.lod_config.min_quality_level {
                                                 0 => "Ultra",
                                                 1 => "High",
                                                 2 => "Medium",
@@ -2573,16 +2578,16 @@ impl UI {
                                             })
                                             .show_ui(ui, |ui| {
                                                 let mut changed_local = false;
-                                                changed_local |= ui.selectable_value(&mut params.lod_config.min_quality_level, 0, "Ultra")
+                                                changed_local |= ui.selectable_value(&mut params.lod.lod_config.min_quality_level, 0, "Ultra")
                                                     .on_hover_text("Never reduce quality below Ultra")
                                                     .changed();
-                                                changed_local |= ui.selectable_value(&mut params.lod_config.min_quality_level, 1, "High")
+                                                changed_local |= ui.selectable_value(&mut params.lod.lod_config.min_quality_level, 1, "High")
                                                     .on_hover_text("Never reduce quality below High")
                                                     .changed();
-                                                changed_local |= ui.selectable_value(&mut params.lod_config.min_quality_level, 2, "Medium")
+                                                changed_local |= ui.selectable_value(&mut params.lod.lod_config.min_quality_level, 2, "Medium")
                                                     .on_hover_text("Never reduce quality below Medium")
                                                     .changed();
-                                                changed_local |= ui.selectable_value(&mut params.lod_config.min_quality_level, 3, "Low")
+                                                changed_local |= ui.selectable_value(&mut params.lod.lod_config.min_quality_level, 3, "Low")
                                                     .on_hover_text("Allow all quality levels")
                                                     .changed();
                                                 changed_local
@@ -2594,7 +2599,7 @@ impl UI {
                                     ui.separator();
                                     ui.collapsing("Status", |ui| {
                                         // Current LOD Level
-                                        let level_name = match params.lod_state.current_level {
+                                        let level_name = match params.lod.lod_state.current_level {
                                             0 => ("Ultra", egui::Color32::from_rgb(0, 255, 0)),
                                             1 => ("High", egui::Color32::from_rgb(100, 255, 100)),
                                             2 => ("Medium", egui::Color32::from_rgb(255, 200, 0)),
@@ -2609,13 +2614,13 @@ impl UI {
 
                                         // FPS Display
                                         ui.horizontal(|ui| {
-                                            ui.label(format!("Current FPS: {:.1}", params.lod_state.current_fps));
+                                            ui.label(format!("Current FPS: {:.1}", params.lod.lod_state.current_fps));
                                         });
 
                                         // Motion Status
                                         ui.horizontal(|ui| {
                                             ui.label("Motion:");
-                                            if params.lod_state.is_moving {
+                                            if params.lod.lod_state.is_moving {
                                                 ui.colored_label(egui::Color32::YELLOW, "Moving");
                                             } else {
                                                 ui.colored_label(egui::Color32::GREEN, "Stationary");
@@ -2623,17 +2628,17 @@ impl UI {
                                         });
 
                                         // Transition Progress
-                                        if params.lod_state.transition_progress < 1.0 {
+                                        if params.lod.lod_state.transition_progress < 1.0 {
                                             ui.horizontal(|ui| {
                                                 ui.label("Transitioning:");
-                                                ui.add(egui::ProgressBar::new(params.lod_state.transition_progress)
+                                                ui.add(egui::ProgressBar::new(params.lod.lod_state.transition_progress)
                                                     .show_percentage());
                                             });
                                         }
 
                                         // Active Quality Parameters (showing what's currently being used)
                                         ui.collapsing("Active Parameters", |ui| {
-                                            let quality = &params.lod_state.active_quality;
+                                            let quality = &params.lod.lod_state.active_quality;
                                             ui.label(format!("Max Steps: {}", quality.max_steps));
                                             ui.label(format!("Min Distance: {:.6}", quality.min_distance));
                                             ui.label(format!("Shadow Samples: {}", quality.shadow_samples));
@@ -2788,7 +2793,7 @@ impl UI {
                         ui.label("• [/]: Decrease/increase orbit speed");
                         ui.separator();
 
-                        match params.render_mode {
+                        match params.settings.render_mode {
                             crate::fractal::RenderMode::TwoD => {
                                 ui.label("Mouse (2D Mode):");
                                 ui.label("• Drag: Pan view");

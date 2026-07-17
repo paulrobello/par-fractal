@@ -166,12 +166,12 @@ impl UI {
                 message = Some(format!("Switched to {:?}", ftype));
             }
             CommandAction::SetColorMode(mode) => {
-                params.color_mode = mode;
+                params.settings.color_mode = mode;
                 changed = true;
                 message = Some(format!("Color mode: {:?}", mode));
             }
             CommandAction::SetShadowMode(mode) => {
-                params.shadow_mode = mode;
+                params.settings.shadow_mode = mode;
                 changed = true;
                 let mode_name = match mode {
                     0 => "OFF",
@@ -181,21 +181,24 @@ impl UI {
                 message = Some(format!("Shadow mode: {}", mode_name));
             }
             CommandAction::SetShadingModel(model) => {
-                params.shading_model = model;
+                params.settings.shading_model = model;
                 changed = true;
                 message = Some(format!("Shading: {:?}", model));
             }
             CommandAction::SetLODProfile(profile) => {
-                params.lod_config.apply_profile(profile);
+                params.lod.lod_config.apply_profile(profile);
                 changed = true;
-                message = Some(format!("LOD Profile: {}", params.lod_config.profile_name()));
+                message = Some(format!(
+                    "LOD Profile: {}",
+                    params.lod.lod_config.profile_name()
+                ));
             }
             CommandAction::ToggleLOD => {
-                params.lod_config.enabled = !params.lod_config.enabled;
+                params.lod.lod_config.enabled = !params.lod.lod_config.enabled;
                 changed = true;
                 message = Some(format!(
                     "LOD System: {}",
-                    if params.lod_config.enabled {
+                    if params.lod.lod_config.enabled {
                         "ON"
                     } else {
                         "OFF"
@@ -203,11 +206,12 @@ impl UI {
                 ));
             }
             CommandAction::ToggleLODDebug => {
-                params.lod_config.debug_visualization = !params.lod_config.debug_visualization;
+                params.lod.lod_config.debug_visualization =
+                    !params.lod.lod_config.debug_visualization;
                 changed = true;
                 message = Some(format!(
                     "LOD Debug: {}",
-                    if params.lod_config.debug_visualization {
+                    if params.lod.lod_config.debug_visualization {
                         "ON"
                     } else {
                         "OFF"
@@ -217,50 +221,54 @@ impl UI {
             CommandAction::ToggleEffect(effect) => {
                 let (new_value, name) = match effect {
                     EffectType::AmbientOcclusion => {
-                        params.ambient_occlusion = !params.ambient_occlusion;
-                        (params.ambient_occlusion, "Ambient Occlusion")
+                        params.settings.ambient_occlusion = !params.settings.ambient_occlusion;
+                        (params.settings.ambient_occlusion, "Ambient Occlusion")
                     }
                     EffectType::Shadows => {
                         // Cycle shadow mode: 0 -> 1 -> 2 -> 0
-                        params.shadow_mode = (params.shadow_mode + 1) % 3;
-                        (params.shadow_mode > 0, "Shadows")
+                        params.settings.shadow_mode = (params.settings.shadow_mode + 1) % 3;
+                        (params.settings.shadow_mode > 0, "Shadows")
                     }
                     EffectType::SoftShadows => {
                         // Toggle soft shadows (mode 0 or 2)
-                        params.shadow_mode = if params.shadow_mode == 2 { 0 } else { 2 };
-                        (params.shadow_mode == 2, "Soft Shadows")
+                        params.settings.shadow_mode = if params.settings.shadow_mode == 2 {
+                            0
+                        } else {
+                            2
+                        };
+                        (params.settings.shadow_mode == 2, "Soft Shadows")
                     }
                     EffectType::DepthOfField => {
-                        params.depth_of_field = !params.depth_of_field;
-                        (params.depth_of_field, "Depth of Field")
+                        params.settings.depth_of_field = !params.settings.depth_of_field;
+                        (params.settings.depth_of_field, "Depth of Field")
                     }
                     EffectType::Fog => {
-                        params.fog_enabled = !params.fog_enabled;
-                        (params.fog_enabled, "Fog")
+                        params.settings.fog_enabled = !params.settings.fog_enabled;
+                        (params.settings.fog_enabled, "Fog")
                     }
                     EffectType::Bloom => {
-                        params.bloom_enabled = !params.bloom_enabled;
-                        (params.bloom_enabled, "Bloom")
+                        params.settings.bloom_enabled = !params.settings.bloom_enabled;
+                        (params.settings.bloom_enabled, "Bloom")
                     }
                     EffectType::Vignette => {
-                        params.vignette_enabled = !params.vignette_enabled;
-                        (params.vignette_enabled, "Vignette")
+                        params.settings.vignette_enabled = !params.settings.vignette_enabled;
+                        (params.settings.vignette_enabled, "Vignette")
                     }
                     EffectType::FXAA => {
-                        params.fxaa_enabled = !params.fxaa_enabled;
-                        (params.fxaa_enabled, "FXAA")
+                        params.settings.fxaa_enabled = !params.settings.fxaa_enabled;
+                        (params.settings.fxaa_enabled, "FXAA")
                     }
                     EffectType::SSR => {
-                        params.floor_reflections = !params.floor_reflections;
-                        (params.floor_reflections, "Floor Reflections")
+                        params.settings.floor_reflections = !params.settings.floor_reflections;
+                        (params.settings.floor_reflections, "Floor Reflections")
                     }
                     EffectType::Floor => {
-                        params.show_floor = !params.show_floor;
-                        (params.show_floor, "Floor")
+                        params.settings.show_floor = !params.settings.show_floor;
+                        (params.settings.show_floor, "Floor")
                     }
                     EffectType::AutoOrbit => {
-                        params.auto_orbit = !params.auto_orbit;
-                        (params.auto_orbit, "Auto-Orbit")
+                        params.settings.auto_orbit = !params.settings.auto_orbit;
+                        (params.settings.auto_orbit, "Auto-Orbit")
                     }
                 };
                 changed = true;
@@ -296,7 +304,7 @@ impl UI {
             CommandAction::CyclePalette => {
                 params.next_palette();
                 changed = true;
-                message = Some(format!("Static Palette: {}", params.palette.name));
+                message = Some(format!("Static Palette: {}", params.settings.palette.name));
             }
             CommandAction::CycleProceduralPalette => {
                 use crate::fractal::ProceduralPalette;
@@ -306,66 +314,75 @@ impl UI {
                     .collect();
                 let current_idx = all_options
                     .iter()
-                    .position(|p| *p == params.procedural_palette)
+                    .position(|p| *p == params.settings.procedural_palette)
                     .unwrap_or(0);
                 let next_idx = (current_idx + 1) % all_options.len();
-                params.procedural_palette = all_options[next_idx];
+                params.settings.procedural_palette = all_options[next_idx];
                 changed = true;
                 message = Some(format!(
                     "Procedural Palette: {}",
-                    params.procedural_palette.name()
+                    params.settings.procedural_palette.name()
                 ));
             }
             CommandAction::IncrementIterations => {
                 use crate::fractal::RenderMode;
-                match params.render_mode {
+                match params.settings.render_mode {
                     RenderMode::TwoD => {
-                        params.max_iterations = (params.max_iterations + 32).min(2048);
-                        message = Some(format!("Max iterations: {}", params.max_iterations));
+                        params.settings.max_iterations =
+                            (params.settings.max_iterations + 32).min(2048);
+                        message = Some(format!(
+                            "Max iterations: {}",
+                            params.settings.max_iterations
+                        ));
                     }
                     RenderMode::ThreeD => {
-                        params.max_steps = (params.max_steps + 10).min(500);
-                        message = Some(format!("Max steps: {}", params.max_steps));
+                        params.settings.max_steps = (params.settings.max_steps + 10).min(500);
+                        message = Some(format!("Max steps: {}", params.settings.max_steps));
                     }
                 }
                 changed = true;
             }
             CommandAction::DecrementIterations => {
                 use crate::fractal::RenderMode;
-                match params.render_mode {
+                match params.settings.render_mode {
                     RenderMode::TwoD => {
-                        params.max_iterations = params.max_iterations.saturating_sub(32).max(32);
-                        message = Some(format!("Max iterations: {}", params.max_iterations));
+                        params.settings.max_iterations =
+                            params.settings.max_iterations.saturating_sub(32).max(32);
+                        message = Some(format!(
+                            "Max iterations: {}",
+                            params.settings.max_iterations
+                        ));
                     }
                     RenderMode::ThreeD => {
-                        params.max_steps = params.max_steps.saturating_sub(10).max(30);
-                        message = Some(format!("Max steps: {}", params.max_steps));
+                        params.settings.max_steps =
+                            params.settings.max_steps.saturating_sub(10).max(30);
+                        message = Some(format!("Max steps: {}", params.settings.max_steps));
                     }
                 }
                 changed = true;
             }
             CommandAction::IncrementPower => {
-                params.power = (params.power + 0.5).min(16.0);
+                params.settings.power = (params.settings.power + 0.5).min(16.0);
                 changed = true;
-                message = Some(format!("Power: {:.1}", params.power));
+                message = Some(format!("Power: {:.1}", params.settings.power));
             }
             CommandAction::DecrementPower => {
-                params.power = (params.power - 0.5).max(2.0);
+                params.settings.power = (params.settings.power - 0.5).max(2.0);
                 changed = true;
-                message = Some(format!("Power: {:.1}", params.power));
+                message = Some(format!("Power: {:.1}", params.settings.power));
             }
             CommandAction::IncrementOrbitSpeed => {
-                params.orbit_speed = (params.orbit_speed + 0.1).min(5.0);
-                message = Some(format!("Orbit speed: {:.2}", params.orbit_speed));
+                params.settings.orbit_speed = (params.settings.orbit_speed + 0.1).min(5.0);
+                message = Some(format!("Orbit speed: {:.2}", params.settings.orbit_speed));
             }
             CommandAction::DecrementOrbitSpeed => {
-                params.orbit_speed = (params.orbit_speed - 0.1).max(0.1);
-                message = Some(format!("Orbit speed: {:.2}", params.orbit_speed));
+                params.settings.orbit_speed = (params.settings.orbit_speed - 0.1).max(0.1);
+                message = Some(format!("Orbit speed: {:.2}", params.settings.orbit_speed));
             }
             CommandAction::ResetView => {
                 // Reset 2D view parameters
-                params.center_2d = [0.0, 0.0];
-                params.zoom_2d = 1.0;
+                params.settings.center_2d = [0.0, 0.0];
+                params.settings.zoom_2d = 1.0;
                 changed = true;
                 message = Some("View reset".to_string());
             }

@@ -308,24 +308,26 @@ impl App {
             log::info!("Setting quality level: {}", quality_name);
 
             // Enable LOD system and set to use the specified quality level
-            fractal_params.lod_config.enabled = true;
-            fractal_params.lod_state.current_level = level;
-            fractal_params.lod_state.target_level = level;
-            fractal_params.lod_state.transition_progress = 1.0;
-            fractal_params.lod_state.active_quality =
-                fractal_params.lod_config.quality_presets[level];
+            fractal_params.lod.lod_config.enabled = true;
+            fractal_params.lod.lod_state.current_level = level;
+            fractal_params.lod.lod_state.target_level = level;
+            fractal_params.lod.lod_state.transition_progress = 1.0;
+            fractal_params.lod.lod_state.active_quality =
+                fractal_params.lod.lod_config.quality_presets[level];
 
             // Set min_quality_level so LOD won't drop below the requested level
-            fractal_params.lod_config.min_quality_level = level;
+            fractal_params.lod.lod_config.min_quality_level = level;
 
             // Apply the quality settings to fractal params immediately
-            fractal_params.max_steps = fractal_params.lod_state.active_quality.max_steps;
-            fractal_params.min_distance = fractal_params.lod_state.active_quality.min_distance;
+            fractal_params.settings.max_steps =
+                fractal_params.lod.lod_state.active_quality.max_steps;
+            fractal_params.settings.min_distance =
+                fractal_params.lod.lod_state.active_quality.min_distance;
         }
 
         let mut camera = Camera::new(size.width, size.height);
-        camera.fovy = fractal_params.camera_fov;
-        let mut camera_controller = CameraController::new(fractal_params.camera_speed);
+        camera.fovy = fractal_params.settings.camera_fov;
+        let mut camera_controller = CameraController::new(fractal_params.settings.camera_speed);
 
         // ARC-014 drift fix: restore camera position + UI state on EVERY
         // target via the platform storage trait. Web previously skipped this
@@ -432,7 +434,9 @@ impl App {
         use crate::fractal::{ProceduralPalette, RenderMode};
 
         // 3D auto-orbit rotates the camera each frame.
-        if self.fractal_params.auto_orbit && self.fractal_params.render_mode == RenderMode::ThreeD {
+        if self.fractal_params.settings.auto_orbit
+            && self.fractal_params.settings.render_mode == RenderMode::ThreeD
+        {
             return true;
         }
         // Smooth camera transition (bookmark load) is interpolating.
@@ -444,20 +448,20 @@ impl App {
             return true;
         }
         // Procedural palette samples the `time` uniform, which advances.
-        if self.fractal_params.procedural_palette != ProceduralPalette::None {
+        if self.fractal_params.settings.procedural_palette != ProceduralPalette::None {
             return true;
         }
         // LOD is smoothly interpolating between quality presets.
-        if self.fractal_params.lod_config.enabled
-            && self.fractal_params.lod_state.transition_progress < 1.0
+        if self.fractal_params.lod.lod_config.enabled
+            && self.fractal_params.lod.lod_state.transition_progress < 1.0
         {
             return true;
         }
         // Attractor / Buddhabrot still accumulating samples.
-        if self.fractal_params.attractor_accumulation_enabled
-            && !self.fractal_params.attractor_paused
-            && (self.fractal_params.fractal_type.is_2d_attractor()
-                || self.fractal_params.fractal_type.is_buddhabrot())
+        if self.fractal_params.settings.attractor_accumulation_enabled
+            && !self.fractal_params.accum.paused
+            && (self.fractal_params.settings.fractal_type.is_2d_attractor()
+                || self.fractal_params.settings.fractal_type.is_buddhabrot())
         {
             return true;
         }
@@ -563,27 +567,28 @@ impl App {
     }
 
     fn reset_view(&mut self) {
-        match self.fractal_params.render_mode {
+        match self.fractal_params.settings.render_mode {
             RenderMode::TwoD => {
                 // Re-apply fractal defaults (this sets the correct center and zoom for each fractal type)
-                let current_type = self.fractal_params.fractal_type;
+                let current_type = self.fractal_params.settings.fractal_type;
                 self.fractal_params.switch_fractal(current_type);
 
                 // Clear accumulation for strange attractors and sync tracking values
-                if self.fractal_params.attractor_accumulation_enabled {
-                    self.fractal_params.attractor_pending_clear = true;
-                    self.fractal_params.attractor_total_iterations = 0;
+                if self.fractal_params.settings.attractor_accumulation_enabled {
+                    self.fractal_params.accum.pending_clear = true;
+                    self.fractal_params.accum.total_iterations = 0;
                     // Sync tracking to the reset values
-                    self.fractal_params.attractor_last_center = self.fractal_params.center_2d;
-                    self.fractal_params.attractor_last_zoom = self.fractal_params.zoom_2d;
-                    self.fractal_params.attractor_last_julia_c = self.fractal_params.julia_c;
+                    self.fractal_params.accum.last_center = self.fractal_params.settings.center_2d;
+                    self.fractal_params.accum.last_zoom = self.fractal_params.settings.zoom_2d;
+                    self.fractal_params.accum.last_julia_c = self.fractal_params.settings.julia_c;
                 }
             }
             RenderMode::ThreeD => {
                 let size = self.renderer.size;
                 self.camera = Camera::new(size.width, size.height);
-                self.camera.fovy = self.fractal_params.camera_fov;
-                self.camera_controller = CameraController::new(self.fractal_params.camera_speed);
+                self.camera.fovy = self.fractal_params.settings.camera_fov;
+                self.camera_controller =
+                    CameraController::new(self.fractal_params.settings.camera_speed);
             }
         }
     }

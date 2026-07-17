@@ -70,7 +70,8 @@ pub mod web_main;
 pub use camera::{Camera, CameraController};
 /// Re-exports the core fractal types for convenience.
 pub use fractal::{
-    ColorPalette, FractalParams, FractalType, Preset, PresetGallery, RenderMode, ShadingModel,
+    AccumulationState, ColorPalette, FractalParams, FractalType, LodRuntime, Preset, PresetGallery,
+    RenderMode, RenderSettings, ShadingModel,
 };
 /// Re-exports the renderer and GPU-info types for convenience.
 pub use renderer::{GpuInfo, Renderer};

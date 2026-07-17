@@ -211,19 +211,21 @@ impl App {
                                 .collect();
                         let current_idx = all_options
                             .iter()
-                            .position(|p| *p == self.fractal_params.procedural_palette)
+                            .position(|p| *p == self.fractal_params.settings.procedural_palette)
                             .unwrap_or(0);
                         let next_idx = (current_idx + 1) % all_options.len();
-                        self.fractal_params.procedural_palette = all_options[next_idx];
+                        self.fractal_params.settings.procedural_palette = all_options[next_idx];
                         self.ui.show_toast(format!(
                             "Procedural: {}",
-                            self.fractal_params.procedural_palette.name()
+                            self.fractal_params.settings.procedural_palette.name()
                         ));
                     } else {
                         // P: Cycle static palette
                         self.fractal_params.next_palette();
-                        self.ui
-                            .show_toast(format!("Palette: {}", self.fractal_params.palette.name));
+                        self.ui.show_toast(format!(
+                            "Palette: {}",
+                            self.fractal_params.settings.palette.name
+                        ));
                     }
                     self.mark_scene_dirty();
                     return true;
@@ -235,11 +237,12 @@ impl App {
                     return true;
                 }
                 KeyCode::KeyO => {
-                    self.fractal_params.auto_orbit = !self.fractal_params.auto_orbit;
+                    self.fractal_params.settings.auto_orbit =
+                        !self.fractal_params.settings.auto_orbit;
                     self.mark_scene_dirty();
                     println!(
                         "Auto-orbit: {}",
-                        if self.fractal_params.auto_orbit {
+                        if self.fractal_params.settings.auto_orbit {
                             "ON"
                         } else {
                             "OFF"
@@ -248,72 +251,92 @@ impl App {
                     return true;
                 }
                 KeyCode::BracketLeft => {
-                    self.fractal_params.orbit_speed =
-                        (self.fractal_params.orbit_speed - 0.1).max(0.1);
+                    self.fractal_params.settings.orbit_speed =
+                        (self.fractal_params.settings.orbit_speed - 0.1).max(0.1);
                     self.mark_scene_dirty();
-                    println!("Orbit speed: {:.2}", self.fractal_params.orbit_speed);
+                    println!(
+                        "Orbit speed: {:.2}",
+                        self.fractal_params.settings.orbit_speed
+                    );
                     return true;
                 }
                 KeyCode::BracketRight => {
-                    self.fractal_params.orbit_speed =
-                        (self.fractal_params.orbit_speed + 0.1).min(5.0);
+                    self.fractal_params.settings.orbit_speed =
+                        (self.fractal_params.settings.orbit_speed + 0.1).min(5.0);
                     self.mark_scene_dirty();
-                    println!("Orbit speed: {:.2}", self.fractal_params.orbit_speed);
+                    println!(
+                        "Orbit speed: {:.2}",
+                        self.fractal_params.settings.orbit_speed
+                    );
                     return true;
                 }
                 KeyCode::Minus => {
-                    match self.fractal_params.render_mode {
+                    match self.fractal_params.settings.render_mode {
                         RenderMode::TwoD => {
-                            self.fractal_params.max_iterations = self
+                            self.fractal_params.settings.max_iterations = self
                                 .fractal_params
+                                .settings
                                 .max_iterations
                                 .saturating_sub(32)
                                 .max(32);
-                            println!("Max iterations: {}", self.fractal_params.max_iterations);
+                            println!(
+                                "Max iterations: {}",
+                                self.fractal_params.settings.max_iterations
+                            );
                         }
                         RenderMode::ThreeD => {
-                            self.fractal_params.max_steps =
-                                self.fractal_params.max_steps.saturating_sub(10).max(30);
-                            println!("Max steps: {}", self.fractal_params.max_steps);
+                            self.fractal_params.settings.max_steps = self
+                                .fractal_params
+                                .settings
+                                .max_steps
+                                .saturating_sub(10)
+                                .max(30);
+                            println!("Max steps: {}", self.fractal_params.settings.max_steps);
                         }
                     }
                     self.mark_scene_dirty();
                     return true;
                 }
                 KeyCode::Equal => {
-                    match self.fractal_params.render_mode {
+                    match self.fractal_params.settings.render_mode {
                         RenderMode::TwoD => {
-                            self.fractal_params.max_iterations =
-                                (self.fractal_params.max_iterations + 32).min(2048);
-                            println!("Max iterations: {}", self.fractal_params.max_iterations);
+                            self.fractal_params.settings.max_iterations =
+                                (self.fractal_params.settings.max_iterations + 32).min(2048);
+                            println!(
+                                "Max iterations: {}",
+                                self.fractal_params.settings.max_iterations
+                            );
                         }
                         RenderMode::ThreeD => {
-                            self.fractal_params.max_steps =
-                                (self.fractal_params.max_steps + 10).min(500);
-                            println!("Max steps: {}", self.fractal_params.max_steps);
+                            self.fractal_params.settings.max_steps =
+                                (self.fractal_params.settings.max_steps + 10).min(500);
+                            println!("Max steps: {}", self.fractal_params.settings.max_steps);
                         }
                     }
                     self.mark_scene_dirty();
                     return true;
                 }
                 KeyCode::Comma => {
-                    self.fractal_params.power = (self.fractal_params.power - 0.5).max(2.0);
+                    self.fractal_params.settings.power =
+                        (self.fractal_params.settings.power - 0.5).max(2.0);
                     self.mark_scene_dirty();
-                    println!("Power: {:.1}", self.fractal_params.power);
+                    println!("Power: {:.1}", self.fractal_params.settings.power);
                     return true;
                 }
                 KeyCode::Period => {
-                    self.fractal_params.power = (self.fractal_params.power + 0.5).min(16.0);
+                    self.fractal_params.settings.power =
+                        (self.fractal_params.settings.power + 0.5).min(16.0);
                     self.mark_scene_dirty();
-                    println!("Power: {:.1}", self.fractal_params.power);
+                    println!("Power: {:.1}", self.fractal_params.settings.power);
                     return true;
                 }
                 KeyCode::KeyL => {
-                    self.fractal_params.ambient_occlusion = !self.fractal_params.ambient_occlusion;
+                    self.fractal_params.settings.ambient_occlusion =
+                        !self.fractal_params.settings.ambient_occlusion;
                     self.mark_scene_dirty();
                     println!(
                         "Ambient Occlusion: {}",
-                        if self.fractal_params.ambient_occlusion {
+                        if self.fractal_params.settings.ambient_occlusion {
                             "ON"
                         } else {
                             "OFF"
@@ -322,11 +345,12 @@ impl App {
                     return true;
                 }
                 KeyCode::KeyT => {
-                    self.fractal_params.depth_of_field = !self.fractal_params.depth_of_field;
+                    self.fractal_params.settings.depth_of_field =
+                        !self.fractal_params.settings.depth_of_field;
                     self.mark_scene_dirty();
                     println!(
                         "Depth of Field: {}",
-                        if self.fractal_params.depth_of_field {
+                        if self.fractal_params.settings.depth_of_field {
                             "ON"
                         } else {
                             "OFF"
@@ -335,11 +359,12 @@ impl App {
                     return true;
                 }
                 KeyCode::KeyG => {
-                    self.fractal_params.show_floor = !self.fractal_params.show_floor;
+                    self.fractal_params.settings.show_floor =
+                        !self.fractal_params.settings.show_floor;
                     self.mark_scene_dirty();
                     println!(
                         "Floor: {}",
-                        if self.fractal_params.show_floor {
+                        if self.fractal_params.settings.show_floor {
                             "ON"
                         } else {
                             "OFF"
@@ -349,8 +374,9 @@ impl App {
                 }
                 KeyCode::KeyB => {
                     // Cycle shadow mode: 0 -> 1 -> 2 -> 0
-                    self.fractal_params.shadow_mode = (self.fractal_params.shadow_mode + 1) % 3;
-                    let mode_name = match self.fractal_params.shadow_mode {
+                    self.fractal_params.settings.shadow_mode =
+                        (self.fractal_params.settings.shadow_mode + 1) % 3;
+                    let mode_name = match self.fractal_params.settings.shadow_mode {
                         0 => "OFF",
                         1 => "HARD",
                         _ => "SOFT",
@@ -361,12 +387,12 @@ impl App {
                 }
                 KeyCode::KeyI => {
                     // Toggle LOD system on/off
-                    self.fractal_params.lod_config.enabled =
-                        !self.fractal_params.lod_config.enabled;
+                    self.fractal_params.lod.lod_config.enabled =
+                        !self.fractal_params.lod.lod_config.enabled;
                     self.mark_scene_dirty();
                     println!(
                         "LOD System: {}",
-                        if self.fractal_params.lod_config.enabled {
+                        if self.fractal_params.lod.lod_config.enabled {
                             "ON"
                         } else {
                             "OFF"
@@ -377,12 +403,12 @@ impl App {
                 KeyCode::KeyD => {
                     // Shift+D toggles LOD debug visualization
                     if self.shift_pressed {
-                        self.fractal_params.lod_config.debug_visualization =
-                            !self.fractal_params.lod_config.debug_visualization;
+                        self.fractal_params.lod.lod_config.debug_visualization =
+                            !self.fractal_params.lod.lod_config.debug_visualization;
                         self.mark_scene_dirty();
                         println!(
                             "LOD Debug Visualization: {}",
-                            if self.fractal_params.lod_config.debug_visualization {
+                            if self.fractal_params.lod.lod_config.debug_visualization {
                                 "ON"
                             } else {
                                 "OFF"
@@ -423,14 +449,14 @@ impl App {
             if matches!(event, WindowEvent::Touch(_)) {
                 log::info!(
                     "Routing touch to mode handler: {:?}",
-                    self.fractal_params.render_mode
+                    self.fractal_params.settings.render_mode
                 );
             }
-            let handled = match self.fractal_params.render_mode {
+            let handled = match self.fractal_params.settings.render_mode {
                 RenderMode::TwoD => self.handle_2d_input(event),
                 RenderMode::ThreeD => {
                     // Don't process camera events during auto-orbit to prevent state accumulation
-                    if !self.fractal_params.auto_orbit {
+                    if !self.fractal_params.settings.auto_orbit {
                         self.camera_controller.process_events(event)
                     } else {
                         false
@@ -569,10 +595,10 @@ impl App {
 
                                 let aspect = self.renderer.size.width as f64
                                     / self.renderer.size.height as f64;
-                                self.fractal_params.center_2d[0] -=
-                                    delta_x * 2.0 / self.fractal_params.zoom_2d * aspect;
-                                self.fractal_params.center_2d[1] +=
-                                    delta_y * 2.0 / self.fractal_params.zoom_2d;
+                                self.fractal_params.settings.center_2d[0] -=
+                                    delta_x * 2.0 / self.fractal_params.settings.zoom_2d * aspect;
+                                self.fractal_params.settings.center_2d[1] +=
+                                    delta_y * 2.0 / self.fractal_params.settings.zoom_2d;
                             }
                             self.last_mouse_pos = Some(current_pos);
                             true
@@ -623,10 +649,10 @@ impl App {
                             self.renderer.size.width as f64 / self.renderer.size.height as f64;
                         // Scale factor matches shader: world = screen * 2 / (zoom * height)
                         // delta is already normalized by width/height, so multiply by 2
-                        self.fractal_params.center_2d[0] -=
-                            delta_x * 2.0 / self.fractal_params.zoom_2d * aspect;
-                        self.fractal_params.center_2d[1] +=
-                            delta_y * 2.0 / self.fractal_params.zoom_2d;
+                        self.fractal_params.settings.center_2d[0] -=
+                            delta_x * 2.0 / self.fractal_params.settings.zoom_2d * aspect;
+                        self.fractal_params.settings.center_2d[1] +=
+                            delta_y * 2.0 / self.fractal_params.settings.zoom_2d;
                     }
                     self.last_mouse_pos = Some(current_pos);
                     true
@@ -644,7 +670,7 @@ impl App {
                 let zoom_factor = 1.1f32.powf(zoom_delta);
 
                 // Zoom at cursor position (for 2D mode)
-                if self.fractal_params.render_mode == RenderMode::TwoD {
+                if self.fractal_params.settings.render_mode == RenderMode::TwoD {
                     let width = self.renderer.size.width as f64;
                     let height = self.renderer.size.height as f64;
                     let aspect = width / height;
@@ -657,7 +683,7 @@ impl App {
                     self.fractal_params
                         .zoom_at((norm_x, norm_y), zoom_factor as f64, aspect);
                 } else {
-                    self.fractal_params.zoom_2d *= zoom_factor as f64;
+                    self.fractal_params.settings.zoom_2d *= zoom_factor as f64;
                 }
                 true
             }

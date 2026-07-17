@@ -48,7 +48,7 @@ impl App {
         // Continuous zoom with shift+left mouse (2D mode)
         if self.shift_pressed
             && self.mouse_pressed
-            && self.fractal_params.render_mode == RenderMode::TwoD
+            && self.fractal_params.settings.render_mode == RenderMode::TwoD
         {
             let zoom_speed = 2.0; // Zoom factor per second
             let zoom_factor = (zoom_speed * dt).exp();
@@ -67,7 +67,7 @@ impl App {
         }
 
         // Update camera for 3D mode
-        if self.fractal_params.render_mode == RenderMode::ThreeD {
+        if self.fractal_params.settings.render_mode == RenderMode::ThreeD {
             let old_pos = self.camera.position;
             let old_target = self.camera.target;
 
@@ -77,17 +77,17 @@ impl App {
                 .update(&mut self.camera, &mut self.camera_controller)
             {
                 // Transition is still running, don't allow other camera movements
-                self.fractal_params.camera_fov = self.camera.fovy;
+                self.fractal_params.settings.camera_fov = self.camera.fovy;
             } else if self.camera_transition.active {
                 // Transition just finished
                 self.camera_transition.active = false;
-            } else if self.fractal_params.auto_orbit {
+            } else if self.fractal_params.settings.auto_orbit {
                 // Auto-orbit camera around fractal center (only if not transitioning)
                 let orbit_center = glam::Vec3::ZERO;
                 let to_camera = self.camera.position - orbit_center;
 
                 // Calculate orbit angle based on speed and delta time
-                let orbit_angle = self.fractal_params.orbit_speed * dt;
+                let orbit_angle = self.fractal_params.settings.orbit_speed * dt;
 
                 // Rotate around Y axis
                 let rotation = glam::Quat::from_axis_angle(glam::Vec3::Y, orbit_angle);
@@ -157,6 +157,7 @@ impl App {
             log::info!("Starting high-resolution render at {}x{}...", width, height);
             let fractal_name = self
                 .fractal_params
+                .settings
                 .fractal_type
                 .filename_safe_name()
                 .to_string();
@@ -175,7 +176,7 @@ impl App {
         }
 
         // Update palette animation (uses delta time to avoid jumps when changing speed)
-        self.fractal_params.palette_offset = self.ui.update_palette_animation(dt);
+        self.fractal_params.settings.palette_offset = self.ui.update_palette_animation(dt);
 
         // Update LOD system (must be done before renderer.update())
         let camera_forward = (self.camera.target - self.camera.position).normalize();

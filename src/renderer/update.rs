@@ -206,8 +206,8 @@ impl Renderer {
         // saves two <1KB uploads per rendered frame. PartialEq on the structs
         // is field-wise (padding is consistent because both derive Pod).
         let bloom_uniforms = BloomUniforms {
-            threshold: params.bloom_threshold,
-            intensity: params.bloom_intensity,
+            threshold: params.settings.bloom_threshold,
+            intensity: params.settings.bloom_intensity,
             _padding: [0.0; 2],
         };
         if self.cached_bloom_uniforms != Some(bloom_uniforms) {
@@ -223,16 +223,20 @@ impl Renderer {
         // We use the same buffer for both H and V passes, just different bind groups
 
         let composite_uniforms = PostProcessUniforms {
-            brightness: params.brightness,
-            contrast: params.contrast,
-            saturation: params.saturation,
-            hue_shift: params.hue_shift,
-            vignette_enabled: if params.vignette_enabled { 1 } else { 0 },
-            vignette_intensity: params.vignette_intensity,
-            vignette_radius: params.vignette_radius,
+            brightness: params.settings.brightness,
+            contrast: params.settings.contrast,
+            saturation: params.settings.saturation,
+            hue_shift: params.settings.hue_shift,
+            vignette_enabled: if params.settings.vignette_enabled {
+                1
+            } else {
+                0
+            },
+            vignette_intensity: params.settings.vignette_intensity,
+            vignette_radius: params.settings.vignette_radius,
             _padding1: 0.0,
-            bloom_enabled: if params.bloom_enabled { 1 } else { 0 },
-            bloom_intensity: params.bloom_intensity,
+            bloom_enabled: if params.settings.bloom_enabled { 1 } else { 0 },
+            bloom_intensity: params.settings.bloom_intensity,
             _padding2: [0.0; 2],
             _padding3: [0.0; 4],
         };

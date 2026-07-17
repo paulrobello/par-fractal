@@ -3,18 +3,18 @@ use super::*;
 #[test]
 fn test_default_fractal_params() {
     let params = FractalParams::default();
-    assert_eq!(params.fractal_type, FractalType::Mandelbrot2D);
-    assert_eq!(params.render_mode, RenderMode::TwoD);
-    assert_eq!(params.zoom_2d, 1.0);
-    assert_eq!(params.max_iterations, 80);
+    assert_eq!(params.settings.fractal_type, FractalType::Mandelbrot2D);
+    assert_eq!(params.settings.render_mode, RenderMode::TwoD);
+    assert_eq!(params.settings.zoom_2d, 1.0);
+    assert_eq!(params.settings.max_iterations, 80);
 }
 
 #[test]
 fn test_switch_fractal_2d_to_3d() {
     let mut params = FractalParams::default();
     params.switch_fractal(FractalType::Mandelbulb3D);
-    assert_eq!(params.fractal_type, FractalType::Mandelbulb3D);
-    assert_eq!(params.render_mode, RenderMode::ThreeD);
+    assert_eq!(params.settings.fractal_type, FractalType::Mandelbulb3D);
+    assert_eq!(params.settings.render_mode, RenderMode::ThreeD);
 }
 
 #[test]
@@ -22,57 +22,60 @@ fn test_switch_fractal_3d_to_2d() {
     let mut params = FractalParams::default();
     params.switch_fractal(FractalType::Mandelbulb3D);
     params.switch_fractal(FractalType::Julia2D);
-    assert_eq!(params.fractal_type, FractalType::Julia2D);
-    assert_eq!(params.render_mode, RenderMode::TwoD);
+    assert_eq!(params.settings.fractal_type, FractalType::Julia2D);
+    assert_eq!(params.settings.render_mode, RenderMode::TwoD);
 }
 
 #[test]
 fn test_palette_cycling() {
     let mut params = FractalParams::default();
-    assert_eq!(params.palette_index, 0);
-    assert_eq!(params.palette.name, "Fire");
+    assert_eq!(params.settings.palette_index, 0);
+    assert_eq!(params.settings.palette.name, "Fire");
 
     params.next_palette();
-    assert_eq!(params.palette_index, 1);
-    assert_eq!(params.palette.name, "Ocean");
+    assert_eq!(params.settings.palette_index, 1);
+    assert_eq!(params.settings.palette.name, "Ocean");
 
     params.next_palette();
-    assert_eq!(params.palette_index, 2);
-    assert_eq!(params.palette.name, "Rainbow");
+    assert_eq!(params.settings.palette_index, 2);
+    assert_eq!(params.settings.palette.name, "Rainbow");
 }
 
 #[test]
 fn test_palette_cycling_wraps() {
     let mut params = FractalParams::default();
-    params.palette_index = ColorPalette::ALL.len() - 1;
-    params.palette = ColorPalette::ALL[params.palette_index];
+    params.settings.palette_index = ColorPalette::ALL.len() - 1;
+    params.settings.palette = ColorPalette::ALL[params.settings.palette_index];
 
     params.next_palette();
-    assert_eq!(params.palette_index, 0);
-    assert_eq!(params.palette.name, "Fire");
+    assert_eq!(params.settings.palette_index, 0);
+    assert_eq!(params.settings.palette.name, "Fire");
 }
 
 #[test]
 fn test_palette_prev() {
     let mut params = FractalParams {
-        palette_index: 2,
-        palette: ColorPalette::ALL[2],
+        settings: RenderSettings {
+            palette_index: 2,
+            palette: ColorPalette::ALL[2],
+            ..Default::default()
+        },
         ..Default::default()
     };
 
     params.prev_palette();
-    assert_eq!(params.palette_index, 1);
-    assert_eq!(params.palette.name, "Ocean");
+    assert_eq!(params.settings.palette_index, 1);
+    assert_eq!(params.settings.palette.name, "Ocean");
 }
 
 #[test]
 fn test_palette_prev_wraps() {
     let mut params = FractalParams::default();
-    assert_eq!(params.palette_index, 0);
+    assert_eq!(params.settings.palette_index, 0);
 
     params.prev_palette();
-    assert_eq!(params.palette_index, ColorPalette::ALL.len() - 1);
-    assert_eq!(params.palette.name, "Volcano"); // Last palette (xfractint)
+    assert_eq!(params.settings.palette_index, ColorPalette::ALL.len() - 1);
+    assert_eq!(params.settings.palette.name, "Volcano"); // Last palette (xfractint)
 }
 
 #[test]
@@ -123,21 +126,21 @@ fn test_palette_colors_valid() {
 #[test]
 fn test_material_properties_valid() {
     let params = FractalParams::default();
-    assert!(params.roughness >= 0.0 && params.roughness <= 1.0);
-    assert!(params.metallic >= 0.0 && params.metallic <= 1.0);
-    assert!(params.albedo.x >= 0.0 && params.albedo.x <= 1.0);
-    assert!(params.albedo.y >= 0.0 && params.albedo.y <= 1.0);
-    assert!(params.albedo.z >= 0.0 && params.albedo.z <= 1.0);
+    assert!(params.settings.roughness >= 0.0 && params.settings.roughness <= 1.0);
+    assert!(params.settings.metallic >= 0.0 && params.settings.metallic <= 1.0);
+    assert!(params.settings.albedo.x >= 0.0 && params.settings.albedo.x <= 1.0);
+    assert!(params.settings.albedo.y >= 0.0 && params.settings.albedo.y <= 1.0);
+    assert!(params.settings.albedo.z >= 0.0 && params.settings.albedo.z <= 1.0);
 }
 
 #[test]
 fn test_3d_parameters_valid() {
     let params = FractalParams::default();
-    assert!(params.power > 0.0);
-    assert!(params.max_steps > 0);
-    assert!(params.min_distance > 0.0);
-    assert!(params.dof_focal_length > 0.0);
-    assert!(params.dof_aperture > 0.0);
+    assert!(params.settings.power > 0.0);
+    assert!(params.settings.max_steps > 0);
+    assert!(params.settings.min_distance > 0.0);
+    assert!(params.settings.dof_focal_length > 0.0);
+    assert!(params.settings.dof_aperture > 0.0);
 }
 
 // ===========================================================================
@@ -172,48 +175,96 @@ fn default_roundtrips_through_settings_yaml() {
     let rebuilt = FractalParams::from_settings(parsed);
 
     // Derived fields that from_settings recomputes (not stored in Settings).
-    assert_eq!(rebuilt.fractal_type, original.fractal_type);
-    assert_eq!(rebuilt.render_mode, original.render_mode);
-    assert_eq!(rebuilt.palette_index, original.palette_index);
-    assert_eq!(rebuilt.palette.name, original.palette.name);
-    assert_eq!(rebuilt.palette_offset, original.palette_offset);
+    assert_eq!(
+        rebuilt.settings.fractal_type,
+        original.settings.fractal_type
+    );
+    assert_eq!(rebuilt.settings.render_mode, original.settings.render_mode);
+    assert_eq!(
+        rebuilt.settings.palette_index,
+        original.settings.palette_index
+    );
+    assert_eq!(
+        rebuilt.settings.palette.name,
+        original.settings.palette.name
+    );
+    assert_eq!(
+        rebuilt.settings.palette_offset,
+        original.settings.palette_offset
+    );
 
     // Representative serialized knobs across every section — if the split
     // drops or renames any of these, this fires.
-    assert_eq!(rebuilt.max_iterations, original.max_iterations);
-    assert_eq!(rebuilt.zoom_2d, original.zoom_2d);
-    assert_eq!(rebuilt.center_2d, original.center_2d);
-    assert_eq!(rebuilt.julia_c, original.julia_c);
-    assert_eq!(rebuilt.power, original.power);
-    assert_eq!(rebuilt.max_steps, original.max_steps);
-    assert_eq!(rebuilt.min_distance, original.min_distance);
-    assert_eq!(rebuilt.ao_intensity, original.ao_intensity);
-    assert_eq!(rebuilt.shadow_mode, original.shadow_mode);
-    assert_eq!(rebuilt.shadow_samples, original.shadow_samples);
-    assert_eq!(rebuilt.dof_samples, original.dof_samples);
-    assert_eq!(rebuilt.fractal_scale, original.fractal_scale);
-    assert_eq!(rebuilt.fractal_fold, original.fractal_fold);
-    assert_eq!(rebuilt.roughness, original.roughness);
-    assert_eq!(rebuilt.metallic, original.metallic);
-    assert_eq!(rebuilt.albedo, original.albedo);
-    assert_eq!(rebuilt.light_intensity, original.light_intensity);
-    assert_eq!(rebuilt.floor_height, original.floor_height);
-    assert_eq!(rebuilt.fog_density, original.fog_density);
-    assert_eq!(rebuilt.camera_fov, original.camera_fov);
-    assert_eq!(rebuilt.auto_orbit, original.auto_orbit);
-    assert_eq!(rebuilt.brightness, original.brightness);
-    assert_eq!(rebuilt.bloom_enabled, original.bloom_enabled);
-    assert_eq!(rebuilt.bloom_intensity, original.bloom_intensity);
-    assert_eq!(rebuilt.fxaa_enabled, original.fxaa_enabled);
     assert_eq!(
-        rebuilt.attractor_accumulation_enabled,
-        original.attractor_accumulation_enabled
+        rebuilt.settings.max_iterations,
+        original.settings.max_iterations
+    );
+    assert_eq!(rebuilt.settings.zoom_2d, original.settings.zoom_2d);
+    assert_eq!(rebuilt.settings.center_2d, original.settings.center_2d);
+    assert_eq!(rebuilt.settings.julia_c, original.settings.julia_c);
+    assert_eq!(rebuilt.settings.power, original.settings.power);
+    assert_eq!(rebuilt.settings.max_steps, original.settings.max_steps);
+    assert_eq!(
+        rebuilt.settings.min_distance,
+        original.settings.min_distance
     );
     assert_eq!(
-        rebuilt.attractor_iterations_per_frame,
-        original.attractor_iterations_per_frame
+        rebuilt.settings.ao_intensity,
+        original.settings.ao_intensity
     );
-    assert_eq!(rebuilt.attractor_log_scale, original.attractor_log_scale);
+    assert_eq!(rebuilt.settings.shadow_mode, original.settings.shadow_mode);
+    assert_eq!(
+        rebuilt.settings.shadow_samples,
+        original.settings.shadow_samples
+    );
+    assert_eq!(rebuilt.settings.dof_samples, original.settings.dof_samples);
+    assert_eq!(
+        rebuilt.settings.fractal_scale,
+        original.settings.fractal_scale
+    );
+    assert_eq!(
+        rebuilt.settings.fractal_fold,
+        original.settings.fractal_fold
+    );
+    assert_eq!(rebuilt.settings.roughness, original.settings.roughness);
+    assert_eq!(rebuilt.settings.metallic, original.settings.metallic);
+    assert_eq!(rebuilt.settings.albedo, original.settings.albedo);
+    assert_eq!(
+        rebuilt.settings.light_intensity,
+        original.settings.light_intensity
+    );
+    assert_eq!(
+        rebuilt.settings.floor_height,
+        original.settings.floor_height
+    );
+    assert_eq!(rebuilt.settings.fog_density, original.settings.fog_density);
+    assert_eq!(rebuilt.settings.camera_fov, original.settings.camera_fov);
+    assert_eq!(rebuilt.settings.auto_orbit, original.settings.auto_orbit);
+    assert_eq!(rebuilt.settings.brightness, original.settings.brightness);
+    assert_eq!(
+        rebuilt.settings.bloom_enabled,
+        original.settings.bloom_enabled
+    );
+    assert_eq!(
+        rebuilt.settings.bloom_intensity,
+        original.settings.bloom_intensity
+    );
+    assert_eq!(
+        rebuilt.settings.fxaa_enabled,
+        original.settings.fxaa_enabled
+    );
+    assert_eq!(
+        rebuilt.settings.attractor_accumulation_enabled,
+        original.settings.attractor_accumulation_enabled
+    );
+    assert_eq!(
+        rebuilt.settings.attractor_iterations_per_frame,
+        original.settings.attractor_iterations_per_frame
+    );
+    assert_eq!(
+        rebuilt.settings.attractor_log_scale,
+        original.settings.attractor_log_scale
+    );
 }
 
 /// A pre-refactor `Settings` YAML (captured baseline) must still parse under
@@ -226,16 +277,16 @@ fn old_settings_yaml_loads_default() {
     let params = FractalParams::from_settings(parsed);
 
     // Spot-check representative fields against the known default values.
-    assert_eq!(params.fractal_type, FractalType::Mandelbrot2D);
-    assert_eq!(params.render_mode, RenderMode::TwoD);
-    assert_eq!(params.max_iterations, 80);
-    assert_eq!(params.zoom_2d, 1.0);
-    assert_eq!(params.power, 2.0);
-    assert_eq!(params.max_steps, 200);
-    assert_eq!(params.shadow_mode, 2);
-    assert!(!params.bloom_enabled);
-    assert!(!params.attractor_accumulation_enabled);
-    assert_eq!(params.attractor_iterations_per_frame, 10_000);
+    assert_eq!(params.settings.fractal_type, FractalType::Mandelbrot2D);
+    assert_eq!(params.settings.render_mode, RenderMode::TwoD);
+    assert_eq!(params.settings.max_iterations, 80);
+    assert_eq!(params.settings.zoom_2d, 1.0);
+    assert_eq!(params.settings.power, 2.0);
+    assert_eq!(params.settings.max_steps, 200);
+    assert_eq!(params.settings.shadow_mode, 2);
+    assert!(!params.settings.bloom_enabled);
+    assert!(!params.settings.attractor_accumulation_enabled);
+    assert_eq!(params.settings.attractor_iterations_per_frame, 10_000);
 }
 
 /// Construct a `Settings` with non-default values everywhere and assert the
@@ -330,19 +381,19 @@ fn nondefault_settings_roundtrip_identical() {
     assert_eq!(yaml, reparsed_yaml, "YAML round-trip is not byte-stable");
 
     let params = FractalParams::from_settings(parsed);
-    assert_eq!(params.fractal_type, FractalType::Julia2D);
-    assert_eq!(params.render_mode, RenderMode::TwoD);
-    assert_eq!(params.max_iterations, 1234);
-    assert_eq!(params.zoom_2d, 1e6);
-    assert_eq!(params.center_2d, [-1.5, 0.25]);
-    assert_eq!(params.power, 6.0);
-    assert_eq!(params.max_steps, 333);
-    assert_eq!(params.shadow_mode, 1);
-    assert_eq!(params.shadow_samples, 64);
-    assert!(params.bloom_enabled);
-    assert_eq!(params.bloom_intensity, 0.4);
-    assert!(params.fxaa_enabled);
-    assert!(params.attractor_accumulation_enabled);
-    assert_eq!(params.attractor_iterations_per_frame, 25_000);
-    assert_eq!(params.attractor_log_scale, 3.0);
+    assert_eq!(params.settings.fractal_type, FractalType::Julia2D);
+    assert_eq!(params.settings.render_mode, RenderMode::TwoD);
+    assert_eq!(params.settings.max_iterations, 1234);
+    assert_eq!(params.settings.zoom_2d, 1e6);
+    assert_eq!(params.settings.center_2d, [-1.5, 0.25]);
+    assert_eq!(params.settings.power, 6.0);
+    assert_eq!(params.settings.max_steps, 333);
+    assert_eq!(params.settings.shadow_mode, 1);
+    assert_eq!(params.settings.shadow_samples, 64);
+    assert!(params.settings.bloom_enabled);
+    assert_eq!(params.settings.bloom_intensity, 0.4);
+    assert!(params.settings.fxaa_enabled);
+    assert!(params.settings.attractor_accumulation_enabled);
+    assert_eq!(params.settings.attractor_iterations_per_frame, 25_000);
+    assert_eq!(params.settings.attractor_log_scale, 3.0);
 }
