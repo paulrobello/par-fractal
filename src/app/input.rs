@@ -6,6 +6,19 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 /// Input handling methods
 impl App {
     pub fn input(&mut self, event: &WindowEvent) -> bool {
+        // ARC-006: any interactive input event must force a redraw, so egui (and
+        // the fractal) actually process it. See `App::input_pending`.
+        if matches!(
+            event,
+            WindowEvent::KeyboardInput { .. }
+                | WindowEvent::MouseInput { .. }
+                | WindowEvent::MouseWheel { .. }
+                | WindowEvent::CursorMoved { .. }
+                | WindowEvent::Touch { .. }
+                | WindowEvent::ModifiersChanged(_)
+        ) {
+            self.input_pending = true;
+        }
         // Let egui handle input first
         let response = self.egui_state.on_window_event(self.window.as_ref(), event);
         if response.consumed {

@@ -85,6 +85,13 @@ pub struct App {
     /// `ControlFlow::Wait` and the app sleeps until the next OS event.
     /// Progressive refinement while idle is ENH-002, NOT this flag.
     scene_dirty: bool,
+    /// ARC-006: set by any unprocessed input event (pointer/keyboard/touch/wheel)
+    /// and OR'd into the redraw decision. Forces a redraw so egui (and the
+    /// fractal) get to process the event. Without this, render-on-demand parks
+    /// the loop after a click that egui doesn't flag for repaint — and since
+    /// egui only updates its pointer/hover state *during* a render, it can never
+    /// request the repaint it would need to resume, freezing the UI.
+    input_pending: bool,
     /// ARC-018: in-flight background GPU enumeration. `Some` while a worker
     /// thread is scanning adapters; the result is drained from the receiver
     /// in `App::update` each frame (no blocking). Native only — on wasm,
@@ -400,6 +407,7 @@ impl App {
             should_exit: false,
             bloom_texture_cleared: false,
             scene_dirty: true,
+            input_pending: false,
             #[cfg(not(target_arch = "wasm32"))]
             gpu_scan_receiver: None,
         }
@@ -496,14 +504,15 @@ impl App {
     /// egui requested a repaint. Also forces a frame while a screenshot /
     /// hi-res render / exit is pending so the request doesn't get stuck.
     pub fn should_render_next_frame(&self) -> bool {
-        if self.scene_dirty || self.is_scene_animation_active() || self.ui_needs_repaint() {
-            return true;
-        }
-        // One-shot events that need a frame to fire even when nothing else changed.
-        if self.save_screenshot || self.save_hires_render.is_some() {
-            return true;
-        }
-        false
+        // `input_pending` covers the egui render-on-demand death spiral: egui
+        // only updates its pointer/hover state during a render, so without a
+        // redraw forced on input it can freeze after a click. See `input_pending`.
+        self.scene_dirty
+            || self.input_pending
+            || self.is_scene_animation_active()
+            || self.ui_needs_repaint()
+            || self.save_screenshot
+            || self.save_hires_render.is_some()
     }
 
     /// ARC-006: hook called from `App::render` after the fractal pass + UI
@@ -511,6 +520,9 @@ impl App {
     /// active (animation sources keep the flag set so the next frame also
     /// renders). Called by `render.rs` at the end of `App::render`.
     pub fn after_render_frame(&mut self) {
+        // The input event has now been processed by this render (egui `run`
+        // consumed it); clear it so the flag is set fresh by the next event.
+        self.input_pending = false;
         if !self.is_scene_animation_active() {
             self.scene_dirty = false;
         }
