@@ -363,17 +363,9 @@ fn two_sum(a: f32, b: f32) -> vec2<f32> {
     return vec2<f32>(s, e);
 }
 
-// Double-float addition: (a_hi, a_lo) + (b_hi, b_lo)
-fn df_add(a_hi: f32, a_lo: f32, b_hi: f32, b_lo: f32) -> vec2<f32> {
-    let s = two_sum(a_hi, b_hi);
-    let t = two_sum(a_lo, b_lo);
-    var c = s.y + t.x;
-    let v = two_sum(s.x, c);
-    c = t.y + v.y;
-    return vec2<f32>(v.x + c, 0.0);  // Simplified: just return (sum, 0)
-}
-
-// More accurate df_add with proper error propagation
+// Double-float addition with proper error propagation (QA-020: removed the
+// simplified `df_add` — it had zero callers and was silently less accurate
+// than `df_add_full`, inviting accidental reuse).
 fn df_add_full(a_hi: f32, a_lo: f32, b_hi: f32, b_lo: f32) -> vec2<f32> {
     let s1 = two_sum(a_hi, b_hi);
     let s2 = two_sum(a_lo, b_lo);
@@ -452,6 +444,22 @@ fn df2_mag_sq(z: df2) -> f32 {
     return z.hi.x * z.hi.x + z.hi.y * z.hi.y;
 }
 
+// Smooth (fractional) iteration count for escape-time fractals (QA-016).
+// Returns (iteration + 1 - nu) / max_iterations where nu is the fractional
+// correction derived from the escape magnitude |z|^2 = mag_sq at bailout.
+// Parameterized over `escape_radius` (R, the bailout whose square the caller
+// compared against) and `power` (n for z^n + c maps), so it serves both
+// fixed-z^2 maps — pass (2.0, 2.0) — and variable-z^n Multibrot variants —
+// pass the actual bailout and n. Callers that defensively clamp the inner
+// ratio with `max(... , eps)` (nova/magnet/collatz) keep their inline
+// epilogues: the clamp is unreachable under their bailouts but is preserved
+// verbatim to avoid any source-level semantic drift.
+fn smooth_iteration_count(iteration: u32, mag_sq: f32, escape_radius: f32, power: f32, max_iterations: u32) -> f32 {
+    let log_zn = log(mag_sq) / 2.0;
+    let nu = log(log_zn / log(escape_radius)) / log(abs(power));
+    return (f32(iteration) + 1.0 - nu) / f32(max_iterations);
+}
+
 // High-precision Mandelbrot
 fn mandelbrot_hp(c_hi: vec2<f32>, c_lo: vec2<f32>) -> f32 {
     var z = df2(vec2<f32>(0.0, 0.0), vec2<f32>(0.0, 0.0));
@@ -468,15 +476,13 @@ fn mandelbrot_hp(c_hi: vec2<f32>, c_lo: vec2<f32>) -> f32 {
         iteration = i;
     }
 
-    if (iteration >= uniforms.max_iterations - 1u) {
-        return 0.0;
+    if (iteration >= max(uniforms.max_iterations, 1u) - 1u) {
+        return -1.0;
     }
 
     // Smooth coloring using high part only (sufficient precision)
     let mag_sq = df2_mag_sq(z);
-    let log_zn = log(mag_sq) / 2.0;
-    let nu = log(log_zn / log(2.0)) / log(2.0);
-    return (f32(iteration) + 1.0 - nu) / f32(uniforms.max_iterations);
+    return smooth_iteration_count(iteration, mag_sq, 2.0, 2.0, uniforms.max_iterations);
 }
 
 // High-precision Julia
@@ -495,14 +501,12 @@ fn julia_hp(z_hi: vec2<f32>, z_lo: vec2<f32>) -> f32 {
         iteration = i;
     }
 
-    if (iteration >= uniforms.max_iterations - 1u) {
-        return 0.0;
+    if (iteration >= max(uniforms.max_iterations, 1u) - 1u) {
+        return -1.0;
     }
 
     let mag_sq = df2_mag_sq(z);
-    let log_zn = log(mag_sq) / 2.0;
-    let nu = log(log_zn / log(2.0)) / log(2.0);
-    return (f32(iteration) + 1.0 - nu) / f32(uniforms.max_iterations);
+    return smooth_iteration_count(iteration, mag_sq, 2.0, 2.0, uniforms.max_iterations);
 }
 
 // High-precision Burning Ship
@@ -526,14 +530,12 @@ fn burning_ship_hp(c_hi: vec2<f32>, c_lo: vec2<f32>) -> f32 {
         iteration = i;
     }
 
-    if (iteration >= uniforms.max_iterations - 1u) {
-        return 0.0;
+    if (iteration >= max(uniforms.max_iterations, 1u) - 1u) {
+        return -1.0;
     }
 
     let mag_sq = df2_mag_sq(z);
-    let log_zn = log(mag_sq) / 2.0;
-    let nu = log(log_zn / log(2.0)) / log(2.0);
-    return (f32(iteration) + 1.0 - nu) / f32(uniforms.max_iterations);
+    return smooth_iteration_count(iteration, mag_sq, 2.0, 2.0, uniforms.max_iterations);
 }
 
 // High-precision Tricorn
@@ -554,14 +556,12 @@ fn tricorn_hp(c_hi: vec2<f32>, c_lo: vec2<f32>) -> f32 {
         iteration = i;
     }
 
-    if (iteration >= uniforms.max_iterations - 1u) {
-        return 0.0;
+    if (iteration >= max(uniforms.max_iterations, 1u) - 1u) {
+        return -1.0;
     }
 
     let mag_sq = df2_mag_sq(z);
-    let log_zn = log(mag_sq) / 2.0;
-    let nu = log(log_zn / log(2.0)) / log(2.0);
-    return (f32(iteration) + 1.0 - nu) / f32(uniforms.max_iterations);
+    return smooth_iteration_count(iteration, mag_sq, 2.0, 2.0, uniforms.max_iterations);
 }
 
 // ============================================================================
@@ -598,14 +598,12 @@ fn mandelbrot(c: vec2<f32>) -> f32 {
         iteration = i;
     }
 
-    if (iteration >= uniforms.max_iterations - 1u) {
-        return 0.0;
+    if (iteration >= max(uniforms.max_iterations, 1u) - 1u) {
+        return -1.0;
     }
 
     // Smooth coloring (adjusted for variable power)
-    let log_zn = log(dot(z, z)) / 2.0;
-    let nu = log(log_zn / log(escape_radius)) / log(abs(n));
-    return (f32(iteration) + 1.0 - nu) / f32(uniforms.max_iterations);
+    return smooth_iteration_count(iteration, dot(z, z), escape_radius, n, uniforms.max_iterations);
 }
 
 fn julia(z_start: vec2<f32>) -> f32 {
@@ -624,14 +622,12 @@ fn julia(z_start: vec2<f32>) -> f32 {
         iteration = i;
     }
 
-    if (iteration >= uniforms.max_iterations - 1u) {
-        return 0.0;
+    if (iteration >= max(uniforms.max_iterations, 1u) - 1u) {
+        return -1.0;
     }
 
     // Smooth coloring (adjusted for variable power)
-    let log_zn = log(dot(z, z)) / 2.0;
-    let nu = log(log_zn / log(escape_radius)) / log(abs(n));
-    return (f32(iteration) + 1.0 - nu) / f32(uniforms.max_iterations);
+    return smooth_iteration_count(iteration, dot(z, z), escape_radius, n, uniforms.max_iterations);
 }
 
 fn sierpinski(coord: vec2<f32>) -> f32 {
@@ -640,7 +636,7 @@ fn sierpinski(coord: vec2<f32>) -> f32 {
 
     // Check if outside main square
     if (p.x < 0.0 || p.x >= 1.0 || p.y < 0.0 || p.y >= 1.0) {
-        return 0.0;
+        return -1.0;
     }
 
     var scale = 1.0;
@@ -659,7 +655,7 @@ fn sierpinski(coord: vec2<f32>) -> f32 {
 
         // Check if in the center cell (removed region)
         if (cell_x == 1.0 && cell_y == 1.0) {
-            return 0.0; // Point is removed
+            return -1.0; // Point is removed (sentinel: render as interior)
         }
 
         // Move to next subdivision level
@@ -712,7 +708,7 @@ fn sierpinski_triangle(coord: vec2<f32>) -> f32 {
 
     // Check if outside the main triangle
     if (bary.x < 0.0 || bary.y < 0.0 || bary.z < 0.0) {
-        return 0.0;  // Outside triangle - render as black
+        return -1.0;  // Outside triangle - render as black (sentinel)
     }
 
     // Iterate using barycentric subdivision
@@ -741,7 +737,7 @@ fn sierpinski_triangle(coord: vec2<f32>) -> f32 {
     }
 
     // Point survived all iterations - it's in the fractal (like points in Mandelbrot set)
-    return 0.0;
+    return -1.0;
 }
 
 // High-precision version for extreme zooms
@@ -767,13 +763,11 @@ fn burning_ship(c: vec2<f32>) -> f32 {
         iteration = i;
     }
 
-    if (iteration >= uniforms.max_iterations - 1u) {
-        return 0.0;
+    if (iteration >= max(uniforms.max_iterations, 1u) - 1u) {
+        return -1.0;
     }
 
-    let log_zn = log(dot(z, z)) / 2.0;
-    let nu = log(log_zn / log(escape_radius)) / log(abs(n));
-    return (f32(iteration) + 1.0 - nu) / f32(uniforms.max_iterations);
+    return smooth_iteration_count(iteration, dot(z, z), escape_radius, n, uniforms.max_iterations);
 }
 
 fn tricorn(c: vec2<f32>) -> f32 {
@@ -793,13 +787,11 @@ fn tricorn(c: vec2<f32>) -> f32 {
         iteration = i;
     }
 
-    if (iteration >= uniforms.max_iterations - 1u) {
-        return 0.0;
+    if (iteration >= max(uniforms.max_iterations, 1u) - 1u) {
+        return -1.0;
     }
 
-    let log_zn = log(dot(z, z)) / 2.0;
-    let nu = log(log_zn / log(escape_radius)) / log(abs(n));
-    return (f32(iteration) + 1.0 - nu) / f32(uniforms.max_iterations);
+    return smooth_iteration_count(iteration, dot(z, z), escape_radius, n, uniforms.max_iterations);
 }
 
 fn phoenix(c: vec2<f32>) -> f32 {
@@ -829,13 +821,11 @@ fn phoenix(c: vec2<f32>) -> f32 {
         iteration = i;
     }
 
-    if (iteration >= uniforms.max_iterations - 1u) {
-        return 0.0;
+    if (iteration >= max(uniforms.max_iterations, 1u) - 1u) {
+        return -1.0;
     }
 
-    let log_zn = log(dot(z, z)) / 2.0;
-    let nu = log(log_zn / log(escape_radius)) / log(abs(n));
-    return (f32(iteration) + 1.0 - nu) / f32(uniforms.max_iterations);
+    return smooth_iteration_count(iteration, dot(z, z), escape_radius, n, uniforms.max_iterations);
 }
 
 fn celtic(c: vec2<f32>) -> f32 {
@@ -855,13 +845,11 @@ fn celtic(c: vec2<f32>) -> f32 {
         iteration = i;
     }
 
-    if (iteration >= uniforms.max_iterations - 1u) {
-        return 0.0;
+    if (iteration >= max(uniforms.max_iterations, 1u) - 1u) {
+        return -1.0;
     }
 
-    let log_zn = log(dot(z, z)) / 2.0;
-    let nu = log(log_zn / log(escape_radius)) / log(abs(n));
-    return (f32(iteration) + 1.0 - nu) / f32(uniforms.max_iterations);
+    return smooth_iteration_count(iteration, dot(z, z), escape_radius, n, uniforms.max_iterations);
 }
 
 // Newton fractal - finds roots of z^3 - 1
@@ -981,10 +969,13 @@ fn nova_fractal(c: vec2<f32>) -> f32 {
         iteration = i;
     }
 
-    if (iteration >= uniforms.max_iterations - 1u) {
-        return 0.0;
+    if (iteration >= max(uniforms.max_iterations, 1u) - 1u) {
+        return -1.0;
     }
 
+    // Smooth coloring — defensive max(... , eps) clamp preserved (unreachable
+    // under the >4 bailout but kept verbatim). Not consolidated into
+    // smooth_iteration_count because that would silently drop the clamp.
     let log_zn = log(dot(z, z)) / 2.0;
     let nu = log(max(log_zn / log(2.0), 0.0001)) / log(2.0);
     return (f32(iteration) + 1.0 - nu) / f32(uniforms.max_iterations);
@@ -1003,7 +994,7 @@ fn magnet_fractal(c: vec2<f32>) -> f32 {
         // Check for convergence to fixed point at z = 1
         let dist_to_one = distance(z, vec2<f32>(1.0, 0.0));
         if (dist_to_one < 0.0001) {
-            return 0.0;  // Converged to attractor
+            return -1.0;  // Converged to attractor (sentinel: render as interior)
         }
 
         // z² = (z.x + iz.y)² = z.x² - z.y² + 2i*z.x*z.y
@@ -1029,10 +1020,13 @@ fn magnet_fractal(c: vec2<f32>) -> f32 {
         iteration = i;
     }
 
-    if (iteration >= uniforms.max_iterations - 1u) {
-        return 0.0;
+    if (iteration >= max(uniforms.max_iterations, 1u) - 1u) {
+        return -1.0;
     }
 
+    // Smooth coloring — defensive clamps preserved (unreachable under the
+    // >10000 bailout but kept verbatim). Not consolidated into
+    // smooth_iteration_count because that would silently drop the clamps.
     let log_zn = log(max(dot(z, z), 1.0)) / 2.0;
     let nu = log(max(log_zn / log(2.0), 0.0001)) / log(2.0);
     return (f32(iteration) + 1.0 - nu) / f32(uniforms.max_iterations);
@@ -2147,38 +2141,28 @@ fn scene_de_with_material(pos: vec3<f32>) -> SceneResult {
     var result: SceneResult;
     var fractal_dist = 1000.0;
 
-    // 3D fractals start at type 13 (after 13 2D types: 0-12)
-    if (uniforms.fractal_type == 13u) {
-        fractal_dist = mandelbulb_de(pos);
-    } else if (uniforms.fractal_type == 14u) {
-        fractal_dist = menger_sponge_de(pos);
-    } else if (uniforms.fractal_type == 15u) {
-        fractal_dist = sierpinski_pyramid_de(pos);
-    } else if (uniforms.fractal_type == 16u) {
-        fractal_dist = julia_set_3d_de(pos);
-    } else if (uniforms.fractal_type == 17u) {
-        fractal_dist = mandelbox_de(pos);
-    } else if (uniforms.fractal_type == 18u) {
-        fractal_dist = octahedral_ifs_de(pos);
-    } else if (uniforms.fractal_type == 19u) {
-        fractal_dist = icosahedral_ifs_de(pos);
-    } else if (uniforms.fractal_type == 20u) {
-        fractal_dist = apollonian_gasket_de(pos);
-    } else if (uniforms.fractal_type == 21u) {
-        fractal_dist = kleinian_de(pos);
-    } else if (uniforms.fractal_type == 22u) {
-        fractal_dist = hybrid_mandelbulb_julia_de(pos);
-    } else if (uniforms.fractal_type == 23u) {
-        fractal_dist = quaternion_cubic_de(pos);
-    } else if (uniforms.fractal_type == 24u) {
-        fractal_dist = sierpinski_gasket_de(pos);
-    // 3D Strange Attractors (types 35-37)
-    } else if (uniforms.fractal_type == 35u) {
-        fractal_dist = pickover_attractor_de(pos);
-    } else if (uniforms.fractal_type == 36u) {
-        fractal_dist = lorenz_attractor_de(pos);
-    } else if (uniforms.fractal_type == 37u) {
-        fractal_dist = rossler_attractor_de(pos);
+    // 3D fractals start at type 13 (after 13 2D types: 0-12). QA-030: switch
+    // is the direct expression of "dispatch on fractal_type" and lets naga
+    // build a jump table instead of a linear scan; the default keeps the
+    // 1000.0 sentinel for any 2D type that reaches ray_march (shouldn't happen).
+    switch uniforms.fractal_type {
+        case 13u: { fractal_dist = mandelbulb_de(pos); }
+        case 14u: { fractal_dist = menger_sponge_de(pos); }
+        case 15u: { fractal_dist = sierpinski_pyramid_de(pos); }
+        case 16u: { fractal_dist = julia_set_3d_de(pos); }
+        case 17u: { fractal_dist = mandelbox_de(pos); }
+        case 18u: { fractal_dist = octahedral_ifs_de(pos); }
+        case 19u: { fractal_dist = icosahedral_ifs_de(pos); }
+        case 20u: { fractal_dist = apollonian_gasket_de(pos); }
+        case 21u: { fractal_dist = kleinian_de(pos); }
+        case 22u: { fractal_dist = hybrid_mandelbulb_julia_de(pos); }
+        case 23u: { fractal_dist = quaternion_cubic_de(pos); }
+        case 24u: { fractal_dist = sierpinski_gasket_de(pos); }
+        // 3D Strange Attractors (types 35-37)
+        case 35u: { fractal_dist = pickover_attractor_de(pos); }
+        case 36u: { fractal_dist = lorenz_attractor_de(pos); }
+        case 37u: { fractal_dist = rossler_attractor_de(pos); }
+        default: { fractal_dist = 1000.0; }
     }
 
     var floor_dist = 1000.0;
@@ -2240,6 +2224,42 @@ struct RayMarchResult {
     material_id: u32,
 }
 
+// Conservative per-type bounding-sphere radius for empty-space skipping (QA-014).
+// Values are world-space extents pre-scale; the return includes a 1.5x safety
+// margin and max(scale, 1) so bigger-than-default `fractal_scale` (which most
+// DE functions divide IN by, effectively multiplying world extent) is honoured.
+// Err generous: too tight a radius visibly clips geometry; too loose just
+// skips less empty space. The pre-QA-014 formula was ~3,250 units for default
+// params, guaranteeing the camera was always inside the sphere and the skip
+// never fired.
+fn bounding_radius_for_type(fractal_type: u32, fractal_scale: f32) -> f32 {
+    // Per-family conservative extents (world units, pre-scale). See DE funcs:
+    var r: f32 = 2.5;  // safe default for unhandled types
+    switch fractal_type {
+        // 3D escape-time / IFS fractals (types 13..=24):
+        case 13u: { r = 1.5; }                       // Mandelbulb3D  (unit bulb, |z|<2 bailout)
+        case 14u: { r = 1.8; }                       // MengerSponge3D (unit cube)
+        case 15u: { r = 2.0; }                       // SierpinskiPyramid3D
+        case 16u: { r = 2.0; }                       // JuliaSet3D (quat Julia, |q|<2 bailout)
+        case 17u: { r = 4.0 * abs(fractal_scale); }  // Mandelbox3D (folds scale with slider)
+        case 18u: { r = 2.5; }                       // OctahedralIFS3D
+        case 19u: { r = 2.5; }                       // IcosahedralIFS3D
+        case 20u: { r = 2.0; }                       // ApollonianGasket3D
+        case 21u: { r = 4.0; }                       // Kleinian3D (amazing surface)
+        case 22u: { r = 2.0; }                       // HybridMandelbulbJulia3D
+        case 23u: { r = 2.0; }                       // QuaternionCubic3D (|q|<2 bailout)
+        case 24u: { r = 2.0; }                       // SierpinskiGasket3D
+        // 3D strange attractors (types 35..=37): point-cloud extents.
+        // pickover/rossler ~20 raw, lorenz ~30 raw (centred at z≈25); each is
+        // multiplied by fractal_scale in its DE, so apply max(scale,1) below.
+        case 35u: { r = 30.0; }                      // Pickover3D
+        case 36u: { r = 60.0; }                      // Lorenz3D (wingspan ~30 around z=25)
+        case 37u: { r = 30.0; }                      // Rossler3D
+        default: { r = 2.5; }                        // 2D types / unknown — safe fallback
+    }
+    return r * max(fractal_scale, 1.0) * 1.5;  // 1.5x safety margin
+}
+
 fn ray_march(origin: vec3<f32>, direction: vec3<f32>) -> RayMarchResult {
     var result: RayMarchResult;
     result.hit = false;
@@ -2247,16 +2267,13 @@ fn ray_march(origin: vec3<f32>, direction: vec3<f32>) -> RayMarchResult {
     result.steps = 0u;
     result.material_id = 0u;
 
-    // Bounding sphere acceleration: skip empty space when camera is outside sphere
+    // Bounding sphere acceleration: skip empty space when camera is outside sphere.
+    // Per-type conservative radius (QA-014): the old iteration-count formula
+    // yielded ~3,250 units and the camera was always inside the sphere, so the
+    // skip never fired. The fractal's spatial extent is independent of iteration
+    // count; radius is now keyed to fractal_type with a safety margin.
     var total_distance = 0.0;
-    // Conservative bounding radius to account for all fractal types and parameters
-    // Different fractals grow at different rates with iterations:
-    // - Menger Sponge: 3^iterations
-    // - IFS fractals: (fold+1)^steps
-    // - Apollonian: complex growth with min_radius
-    // Use very conservative multiplier to ensure we never clip the fractal
-    let iteration_factor = f32(max(uniforms.max_iterations, uniforms.max_steps)) * 0.1;
-    let bounding_radius = 50.0 * uniforms.fractal_scale * max(1.0, uniforms.fractal_fold) * max(1.0, iteration_factor);
+    let bounding_radius = bounding_radius_for_type(uniforms.fractal_type, uniforms.fractal_scale);
     let bounding_center = vec3<f32>(0.0);
 
     // Check if camera is outside the bounding sphere
@@ -2977,28 +2994,24 @@ fn fs_main_2d(input: VertexOutput) -> @location(0) vec4<f32> {
         let coord_lo = vec2<f32>(coord_x.y, coord_y.y);
         coord = coord_hi; // Use high part for color modes
 
-        // Use high-precision fractal functions
-        if (uniforms.fractal_type == 0u) {
-            t = mandelbrot_hp(coord_hi, coord_lo);
-        } else if (uniforms.fractal_type == 1u) {
-            t = julia_hp(coord_hi, coord_lo);
-        } else if (uniforms.fractal_type == 2u) {
-            t = sierpinski_hp(coord_hi, coord_lo);
-        } else if (uniforms.fractal_type == 3u) {
-            t = sierpinski_triangle_hp(coord_hi, coord_lo);
-        } else if (uniforms.fractal_type == 4u) {
-            t = burning_ship_hp(coord_hi, coord_lo);
-        } else if (uniforms.fractal_type == 5u) {
-            t = tricorn_hp(coord_hi, coord_lo);
-        } else {
-            // Defensive fallback (unreachable: gate ensures type in 0..=5).
-            // Use standard-precision coord + mandelbrot as a safe default —
-            // never silently dispatch through an hp function.
-            coord = vec2<f32>(
-                uniforms.center.x + (input.uv.x * 2.0 / uniforms.zoom) * aspect,
-                uniforms.center.y + (input.uv.y * 2.0 / uniforms.zoom)
-            );
-            t = mandelbrot(coord);
+        // Use high-precision fractal functions (QA-030: switch on fractal_type)
+        switch uniforms.fractal_type {
+            case 0u: { t = mandelbrot_hp(coord_hi, coord_lo); }
+            case 1u: { t = julia_hp(coord_hi, coord_lo); }
+            case 2u: { t = sierpinski_hp(coord_hi, coord_lo); }
+            case 3u: { t = sierpinski_triangle_hp(coord_hi, coord_lo); }
+            case 4u: { t = burning_ship_hp(coord_hi, coord_lo); }
+            case 5u: { t = tricorn_hp(coord_hi, coord_lo); }
+            default: {
+                // Defensive fallback (unreachable: gate ensures type in 0..=5).
+                // Use standard-precision coord + mandelbrot as a safe default —
+                // never silently dispatch through an hp function.
+                coord = vec2<f32>(
+                    uniforms.center.x + (input.uv.x * 2.0 / uniforms.zoom) * aspect,
+                    uniforms.center.y + (input.uv.y * 2.0 / uniforms.zoom)
+                );
+                t = mandelbrot(coord);
+            }
         }
     } else {
         // Standard precision coordinate
@@ -3007,58 +3020,40 @@ fn fs_main_2d(input: VertexOutput) -> @location(0) vec4<f32> {
             uniforms.center.y + (input.uv.y * 2.0 / uniforms.zoom)
         );
 
-        if (uniforms.fractal_type == 0u) {
-            t = mandelbrot(coord);
-        } else if (uniforms.fractal_type == 1u) {
-            t = julia(coord);
-        } else if (uniforms.fractal_type == 2u) {
-            t = sierpinski(coord);
-        } else if (uniforms.fractal_type == 3u) {
-            t = sierpinski_triangle(coord);
-        } else if (uniforms.fractal_type == 4u) {
-            t = burning_ship(coord);
-        } else if (uniforms.fractal_type == 5u) {
-            t = tricorn(coord);
-        } else if (uniforms.fractal_type == 6u) {
-            t = phoenix(coord);
-        } else if (uniforms.fractal_type == 7u) {
-            t = celtic(coord);
-        } else if (uniforms.fractal_type == 8u) {
-            t = newton_fractal(coord);
-        } else if (uniforms.fractal_type == 9u) {
-            t = lyapunov_fractal(coord);
-        } else if (uniforms.fractal_type == 10u) {
-            t = nova_fractal(coord);
-        } else if (uniforms.fractal_type == 11u) {
-            t = magnet_fractal(coord);
-        } else if (uniforms.fractal_type == 12u) {
-            t = collatz_fractal(coord);
-        // Strange Attractors (types 26-34, indices after 3D fractals)
-        } else if (uniforms.fractal_type == 26u) {
-            t = hopalong_attractor(coord);
-        } else if (uniforms.fractal_type == 27u) {
-            t = henon_attractor(coord);
-        } else if (uniforms.fractal_type == 28u) {
-            t = martin_attractor(coord);
-        } else if (uniforms.fractal_type == 29u) {
-            t = gingerbreadman_attractor(coord);
-        } else if (uniforms.fractal_type == 30u) {
-            t = latoocarfian_attractor(coord);
-        } else if (uniforms.fractal_type == 31u) {
-            t = chip_attractor(coord);
-        } else if (uniforms.fractal_type == 32u) {
-            t = quadruptwo_attractor(coord);
-        } else if (uniforms.fractal_type == 33u) {
-            t = threeply_attractor(coord);
-        } else if (uniforms.fractal_type == 34u) {
-            t = icon_attractor(coord);
-        } else {
-            t = collatz_fractal(coord);
+        // QA-030: switch replaces the 21-arm if/else-if ladder.
+        switch uniforms.fractal_type {
+            case 0u: { t = mandelbrot(coord); }
+            case 1u: { t = julia(coord); }
+            case 2u: { t = sierpinski(coord); }
+            case 3u: { t = sierpinski_triangle(coord); }
+            case 4u: { t = burning_ship(coord); }
+            case 5u: { t = tricorn(coord); }
+            case 6u: { t = phoenix(coord); }
+            case 7u: { t = celtic(coord); }
+            case 8u: { t = newton_fractal(coord); }
+            case 9u: { t = lyapunov_fractal(coord); }
+            case 10u: { t = nova_fractal(coord); }
+            case 11u: { t = magnet_fractal(coord); }
+            case 12u: { t = collatz_fractal(coord); }
+            // Strange Attractors (types 26-34, indices after 3D fractals)
+            case 26u: { t = hopalong_attractor(coord); }
+            case 27u: { t = henon_attractor(coord); }
+            case 28u: { t = martin_attractor(coord); }
+            case 29u: { t = gingerbreadman_attractor(coord); }
+            case 30u: { t = latoocarfian_attractor(coord); }
+            case 31u: { t = chip_attractor(coord); }
+            case 32u: { t = quadruptwo_attractor(coord); }
+            case 33u: { t = threeply_attractor(coord); }
+            case 34u: { t = icon_attractor(coord); }
+            default: { t = collatz_fractal(coord); }
         }
     }
 
-    if (t == 0.0) {
-        // No post-processing - render raw fractal (post-FX done in multi-pass pipeline)
+    if (t < 0.0) {
+        // Sentinel: fractal function returned -1.0 to signal "inside the set"
+        // (escape-time interior, sierpinski removed-cell, magnet convergence, etc.).
+        // QA-023: previously `t == 0.0`, which conflated a legitimate first-iteration
+        // smooth value of exactly 0.0 with the interior sentinel.
         return vec4<f32>(0.0, 0.0, 0.0, 1.0);
     }
 
