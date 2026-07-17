@@ -1,0 +1,183 @@
+fractal_type: Mandelbrot2D
+shading_model: PBR
+color_mode: Palette
+palette_index: 0
+orbit_trap_scale: 1.0
+channel_r: Iterations
+channel_g: Distance
+channel_b: PositionZ
+procedural_palette: None
+procedural_brightness:
+- 0.5
+- 0.5
+- 0.5
+procedural_contrast:
+- 0.5
+- 0.5
+- 0.5
+procedural_frequency:
+- 1.0
+- 1.0
+- 1.0
+procedural_phase:
+- 0.0
+- 0.333
+- 0.667
+ui_state:
+  fractal_type_open: true
+  presets_open: false
+  color_viz_open: true
+  params_2d_open: true
+  params_3d_open: true
+  ray_marching_open: false
+  camera_open: false
+  shading_open: true
+  lighting_open: true
+  effects_open: false
+  floor_open: false
+  lod_open: false
+  settings_open: false
+  controls_open: false
+  capture_window_open: false
+  about_window_open: false
+  show_fps: false
+  show_camera_info: false
+auto_open_captures: false
+custom_width: '1920'
+custom_height: '1080'
+center_2d:
+- 0.0
+- 0.0
+zoom_2d: 1.0
+julia_c:
+- -0.7
+- 0.27015
+max_iterations: 80
+power: 2.0
+max_steps: 200
+min_distance: 0.00035
+ambient_occlusion: true
+ao_intensity: 1.0
+ao_step_size: 0.12
+shadow_mode: 2
+shadow_softness: 8.0
+shadow_max_distance: 5.0
+shadow_samples: 128
+shadow_step_factor: 0.6
+depth_of_field: false
+dof_focal_length: 6.0
+dof_aperture: 0.01
+dof_samples: 2
+fractal_scale: 2.0
+fractal_fold: 1.0
+fractal_min_radius: 0.5
+roughness: 0.4
+metallic: 0.2
+albedo:
+- 0.8
+- 0.8
+- 0.8
+light_intensity: 3.0
+ambient_light: 0.15
+light_azimuth: 45.0
+light_elevation: 35.0
+show_floor: true
+floor_height: -2.0
+floor_color1:
+- 1.0
+- 1.0
+- 1.0
+floor_color2:
+- 0.0
+- 0.0
+- 0.0
+floor_reflections: false
+floor_reflection_strength: 0.5
+fog_enabled: true
+fog_mode: Quadratic
+fog_density: 0.005
+fog_color:
+- 0.0
+- 0.0
+- 0.0
+use_adaptive_step: true
+fixed_step_size: 0.1
+step_multiplier: 1.0
+max_distance: 100.0
+camera_position:
+- 0.0
+- 0.0
+- 3.0
+camera_target:
+- 0.0
+- 0.0
+- 0.0
+camera_speed: 2.0
+camera_fov: 45.0
+auto_orbit: false
+orbit_speed: 0.2
+brightness: 1.0
+contrast: 1.0
+saturation: 1.0
+hue_shift: 0.0
+vignette_enabled: false
+vignette_intensity: 0.5
+vignette_radius: 0.8
+bloom_enabled: false
+bloom_threshold: 0.75
+bloom_intensity: 0.1
+bloom_radius: 0.005
+fxaa_enabled: false
+lod_config:
+  enabled: false
+  profile: Balanced
+  strategy: Hybrid
+  target_fps: 60.0
+  distance_zones:
+  - 10.0
+  - 25.0
+  - 50.0
+  motion_threshold: 0.1
+  restore_delay: 0.5
+  quality_presets:
+  - max_steps: 325
+    min_distance: 0.00035
+    shadow_samples: 128
+    shadow_step_factor: 0.6
+    ao_step_size: 0.12
+    dof_samples: 8
+    render_scale: 1.0
+    iteration_scale: 1.0
+  - max_steps: 250
+    min_distance: 0.0007
+    shadow_samples: 64
+    shadow_step_factor: 0.7
+    ao_step_size: 0.18
+    dof_samples: 4
+    render_scale: 0.85
+    iteration_scale: 0.85
+  - max_steps: 175
+    min_distance: 0.0015
+    shadow_samples: 32
+    shadow_step_factor: 0.8
+    ao_step_size: 0.24
+    dof_samples: 2
+    render_scale: 0.7
+    iteration_scale: 0.6
+  - max_steps: 100
+    min_distance: 0.003
+    shadow_samples: 16
+    shadow_step_factor: 0.9
+    ao_step_size: 0.35
+    dof_samples: 1
+    render_scale: 0.5
+    iteration_scale: 0.35
+  debug_visualization: false
+  smooth_transitions: true
+  transition_duration: 0.3
+  motion_sensitivity: 1.0
+  min_quality_level: 0
+  aggressive_mode: false
+attractor_accumulation_enabled: false
+attractor_iterations_per_frame: 10000
+attractor_log_scale: 4.0
