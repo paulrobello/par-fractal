@@ -13,15 +13,6 @@ impl App {
         // instant the worker thread finishes, without blocking the loop.
         self.poll_gpu_scan();
 
-        // ENH-001 Phase A step 5: drive the perturbation reference-orbit
-        // worker. Records the current view (marking the orbit stale on
-        // pan/zoom/iter change), spawns a worker when stale + gate-met, and
-        // drains any completed orbit onto the GPU. Runs BEFORE
-        // `renderer.update` so the uploaded orbit is reflected in this
-        // frame's uniform write. Cheap when the gate isn't met (the worker
-        // never spawns below log2(zoom) > 24).
-        self.update_perturbation();
-
         // Update FPS counter
         self.frame_count += 1;
         let fps_elapsed = (now - self.fps_timer).as_secs_f32();
@@ -191,6 +182,18 @@ impl App {
         let camera_forward = (self.camera.target - self.camera.position).normalize();
         self.fractal_params
             .update_lod(self.camera.position, camera_forward, dt);
+
+        // ENH-001: drive the perturbation worker AFTER `update_lod` and BEFORE
+        // `renderer.update`. The orbit's spawn-time max_iter and the shader's
+        // uniform both derive from `effective_2d_max_iterations`, which reads
+        // LOD's `iteration_scale` — so they MUST see the same LOD tick or the
+        // async orbit spawns at a pre-tick scale and lands shorter than the
+        // shader's loop (the max_iter desync root-caused 2026-07-18: orbit=89
+        // vs shader=329). Running it here (post-LOD, pre-render) keeps them in
+        // lockstep; the uploaded orbit is still reflected in this frame's
+        // uniform write, and `activate_perturbation` pins the shader to the
+        // orbit length as a backstop.
+        self.update_perturbation();
 
         // Update renderer uniforms
         self.renderer.update(&self.camera, &self.fractal_params);
