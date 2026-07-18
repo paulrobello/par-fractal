@@ -656,7 +656,11 @@ const _: () = assert!(
 pub(super) struct BloomUniforms {
     pub(super) threshold: f32,
     pub(super) intensity: f32,
-    pub(super) _padding: [f32; 2],
+    /// ENH-003: fraction of `scene_texture` the fractal pass actually wrote
+    /// (sub-rect viewport during LOD motion). `[1.0, 1.0]` at full resolution
+    /// — the bloom-extract shader's `scene_sample_uv` is a no-op then. Repurposes
+    /// the prior `_padding` slot, so the struct stays 16 bytes.
+    pub(super) scene_uv_scale: [f32; 2],
 }
 
 #[repr(C)]
@@ -683,8 +687,8 @@ pub(super) struct PostProcessUniforms {
     pub(super) bloom_intensity: f32, // offset 36
     pub(super) _padding2: [f32; 2],  // offset 40 (pad to 48)
 
-    pub(super) _padding3: [f32; 4], // offset 48 (vec3 + alignment = 16 bytes)
-                                    // Total: 64 bytes
+    pub(super) scene_uv_scale: [f32; 2], // offset 48 — ENH-003: sub-rect of scene_texture the fractal pass wrote ([1,1] = full res; composite's scene_sample_uv is a no-op then). Repurposes half of the prior _padding3 vec4.
+    pub(super) _padding3: [f32; 2],      // offset 56 (pad to 64)
 }
 
 #[cfg(test)]
@@ -751,6 +755,21 @@ mod layout_tests {
         assert_eq!(offset_of!(Uniforms, _padding_perturb), 876);
         assert_eq!(offset_of!(Uniforms, delta_c_scale), 880);
         assert_eq!(offset_of!(Uniforms, delta_c_origin), 888);
+    }
+
+    /// ENH-003: lock the post-processing uniform layouts. `scene_uv_scale`
+    /// repurposes pre-existing padding, so the struct sizes must NOT change
+    /// (16B / 64B) and the new field lands at the documented offset.
+    #[test]
+    fn post_uniform_layout_contract() {
+        assert_eq!(std::mem::size_of::<BloomUniforms>(), 16);
+        assert_eq!(offset_of!(BloomUniforms, threshold), 0);
+        assert_eq!(offset_of!(BloomUniforms, intensity), 4);
+        assert_eq!(offset_of!(BloomUniforms, scene_uv_scale), 8);
+
+        assert_eq!(std::mem::size_of::<PostProcessUniforms>(), 64);
+        assert_eq!(offset_of!(PostProcessUniforms, scene_uv_scale), 48);
+        assert_eq!(offset_of!(PostProcessUniforms, _padding3), 56);
     }
 }
 

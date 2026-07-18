@@ -32,7 +32,7 @@ fn vs_main(input: VertexInput) -> VertexOutput {
 struct BloomUniforms {
     threshold: f32,
     intensity: f32,
-    _padding: vec2<f32>,
+    scene_uv_scale: vec2<f32>,
 }
 
 @group(1) @binding(0)
@@ -125,7 +125,10 @@ struct PostProcessUniforms {
     bloom_intensity: f32,       // offset 36
     _padding2: vec2<f32>,       // offset 40
 
-    _padding3: vec4<f32>,       // offset 48
+    // ENH-003: sub-rect of scene_texture the fractal pass wrote ([1,1] = full
+    // res; bloom-extract's scene_sample_uv is a no-op then).
+    scene_uv_scale: vec2<f32>,  // offset 48
+    _padding3: vec2<f32>,       // offset 56
 }
 
 @group(1) @binding(0)

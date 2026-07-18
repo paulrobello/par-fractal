@@ -428,7 +428,7 @@ impl Renderer {
         let bloom_uniforms = BloomUniforms {
             threshold: 0.7,
             intensity: 0.5,
-            _padding: [0.0; 2],
+            scene_uv_scale: [1.0, 1.0],
         };
         let bloom_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Bloom Uniform Buffer"),
@@ -462,7 +462,8 @@ impl Renderer {
             bloom_enabled: 0,
             bloom_intensity: 0.5,
             _padding2: [0.0; 2],
-            _padding3: [0.0; 4],
+            scene_uv_scale: [1.0, 1.0],
+            _padding3: [0.0, 0.0],
         };
         let composite_uniform_buffer =
             device.create_buffer_init(&wgpu::util::BufferInitDescriptor {

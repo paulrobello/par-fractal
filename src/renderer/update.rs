@@ -234,7 +234,7 @@ impl Renderer {
         let bloom_uniforms = BloomUniforms {
             threshold: params.settings.bloom_threshold,
             intensity: params.settings.bloom_intensity,
-            _padding: [0.0; 2],
+            scene_uv_scale: [1.0, 1.0],
         };
         if self.cached_bloom_uniforms != Some(bloom_uniforms) {
             self.queue.write_buffer(
@@ -264,7 +264,8 @@ impl Renderer {
             bloom_enabled: if params.settings.bloom_enabled { 1 } else { 0 },
             bloom_intensity: params.settings.bloom_intensity,
             _padding2: [0.0; 2],
-            _padding3: [0.0; 4],
+            scene_uv_scale: [1.0, 1.0],
+            _padding3: [0.0, 0.0],
         };
         if self.cached_composite_uniforms != Some(composite_uniforms) {
             self.queue.write_buffer(
