@@ -26,7 +26,7 @@
 | ENH-007 | Deep-zoom visual regression harness | High (guards every other change) | Low–Medium (~1–2 days) | none — do first | **Done** (CPU teeth + GPU goldens; root-caused the >1e7 HP precision collapse → ENH-001) |
 | ENH-002 | Progressive refinement + render-on-demand | High | Medium–High (~1 week) | ARC-006/008 fixes | **Partial** — render-on-demand done (ARC-006) |
 | ENH-003 | Dynamic resolution scaling (wire `render_scale`) | High | Medium (~2–3 days) | ARC-007/008 fixes | Not started (render_scale still inert) |
-| ENH-001 | Perturbation-theory infinite zoom | Transformative | Very High (2–4 weeks) | ARC-001/002 bundle, ENH-007 | Not started (HP prereq landed via ARC-002) |
+| ENH-001 | Perturbation-theory infinite zoom | Transformative | Very High (2–4 weeks) | ARC-001/002 bundle, ENH-007 | **Phase A + breadth done** (Mandelbrot/Julia/BurningShip/Tricorn); 1e8 golden pinned & deterministic; BLA deferred (orbit is already ~1.5 ms) |
 | ENH-006 | GPU frame profiler (timestamp queries + HUD) | Medium (enables tuning) | Medium (~2 days) | none | Not started |
 | ENH-005 | Half-resolution bloom pipeline | Medium | Low–Medium (~1 day) | ARC-005 (bloom gating) | Not started (bloom gating done via ARC-005) |
 | ENH-004 | Per-fractal pipeline specialization | Medium | Medium (~3 days) | ENH-006 (to measure) | **Partial** — 2D/3D split done |
@@ -36,7 +36,7 @@
 
 ### ENH-001 — Perturbation-theory infinite zoom
 **Plan**: `docs/fable/ENH-001-perturbation-deep-zoom.md`
-**Status (2026-07-17, v0.9.0):** Not started. Only the ARC-002 high-precision/DF prerequisite landed. No arbitrary-precision crate in `Cargo.toml`, no `deep_zoom/` module, no reference-orbit storage buffer, and no per-pixel delta-iteration shader path exist.
+**Status (2026-07-18, post-v0.9.0):** Phase A + Phase B breadth landed. `dashu-float` is in `Cargo.toml`; `src/deep_zoom/{orbit,driver}.rs` compute the arbitrary-precision reference orbit off-thread and upload it to a GPU storage buffer; `mandelbrot_perturb` / `julia_perturb` / `tricorn_perturb` / `burning_ship_perturb` in `shaders/fractal.wgsl` iterate per-pixel f32 deltas; a `PERTURBATION_LOG2_GATE = 24` uniform engages it past zoom ~1.6e7. The original >1e7 HP collapse is fixed and pinned by a deterministic 1e8 golden (`mandel-seahorse-1e8`, MAE 0.0 run-to-run). The recurrence math is CPU-verified against direct f64 in `tests/perturb_math.rs` (all four kinds). **Deferred — Phase B step 8 (BLA series-approximation tables):** measured the reference orbit at ~1.5 ms single / ~7.5 ms for the 9× probe at 1e8 (91 bits), scaling gently to ~1.9 ms at 1e30 — an earlier "~15–20 s" estimate was the pre-fix LOD-churn (orbit recomputed every frame), not the per-orbit cost, and is already resolved by the deterministic `perturbation_max_iterations` budget. GPU per-pixel cost is sub-frame at every testable zoom, so BLA's stated benefit (1e50+ "fast") is unverifiable today (f64 center carries ~15 digits; no 1e50 golden). Re-open when a >1e15 precise-center path exists AND GPU per-pixel cost is measured as the bottleneck. Remaining: Phase B step 9 (progressive integration with ENH-002), Phase C (UX: 10ˣ zoom, decimal-string centers).
 
 The current double-float pipeline hard-caps near zoom ~1e11 (AUDIT ARC-001). Perturbation theory
 removes the cap: compute ONE reference orbit per view in arbitrary precision on the CPU, upload it

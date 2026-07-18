@@ -591,4 +591,109 @@ mod tests {
             "Z_2=({r2}, {i2})"
         );
     }
+
+    // --- ENH-001 step 8: deep-zoom orbit timing (ignored; run with --ignored) ---
+    //
+    // Measures where time goes at the engagement zoom (1e8) so step 8 picks
+    // the lever that actually addresses the bottleneck rather than guessing.
+
+    /// Realistic 1e8 timing: single orbit vs the 9× probe the driver runs in
+    /// production, plus per-candidate escape status. Run with:
+    ///   cargo test -r orbit_timing_1e8 -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn orbit_timing_1e8() {
+        let (cr, ci) = (-0.7436438870_f64, 0.1318259042_f64); // seahorse valley
+        let zoom = 1e8_f64;
+        let max_iter = (1000u32 + ((zoom.log2() * 15.0) as u32)).max(16); // 1398
+        let precision = precision_bits_for_zoom(zoom); // 91
+        // View half-extents at 1e8, 16:9.
+        let hx = (2.0 / zoom) * (16.0 / 9.0);
+        let hy = 2.0 / zoom;
+
+        let t0 = std::time::Instant::now();
+        let single = compute_reference_orbit(
+            FractalKind::Mandelbrot,
+            cr,
+            ci,
+            [0.0, 0.0],
+            max_iter,
+            precision,
+        );
+        let t_single = t0.elapsed();
+
+        // Per-candidate escape status (which of the 9 probes are bounded?).
+        let step_x = 0.5 * hx;
+        let step_y = 0.5 * hy;
+        let mut bounded = 0u32;
+        let mut latest_escape: Option<u32> = None;
+        for dy in [-1.0_f64, 0.0, 1.0] {
+            for dx in [-1.0_f64, 0.0, 1.0] {
+                let o = compute_reference_orbit(
+                    FractalKind::Mandelbrot,
+                    cr + dx * step_x,
+                    ci + dy * step_y,
+                    [0.0, 0.0],
+                    max_iter,
+                    precision,
+                );
+                match o.escaped_at {
+                    None => bounded += 1,
+                    Some(e) => latest_escape = Some(latest_escape.map_or(e, |p| p.max(e))),
+                }
+            }
+        }
+
+        let t0 = std::time::Instant::now();
+        let _best = compute_reference_orbit_best(
+            FractalKind::Mandelbrot,
+            cr,
+            ci,
+            hx,
+            hy,
+            [0.0, 0.0],
+            max_iter,
+            precision,
+        );
+        let t_probe = t0.elapsed();
+
+        eprintln!(
+            "ORBIT-TIMING 1e8: max_iter={max_iter} prec={precision}bits\n\
+             single-orbit: {t_single:?}  (len={}, escaped_at={:?})\n\
+             9x probe:     {t_probe:?}\n\
+             candidates:   bounded={bounded}/9  latest_escape={latest_escape:?}",
+            single.z.len(),
+            single.escaped_at,
+        );
+    }
+
+    /// Zoom-ladder timing: how does single-orbit time scale with zoom? Run with:
+    ///   cargo test -r orbit_timing_zoom_ladder -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn orbit_timing_zoom_ladder() {
+        let (cr, ci) = (-0.7436438870_f64, 0.1318259042_f64);
+        eprintln!(
+            "ZOOM-LADDER single orbit (seahorse): zoom  max_iter  prec  time  len  escaped_at"
+        );
+        for &zoom in &[1e6_f64, 1e8, 1e12, 1e20, 1e30] {
+            let max_iter = (1000u32 + ((zoom.log2() * 15.0) as u32)).max(16);
+            let precision = precision_bits_for_zoom(zoom);
+            let t0 = std::time::Instant::now();
+            let o = compute_reference_orbit(
+                FractalKind::Mandelbrot,
+                cr,
+                ci,
+                [0.0, 0.0],
+                max_iter,
+                precision,
+            );
+            let t = t0.elapsed();
+            eprintln!(
+                "  {zoom:>7.0e}  {max_iter:>8}  {precision:>4}  {t:?}  len={}  escaped_at={:?}",
+                o.z.len(),
+                o.escaped_at,
+            );
+        }
+    }
 }

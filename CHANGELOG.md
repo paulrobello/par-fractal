@@ -8,8 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Perturbation deep-zoom (ENH-001), Phase A + breadth.** Arbitrary-precision
+  reference orbit (`dashu-float`, `src/deep_zoom/`) computed off-thread and uploaded
+  as a storage buffer; per-pixel f32 delta recurrences for Mandelbrot, Julia, Burning
+  Ship, and Tricorn in `shaders/fractal.wgsl`. Engages past zoom ~1.6e7
+  (`PERTURBATION_LOG2_GATE = 24`) and fixes the >1e7 HP coordinate-precision collapse.
+  Recurrence math CPU-verified vs direct f64 in `tests/perturb_math.rs`.
+- **1e8 deep-zoom golden** (`mandel-seahorse-1e8`) — pins the collapse-fix in the
+  visual-regression harness: structured output (39 distinct gray values vs the 3 of the
+  pre-fix collapse) and pixel-identical across runs (MAE 0.0) via the deterministic
+  `perturbation_max_iterations` budget.
 - **Deep-zoom visual-regression harness (ENH-007).** A CPU f64 reference renderer
-  (`src/reference.rs`) plus a byte-for-byte Rust mirror of the shader's double-float
+  (`src/reference.rs`) plus a byte-by-byte Rust mirror of the shader's double-float
   math, with CI-safe precision teeth in `tests/reference_math.rs` (DF-vs-f64 on
   deep-zoom tiles, error-free-transform checks on `two_prod`/`two_sum`, known-point
   and drift-table pins). A local GPU golden-image layer (`scripts/visual_test.sh`,
@@ -22,14 +32,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `capture_screenshot` honors `--screenshot-path` (no timestamp / toast / auto-open
   in harness mode); interactive behavior is unchanged.
 
-### Known issues
-- The GPU's double-float HP path is correct through ~1e7 zoom but collapses above ~3e7
+### Notes
+- The GPU's double-float HP path was correct through ~1e7 zoom but collapsed above ~3e7
   (root-caused via the harness: a fast ~1.2 ms frame with no device-loss, but per-pixel
-  coordinate precision collapses to one shared orbit → a near-uniform image instead of the
-  fractal; naga's Metal `two_prod` EFT is intact, so the collapse is downstream Metal
-  flush-to-zero / sub-ULP lo-word loss). The CPU f64/DF mirror does not collapse. Fixed only
-  by perturbation theory (ENH-001); until then manifest goldens stay at ≤1e5 and deep-zoom
-  *math* correctness is guarded by the CI-safe CPU teeth.
+  coordinate precision collapsed to one shared orbit → a near-uniform image; naga's Metal
+  `two_prod` EFT was intact, so the collapse was downstream Metal flush-to-zero / sub-ULP
+  lo-word loss). **Now fixed by ENH-001 perturbation** (engages past ~1e6e7) and pinned by
+  the 1e8 golden; deep-zoom *math* correctness is also guarded by the CI-safe CPU teeth in
+  `tests/reference_math.rs`.
+- The reference orbit is cheap — ~1.5 ms single / ~7.5 ms for the 9× probe at 1e8 (91 bits),
+  ~1.9 ms at 1e30 (measured via `cargo test orbit_timing -- --ignored`). An earlier "~15–20 s"
+  estimate was the pre-fix LOD-churn (the orbit recomputed every frame because LOD's
+  `iteration_scale` varied), resolved by the deterministic budget — not the per-orbit cost.
+  Phase B step 8 (BLA series-approximation tables) is therefore deferred: GPU per-pixel cost
+  is sub-frame at every testable zoom, and BLA's benefit only appears at 1e50+ (unverifiable
+  today, since the f64 center carries ~15 significant digits).
+- The harness's optional CPU cross-check (`CROSSCHECK=1`, `imgdiff render-ref`) is
+  qualitative only: the CPU reference renderer's y-axis convention is inverted relative to
+  the GPU framebuffer (verified — the known-good 1e5 golden is similarly flipped vs the
+  reference, `r(vflip)=0.73` vs `r(direct)=0.04`), so raw-pixel MAE never aligns even at
+  zoom 1. The CPU teeth, not the cross-check, guard deep-zoom correctness.
 
 ## [0.9.0] - 2026-07-17
 

@@ -24,17 +24,19 @@
 # coordinate precision collapses to one shared orbit → near-uniform image; naga's
 # Metal two_prod EFT is intact, so the collapse is downstream Metal FTZ / sub-ULP
 # lo-word loss). ENH-001 perturbation (engages at zoom > ~1.6e7, log2>24) fixes
-# this: verified manually at 1e8 it renders ~76 distinct gray values (vs the 3
-# of the pre-fix collapse) and is deterministic across runs (MAE 0.0) once the
-# orbit uses the deterministic `perturbation_max_iterations` budget. A 1e8 golden
-# row is deferred: the BigFloat reference orbit at 91+ bits is slow (~15-20 s) so
-# the row is timing-flaky on cold harness runs — add it once the orbit is faster
-# (BLA series approximation, Phase B step 8) or run with a long SETTLE_S. Deep-
-# zoom MATH correctness stays guarded by the CI-safe CPU teeth in
+# this: the 1e8 golden below renders ~76 distinct gray values (vs the 3 of the
+# pre-fix collapse) and is deterministic across runs (MAE 0.0, pixel-identical)
+# via the deterministic `perturbation_max_iterations` budget. The reference orbit
+# itself is cheap — ~1.5 ms single / ~7.5 ms for the 9× probe at 1e8, 91 bits
+# (measured 2026-07-18); an earlier "~15-20 s" estimate was the pre-fix LOD churn
+# (the orbit recomputed every frame because LOD's iteration_scale varied), not
+# the per-orbit cost, and was resolved by the deterministic budget. Deep-zoom
+# MATH correctness stays guarded by the CI-safe CPU teeth in
 # `tests/reference_math.rs` (DF-vs-f64).
 #
 # id                    kind          FractalType     cx             cy             zoom  iters  color_mode  size
 mandel-shallow         mandelbrot    Mandelbrot2D    -0.5           0              1     256    2           256x256
 mandel-seahorse-1e5    mandelbrot    Mandelbrot2D    -0.7436438870  0.1318259042   1e5   1000   2           256x256
+mandel-seahorse-1e8    mandelbrot    Mandelbrot2D    -0.7436438870  0.1318259042   1e8   1000   2           256x256
 tricorn-full           tricorn       Tricorn2D       -0.5           0              1     256    2           256x256
 ship-full              burning_ship  BurningShip2D   -0.5           -0.5           1     256    2           256x256

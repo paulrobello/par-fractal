@@ -114,6 +114,15 @@ Burning Ship, Tricorn) correctly and interactively, using perturbation theory:
 8. **Series approximation / BLA**: implement bilinear approximation tables (per Zhuoran/Fraktaler-3)
    to skip iterations: precompute on CPU per orbit, upload as a second storage buffer. This is
    what makes 1e50+ *fast* rather than merely correct. Gate behind a settings flag initially.
+
+   > **Status (2026-07-18): deferred.** The reference orbit is already cheap — ~1.5 ms single /
+   > ~7.5 ms for the 9× probe at 1e8 (91 bits), ~1.9 ms at 1e30 (run `cargo test -r orbit_timing
+   > -- --ignored` to re-measure) — so there is no slow CPU orbit to optimize. GPU per-pixel cost
+   > is sub-frame at every testable zoom. BLA's benefit only appears at 1e50+, which is
+   > unverifiable today (the f64 center carries ~15 significant digits; no 1e50 golden exists).
+   > Re-open when (a) a >1e15 precise-center path (Phase C decimal-string center) exists AND
+   > (b) GPU per-pixel cost is measured as the bottleneck. High blast radius (second storage
+   > buffer + uniforms on both Rust/WGSL sides + size assert) — not worth it while idle.
 9. Progressive integration: perturbation frames render through ENH-002's progressive path when
    available (tile refinement), else full-frame.
 
