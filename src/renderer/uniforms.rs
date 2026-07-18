@@ -50,6 +50,29 @@ pub(crate) fn effective_2d_max_iterations(params: &FractalParams) -> u32 {
     }
 }
 
+/// Deterministic max_iter for the perturbation reference orbit: the full 2D
+/// budget (user iterations + zoom bonus) WITHOUT LOD's `iteration_scale`.
+///
+/// Two reasons it must NOT be the LOD-scaled `effective_2d_max_iterations`:
+/// (1) Determinism — LOD's scale varies frame-to-frame, so an LOD-scaled orbit
+///     triggers continuous recomputes (each a full BigFloat walk) and the
+///     async orbit that lands varies run-to-run ⇒ non-deterministic output
+///     (verified MAE 117 between runs at 1e8). A fixed budget computes the
+///     orbit ONCE.
+/// (2) Coverage — the orbit must be at least as long as the shader's loop so
+///     the delta path never reads past it. `activate_perturbation` pins the
+///     shader's `max_iterations` to the orbit length, so a deterministic orbit
+///     length gives a deterministic shader loop. Perturbation engages only at
+///     zoom > ~1.6e7 (below that the HP path renders and this isn't called),
+///     so not matching the LOD-scaled value at shallow zoom is irrelevant.
+pub(crate) fn perturbation_max_iterations(params: &FractalParams) -> u32 {
+    if params.settings.render_mode == crate::fractal::RenderMode::TwoD {
+        let zoom_bonus = zoom_iteration_bonus(params.settings.zoom_2d);
+        (params.settings.max_iterations + zoom_bonus).max(16)
+    } else {
+        params.settings.max_iterations
+    }
+}
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct Uniforms {

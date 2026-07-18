@@ -221,18 +221,17 @@ impl App {
     /// index a fully-served iteration budget.
     fn update_perturbation(&mut self) {
         use crate::deep_zoom::perturbation_eligible;
-        use crate::renderer::uniforms::effective_2d_max_iterations;
+        use crate::renderer::uniforms::perturbation_max_iterations;
 
         let center = self.fractal_params.settings.center_2d;
         let zoom = self.fractal_params.settings.zoom_2d;
         let aspect = self.camera.aspect;
         let fractal_type = self.fractal_params.settings.fractal_type;
         let render_mode = self.fractal_params.settings.render_mode;
-        // Match the shader's iteration budget exactly: the shader's loop runs
-        // `effective_2d_max_iterations`, and `activate_perturbation` pins the
-        // uniform to the orbit's length, so the orbit MUST be computed at this
-        // same value or the pinned shader under-/over-iterates relative to HP.
-        let effective_max_iter = effective_2d_max_iterations(&self.fractal_params);
+        // Deterministic (non-LOD) budget: see `perturbation_max_iterations`.
+        // A fixed budget means the orbit computes once (no LOD-driven
+        // recompute) and lands deterministically.
+        let effective_max_iter = perturbation_max_iterations(&self.fractal_params);
 
         // (1) Record view → mark stale on change.
         self.perturbation_driver

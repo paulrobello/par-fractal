@@ -23,9 +23,15 @@
 # (root-caused 2026-07-17: fast ~1.2 ms frame, no device-loss, but per-pixel
 # coordinate precision collapses to one shared orbit → near-uniform image; naga's
 # Metal two_prod EFT is intact, so the collapse is downstream Metal FTZ / sub-ULP
-# lo-word loss). Fixed only by perturbation (ENH-001), which iterates plain-f32
-# deltas. Deep-zoom MATH correctness stays guarded by the CI-safe CPU teeth in
-# `tests/reference_math.rs` (DF-vs-f64). Add deeper rows once ENH-001 lands.
+# lo-word loss). ENH-001 perturbation (engages at zoom > ~1.6e7, log2>24) fixes
+# this: verified manually at 1e8 it renders ~76 distinct gray values (vs the 3
+# of the pre-fix collapse) and is deterministic across runs (MAE 0.0) once the
+# orbit uses the deterministic `perturbation_max_iterations` budget. A 1e8 golden
+# row is deferred: the BigFloat reference orbit at 91+ bits is slow (~15-20 s) so
+# the row is timing-flaky on cold harness runs — add it once the orbit is faster
+# (BLA series approximation, Phase B step 8) or run with a long SETTLE_S. Deep-
+# zoom MATH correctness stays guarded by the CI-safe CPU teeth in
+# `tests/reference_math.rs` (DF-vs-f64).
 #
 # id                    kind          FractalType     cx             cy             zoom  iters  color_mode  size
 mandel-shallow         mandelbrot    Mandelbrot2D    -0.5           0              1     256    2           256x256
