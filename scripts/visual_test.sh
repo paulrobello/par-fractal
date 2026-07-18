@@ -11,12 +11,14 @@
 #
 # Modes (env vars):
 #   BLESS=1       — (re)write tests/golden/<id>.png from this run's screenshot.
-#   CROSSCHECK=1  — also render the CPU f64 reference and compare (looser
-#                   tolerance; flags DF-vs-f64 drift beyond golden determinism).
-#                   NOTE: the GPU screenshot is post-processed (composite color
-#                   grading + FXAA) while the CPU reference is raw smooth-`t`, so
-#                   this is a *qualitative* check — useful for spotting gross
-#                   failures (black frames, wrong fractal), not last-bit deltas.
+#   CROSSCHECK=1  — also render the CPU f64 reference and compare by Pearson
+#                   correlation over luma (qualitative; never gates the run).
+#                   render-ref mirrors the GPU's sRGB surface encoding and
+#                   effective max_iter; correlation (not per-pixel MAE) tolerates
+#                   the f32/double-float/perturbation-vs-f64 boundary drift that
+#                   makes ~half the pixels differ on a correct render. A correct
+#                   render scores r~0.67-0.87; --min-corr 0.5 flags gross
+#                   failures (black frame, wrong fractal, collapsed zoom).
 #   SETTLE_S=<n>  — seconds to wait before screenshotting (default 8; the
 #                   double-float HP path is slower and needs the headroom to
 #                   finish a complete frame — too low and deep rows go black).
@@ -112,14 +114,23 @@ while read -r id kind ftype cx cy zoom iters color_mode size; do
     fi
   fi
 
-  # 3b. optional CPU-vs-GPU cross-check (looser tolerance; never gates the run)
+  # 3b. optional CPU-vs-GPU cross-check (qualitative; never gates the run).
+  # render-ref mirrors the GPU's sRGB surface encoding and effective max_iter
+  # (max_iterations + zoom_iteration_bonus), so it is structurally faithful.
+  # The gate is Pearson correlation over luma (--min-corr), NOT per-pixel MAE:
+  # the GPU iterates f32 / double-float / perturbation while the reference is
+  # f64-exact, so fractal-boundary pixels diverge on ~half of all pixels even
+  # for a correct render (bad_pixel_fraction 0.2-0.9), making MAE+frac gates
+  # unpassable. Correlation captures structural agreement instead — a correct
+  # render scores ~0.67-0.87 across the manifest; a black frame or wrong
+  # fractal scores ~0. --min-corr 0.5 passes every correct row with margin.
   if [ "$CROSSCHECK" -eq 1 ]; then
     ref_png="$OUT_DIR/$id.ref.png"
     "$IMGDIFF" render-ref "$kind" "$cx" "$cy" "$zoom" "$iters" "$size" "$ref_png" || true
-    if [ -f "$ref_png" ] && "$IMGDIFF" "$out_png" "$ref_png" --mae 4.0; then
+    if [ -f "$ref_png" ] && "$IMGDIFF" "$out_png" "$ref_png" --min-corr 0.5; then
       echo "  PASS (cross-check vs CPU reference)"
     else
-      echo "  WARN: cross-check outside tolerance (may be legitimate DF/f64 drift)"
+      echo "  WARN: cross-check correlation < 0.5 (likely a real regression, not f32/f64 drift)"
     fi
   fi
 done < "$MANIFEST"

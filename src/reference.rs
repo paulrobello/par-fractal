@@ -295,11 +295,26 @@ pub fn render(
     out
 }
 
+/// sRGB OECF (linear → sRGB), matching the GPU's sRGB surface encoding. The
+/// renderer picks an sRGB display format (`Bgra8UnormSrgb` on macOS,
+/// `initialization.rs`), so the fragment's linear `vec3(t)` is hardware-encoded
+/// to sRGB before the screenshot reads it back. The CPU reference writes PNG
+/// bytes directly, so it must apply the same OECF or its output renders far too
+/// dark vs the GPU (linear `t` vs sRGB `t` is the dominant cross-check error).
+fn srgb_oecf(v: f32) -> f32 {
+    if v <= 0.0031308 {
+        12.92 * v
+    } else {
+        1.055 * v.powf(1.0 / 2.4) - 0.055
+    }
+}
+
 /// Map a buffer of smooth values to grayscale RGBA bytes (the shader's
 /// `color_mode == 2`: `color = vec3(t)`), with the interior (`t < 0`) sent to
-/// black — exactly what `fs_main_2d` writes for `t < 0`. Used by `imgdiff`'s
-/// reference-render mode so the CPU reference and the GPU screenshot are
-/// compared through the *same* color mapping.
+/// black — exactly what `fs_main_2d` writes for `t < 0`. The exterior value is
+/// run through [`srgb_oecf`] to match the GPU's sRGB surface encoding, so the
+/// CPU reference and the GPU screenshot are compared through the *same* color
+/// mapping. Used by `imgdiff`'s reference-render mode.
 pub fn smooth_to_grayscale_rgba(smooth: &[f32], size: (u32, u32)) -> Vec<u8> {
     let n = (size.0 as usize) * (size.1 as usize);
     let mut rgba = Vec::with_capacity(n * 4);
@@ -307,7 +322,7 @@ pub fn smooth_to_grayscale_rgba(smooth: &[f32], size: (u32, u32)) -> Vec<u8> {
         let g = if t < 0.0 {
             0u8
         } else {
-            (t.clamp(0.0, 1.0) * 255.0).round() as u8
+            (srgb_oecf(t.clamp(0.0, 1.0)) * 255.0).round() as u8
         };
         rgba.extend_from_slice(&[g, g, g, 255]);
     }

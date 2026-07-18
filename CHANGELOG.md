@@ -47,16 +47,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Phase B step 8 (BLA series-approximation tables) is therefore deferred: GPU per-pixel cost
   is sub-frame at every testable zoom, and BLA's benefit only appears at 1e50+ (unverifiable
   today, since the f64 center carries ~15 significant digits).
-- The harness's optional CPU cross-check (`CROSSCHECK=1`, `imgdiff render-ref`) is now
-  structurally aligned with the GPU framebuffer: `reference::pixel_to_c` maps `py = 0`
-  (the screenshot's top row) to clip-space `uv.y = +1`, matching WebGPU's y-up clip
-  space. Previously the y-axis was inverted, so render-ref rendered a vertically flipped
-  image (the known-good 1e5 golden matched only after a vertical flip, `r(vflip)=0.73`
-  vs `r(direct)=0.04`); after the fix render-ref matches the GPU directly (`r≈0.73` at
-  1e5, `≈0.82` at 1e8 — the residual gap from 1.0 is post-processing: FXAA, color
-  grading, bloom). It remains a qualitative gross-failure check, not a last-bit
-  comparison; the CI-safe CPU teeth in `tests/reference_math.rs` guard deep-zoom
-  correctness.
+- The harness's optional CPU cross-check (`CROSSCHECK=1`, `imgdiff render-ref`) now
+  passes for every manifest row and catches gross failures. Three fixes, each rooted
+  out by measurement:
+  (1) `reference::pixel_to_c` mapped `py = 0` to clip-space `uv.y = -1`, but WebGPU
+  clip space is y-up, so render-ref rendered a vertically flipped image (the 1e5
+  golden matched only after a vertical flip); fixed to `uv.y = +1`.
+  (2) render-ref wrote linear `t·255` while the GPU's `Bgra8UnormSrgb` surface
+  sRGB-encodes its linear `vec3(t)` — the dominant error (t=0.094 → 87, exactly the
+  sRGB OECF); render-ref now applies the same OECF.
+  (3) render-ref iterated the manifest's raw `max_iterations`, but the GPU runs
+  `max_iterations + zoom_iteration_bonus`; render-ref now uses the effective budget.
+  Even faithful, the per-pixel MAE+frac gate is unpassable: the GPU iterates
+  f32 / double-float / perturbation while the reference is f64-exact, so fractal-
+  boundary pixels differ on ~half of all pixels (`bad_pixel_fraction` 0.2–0.95) on a
+  *correct* render. The cross-check now gates on **Pearson correlation over luma**
+  (`imgdiff --min-corr`, 0.7–0.87 for correct renders, ~0 for black frames / wrong
+  fractals / collapsed deep zoom). It remains non-gating; the CI-safe CPU teeth in
+  `tests/reference_math.rs` guard deep-zoom math correctness.
 
 ## [0.9.0] - 2026-07-17
 

@@ -22,7 +22,7 @@ pub(crate) fn split_f64(v: f64) -> (f32, f32) {
 /// iterations. Used by the 2D escape-time path only.
 ///
 /// Extracted (QA-019) so the bonus is unit-testable in isolation.
-pub(crate) fn zoom_iteration_bonus(zoom_2d: f64) -> u32 {
+pub fn zoom_iteration_bonus(zoom_2d: f64) -> u32 {
     (zoom_2d.max(1.0).log2() * 15.0) as u32
 }
 

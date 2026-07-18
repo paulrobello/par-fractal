@@ -3,10 +3,14 @@
 //! Three modes (the first positional arg selects; two bare paths = compare):
 //!
 //! - `imgdiff <a.png> <b.png>` — compare two PNGs. Prints JSON metrics and
-//!   exits `0` if within tolerance, `1` otherwise. Tolerance (overridable via
-//!   `--mae` / `--frac`): bad-pixel fraction < 0.5% *and* mean abs error < 2.0.
-//!   Loose enough for GPU/driver dither, tight enough to catch quantization
-//!   blocks, wrong-fractal dispatch, and black frames.
+//!   exits `0` if within tolerance, `1` otherwise. Default tolerance (overridable
+//!   via `--mae` / `--frac`): bad-pixel fraction < 0.5% *and* mean abs error <
+//!   2.0 — pixel-exact, for goldens. `--min-corr R` switches the gate to Pearson
+//!   correlation over luma (`pass = corr >= R`), the metric the f32-GPU-vs-f64-
+//!   reference cross-check needs: fractal-boundary drift makes ~half the pixels
+//!   differ on a *correct* render, so per-pixel MAE is unpassable there, while
+//!   correlation stays ~0.7-0.9 and collapses to ~0 on a black frame / wrong
+//!   fractal.
 //! - `imgdiff render-ref <kind> <cx> <cy> <zoom> <iters> <WxH> <out.png>` —
 //!   render the CPU f64 reference to a grayscale PNG (`color_mode == 2`:
 //!   `vec3(t)`), for the optional CPU-vs-GPU cross-check. `<kind>` ∈
@@ -26,7 +30,7 @@ const DEFAULT_FRAC: f64 = 0.005; // 0.5 %
 fn usage() -> ! {
     eprintln!(
         "usage:\n  \
-         imgdiff <a.png> <b.png> [--mae M] [--frac F]\n  \
+         imgdiff <a.png> <b.png> [--mae M] [--frac F] [--min-corr R]\n  \
          imgdiff render-ref <kind> <cx> <cy> <zoom> <iters> <WxH> <out.png>\n  \
          imgdiff gen-preset <id> <FractalType> <cx> <cy> <zoom> <iters> <color_mode>"
     );
@@ -51,8 +55,8 @@ fn main() -> ExitCode {
 // ---------------------------------------------------------------------------
 
 fn run_compare(args: &[String]) -> ExitCode {
-    // Pull optional --mae/--frac off the end, leaving the two PNG paths.
-    let (paths, mae, frac) = parse_compare_args(args);
+    // Pull optional --mae/--frac/--min-corr off the end, leaving the two PNG paths.
+    let (paths, mae, frac, min_corr) = parse_compare_args(args);
     if paths.len() != 2 {
         usage();
     }
@@ -83,9 +87,17 @@ fn run_compare(args: &[String]) -> ExitCode {
     }
 
     let (bad_frac, mae_value) = compare_rgba(&a, &b);
-    let pass = bad_frac < frac && mae_value < mae;
+    let corr = compare_corr(&a, &b);
+    // `--min-corr` switches the gate to structural correlation (Pearson over
+    // luma) — the only metric that tolerates f32-GPU-vs-f64-reference boundary
+    // drift, where ~half the pixels differ >8/255 on a *correct* render. Without
+    // it, the default MAE+frac gate (pixel-exact) is used for goldens.
+    let pass = match min_corr {
+        Some(mc) => corr >= mc,
+        None => bad_frac < frac && mae_value < mae,
+    };
     println!(
-        "{{\"bad_pixel_fraction\": {bad_frac:.6}, \"mae\": {mae_value:.4}, \
+        "{{\"bad_pixel_fraction\": {bad_frac:.6}, \"mae\": {mae_value:.4}, \"corr\": {corr:.4}, \
          \"threshold_frac\": {frac}, \"threshold_mae\": {mae}, \"pass\": {pass}}}"
     );
     if pass {
@@ -96,9 +108,10 @@ fn run_compare(args: &[String]) -> ExitCode {
 }
 
 /// Split `args` into PNG paths and the (possibly overridden) thresholds.
-fn parse_compare_args(args: &[String]) -> (Vec<&str>, f64, f64) {
+fn parse_compare_args(args: &[String]) -> (Vec<&str>, f64, f64, Option<f64>) {
     let mut mae = DEFAULT_MAE;
     let mut frac = DEFAULT_FRAC;
+    let mut min_corr: Option<f64> = None;
     let mut paths = Vec::with_capacity(2);
     let mut i = 0;
     while i < args.len() {
@@ -117,13 +130,50 @@ fn parse_compare_args(args: &[String]) -> (Vec<&str>, f64, f64) {
                     .unwrap_or_else(|| usage());
                 i += 2;
             }
+            "--min-corr" => {
+                min_corr = Some(
+                    args.get(i + 1)
+                        .and_then(|s| s.parse().ok())
+                        .unwrap_or_else(|| usage()),
+                );
+                i += 2;
+            }
             other => {
                 paths.push(other);
                 i += 1;
             }
         }
     }
-    (paths, mae, frac)
+    (paths, mae, frac, min_corr)
+}
+
+/// Pearson correlation over per-pixel luma `(R+G+B)/3`. Captures structural
+/// agreement (is the same fractal in the same place/orientation?) independent
+/// of per-pixel drift, so a correct f32-GPU-vs-f64-reference render scores
+/// ~0.7-0.9 while a black frame or wrong fractal scores ~0. Returns 0.0 for a
+/// degenerate (solid) image — such a match should not pass a positive gate.
+fn compare_corr(a: &image::RgbaImage, b: &image::RgbaImage) -> f64 {
+    let av = a.as_raw();
+    let bv = b.as_raw();
+    let n = (av.len() / 4) as f64;
+    let luma = |p: &[u8]| (p[0] as f64 + p[1] as f64 + p[2] as f64) / 3.0;
+    let la: Vec<f64> = av.chunks_exact(4).map(luma).collect();
+    let lb: Vec<f64> = bv.chunks_exact(4).map(luma).collect();
+    let ma = la.iter().sum::<f64>() / n;
+    let mb = lb.iter().sum::<f64>() / n;
+    let cov = la
+        .iter()
+        .zip(&lb)
+        .map(|(x, y)| (x - ma) * (y - mb))
+        .sum::<f64>()
+        / n;
+    let sa = (la.iter().map(|x| (x - ma).powi(2)).sum::<f64>() / n).sqrt();
+    let sb = (lb.iter().map(|y| (y - mb).powi(2)).sum::<f64>() / n).sqrt();
+    if sa == 0.0 || sb == 0.0 {
+        0.0
+    } else {
+        cov / (sa * sb)
+    }
 }
 
 /// `(bad_pixel_fraction, mean_abs_error)` over the RGBA channels. A pixel is
@@ -170,7 +220,15 @@ fn run_render_ref(args: &[String]) -> ExitCode {
     let (w, h) = parse_size(&args[5]);
     let out = &args[6];
 
-    let smooth = par_fractal::reference::render(kind, (cx, cy), zoom, (w, h), iters, 2.0);
+    // Iterate the same budget the GPU runs: the manifest's `iters` is
+    // `settings.max_iterations`, but the shader loop uses max_iterations +
+    // zoom_iteration_bonus (and perturbation pins to that same length when the
+    // reference is bounded). Without the bonus the f64 reference normalizes
+    // smooth-`t` by the wrong divisor and pixels near the boundary flip
+    // interior/exterior vs the GPU — a structural mismatch no threshold hides.
+    let effective_iters = iters + par_fractal::renderer::uniforms::zoom_iteration_bonus(zoom);
+
+    let smooth = par_fractal::reference::render(kind, (cx, cy), zoom, (w, h), effective_iters, 2.0);
     let rgba = par_fractal::reference::smooth_to_grayscale_rgba(&smooth, (w, h));
     match image::RgbaImage::from_raw(w, h, rgba) {
         Some(img) => match img.save(out) {
