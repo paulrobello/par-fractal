@@ -42,6 +42,9 @@ pub mod camera;
 /// Quick command palette for fractal, effect, color, camera, and recording
 /// actions.
 pub mod command_palette;
+/// ENH-001 perturbation-theory deep-zoom subsystem: arbitrary-precision
+/// reference orbit (CPU foundation) for f32 per-pixel delta iteration.
+pub mod deep_zoom;
 /// Fractal parameter model (`FractalParams`), fractal types, color palettes,
 /// presets, and serializable settings.
 pub mod fractal;
