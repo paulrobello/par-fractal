@@ -213,6 +213,7 @@ impl Renderer {
                 active.escaped_at,
                 params.settings.zoom_2d,
                 camera.aspect,
+                active.reference_offset,
             );
         }
 
@@ -326,6 +327,7 @@ impl Renderer {
         self.active_orbit = Some(super::orbit_buffer::ActiveOrbit {
             len: orbit.z.len() as u32,
             escaped_at: orbit.escaped_at.unwrap_or(0),
+            reference_offset: orbit.reference_offset,
         });
     }
 

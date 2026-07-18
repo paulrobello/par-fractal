@@ -17,7 +17,9 @@
 //! Native only. `std::thread::spawn` is unavailable on wasm; on wasm the HP
 //! path handles deep zoom with its known ceiling and the driver is a no-op.
 
-use crate::deep_zoom::orbit::{ReferenceOrbit, compute_reference_orbit, precision_bits_for_zoom};
+use crate::deep_zoom::orbit::{
+    ReferenceOrbit, compute_reference_orbit_best, precision_bits_for_zoom,
+};
 use crate::fractal::{FractalType, RenderMode};
 
 /// Zoom (as log2) above which perturbation activates.
@@ -50,10 +52,14 @@ pub fn perturbation_eligible(
 /// CPU-side f64 `FractalParams.center_2d` (still the entry point in Phase
 /// A); `max_iter` is the GPU-effective value (zoom bonus + LOD scale) so a
 /// recompute always serves the exact iteration budget the shader uses.
+/// `aspect` is included because the 3×3 probe grid spreads candidates by
+/// `0.5 * view_half_extent`, which depends on aspect — a window resize that
+/// changes aspect changes the probe locations and must invalidate.
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct ViewSignature {
     center: [f64; 2],
     zoom: f64,
+    aspect: f32,
     max_iter: u32,
 }
 
@@ -109,11 +115,14 @@ impl PerturbationDriver {
     /// Record the current view, marking the orbit stale if it differs from
     /// the last recorded view. The caller should pass the GPU-effective
     /// `max_iter` (zoom bonus + LOD iteration scale applied) so a recompute
-    /// always serves the exact budget the shader loop runs.
-    pub fn note_view(&mut self, center: [f64; 2], zoom: f64, max_iter: u32) {
+    /// always serves the exact budget the shader loop runs. `aspect` is the
+    /// camera's width/height — used by the probe-grid selector to spread
+    /// candidates across the visible view.
+    pub fn note_view(&mut self, center: [f64; 2], zoom: f64, aspect: f32, max_iter: u32) {
         let sig = ViewSignature {
             center,
             zoom,
+            aspect,
             max_iter,
         };
         if self.last_view != Some(sig) {
@@ -126,10 +135,13 @@ impl PerturbationDriver {
     /// the reference orbit and sends it over a channel. Returns `true` when
     /// a worker was spawned this call (caller shows the "computing…" toast).
     ///
-    /// The worker is `compute_reference_orbit` (CPU-only BigFloat math, no
-    /// GPU access) — safe to run off the render thread. The result lands via
-    /// [`Self::poll`].
-    pub fn maybe_spawn(&mut self, center: [f64; 2], zoom: f64, max_iter: u32) -> bool {
+    /// The worker runs `compute_reference_orbit_best` — a 3×3 probe across
+    /// the view that picks the latest-escaping candidate (CPU-only BigFloat
+    /// math, no GPU access) — safe to run off the render thread. The result
+    /// lands via [`Self::poll`]. Probing 9 candidates is roughly 9× the
+    /// single-orbit cost; the GUI stays responsive because the work happens
+    /// off the render thread.
+    pub fn maybe_spawn(&mut self, center: [f64; 2], zoom: f64, aspect: f32, max_iter: u32) -> bool {
         #[cfg(not(target_arch = "wasm32"))]
         {
             if !self.dirty || self.computing {
@@ -141,16 +153,30 @@ impl PerturbationDriver {
                 return false;
             }
             let precision_bits = precision_bits_for_zoom(zoom);
+            // View half-extent in complex units per axis — matches the
+            // shader's `delta_c_scale` derivation so the probe grid lands at
+            // the same UV spacing the per-pixel deltas use.
+            let aspect_f64 = aspect as f64;
+            let inv_zoom = 2.0 / zoom;
+            let view_half_extent_x = inv_zoom * aspect_f64;
+            let view_half_extent_y = inv_zoom;
             let (tx, rx) = std::sync::mpsc::channel::<ReferenceOrbit>();
             self.pending = Some(rx);
             self.computing = true;
             self.dirty = false;
-            // Move only Copy data into the worker — `center`, `max_iter`,
-            // `precision_bits` — plus the Sender. No GPU handles cross the
-            // thread boundary (the upload happens on the main thread in
-            // `Renderer::set_reference_orbit`).
+            // Move only Copy data into the worker — `center`, the half-extents,
+            // `max_iter`, `precision_bits` — plus the Sender. No GPU handles
+            // cross the thread boundary (the upload happens on the main thread
+            // in `Renderer::set_reference_orbit`).
             std::thread::spawn(move || {
-                let orbit = compute_reference_orbit(center[0], center[1], max_iter, precision_bits);
+                let orbit = compute_reference_orbit_best(
+                    center[0],
+                    center[1],
+                    view_half_extent_x,
+                    view_half_extent_y,
+                    max_iter,
+                    precision_bits,
+                );
                 // Ignore send error: if the App was dropped, the result is
                 // just unused (the worker still completes its CPU work).
                 let _ = tx.send(orbit);
@@ -162,7 +188,7 @@ impl PerturbationDriver {
             // wasm has no `std::thread`; perturbation is native-only for
             // Phase A. Clear `dirty` so eligible views don't keep churning
             // the (no-op) spawn path every frame; the HP path renders.
-            let _ = (center, zoom, max_iter);
+            let _ = (center, zoom, aspect, max_iter);
             self.dirty = false;
             false
         }
@@ -251,7 +277,7 @@ mod tests {
         ));
     }
 
-    /// `note_view` marks dirty exactly when one of the three signature
+    /// `note_view` marks dirty exactly when one of the four signature
     /// fields changes — and never when an identical view is re-recorded.
     /// This is the invalidation contract the driver relies on to avoid
     /// respawning the worker every frame at a still view.
@@ -261,22 +287,25 @@ mod tests {
         // Initial state is dirty (so the first eligible frame spawns).
         assert!(d.dirty);
 
-        d.note_view([-0.5, 0.0], 1e8, 1000);
+        d.note_view([-0.5, 0.0], 1e8, 16.0 / 9.0, 1000);
         assert!(d.dirty, "first note is always a change from None");
 
         // Same view: not dirty.
         d.dirty = false;
-        d.note_view([-0.5, 0.0], 1e8, 1000);
+        d.note_view([-0.5, 0.0], 1e8, 16.0 / 9.0, 1000);
         assert!(!d.dirty, "identical view must not mark dirty");
 
         // Each field change marks dirty.
-        d.note_view([-0.5, 0.0001], 1e8, 1000);
+        d.note_view([-0.5, 0.0001], 1e8, 16.0 / 9.0, 1000);
         assert!(d.dirty, "center change must mark dirty");
         d.dirty = false;
-        d.note_view([-0.5, 0.0001], 2e8, 1000);
+        d.note_view([-0.5, 0.0001], 2e8, 16.0 / 9.0, 1000);
         assert!(d.dirty, "zoom change must mark dirty");
         d.dirty = false;
-        d.note_view([-0.5, 0.0001], 2e8, 1001);
+        d.note_view([-0.5, 0.0001], 2e8, 4.0 / 3.0, 1000);
+        assert!(d.dirty, "aspect change must mark dirty");
+        d.dirty = false;
+        d.note_view([-0.5, 0.0001], 2e8, 4.0 / 3.0, 1001);
         assert!(d.dirty, "max_iter change must mark dirty");
     }
 
@@ -286,9 +315,10 @@ mod tests {
     #[test]
     fn maybe_spawn_no_op_below_gate_and_no_duplicate_spawns() {
         let mut d = PerturbationDriver::new();
-        d.note_view([-0.5, 0.0], 1.0, 1000); // dirty, but zoom = 1 (below gate)
+        // dirty, but zoom = 1 (below gate)
+        d.note_view([-0.5, 0.0], 1.0, 16.0 / 9.0, 1000);
 
-        let spawned = d.maybe_spawn([-0.5, 0.0], 1.0, 1000);
+        let spawned = d.maybe_spawn([-0.5, 0.0], 1.0, 16.0 / 9.0, 1000);
         // No spawn below the gate on native; on wasm it's always no-op.
         // Either way `spawned` is false and `computing` stays false.
         assert!(!spawned);

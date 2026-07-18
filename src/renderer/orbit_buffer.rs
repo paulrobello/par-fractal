@@ -22,8 +22,9 @@
 /// `Some` on the renderer means perturbation is live for the frame: the
 /// orbit has been computed, uploaded, and the view still meets the
 /// activation gate. The CPU-side `z` vector itself is NOT retained — once
-/// uploaded to the GPU, only the length and escape index are needed to
-/// populate the matching uniforms and let the shader bounds-check.
+/// uploaded to the GPU, only the length, escape index, and reference offset
+/// are needed to populate the matching uniforms and let the shader
+/// bounds-check.
 ///
 /// (ENH-001 Phase A step 5.)
 #[derive(Debug, Clone, Copy)]
@@ -37,6 +38,11 @@ pub struct ActiveOrbit {
     /// safe for the bounded case because the shader's per-pixel delta orbit
     /// never needs to rebase before iteration 0.
     pub escaped_at: u32,
+    /// `c_center − c_ref` as an f32 pair (the orbit's `reference_offset`).
+    /// The shader adds this to `uv * delta_c_scale` to reconstruct each
+    /// pixel's Δc — see `Uniforms::activate_perturbation`. `[0,0]` when the
+    /// reference is the view center.
+    pub reference_offset: [f32; 2],
 }
 
 /// GPU storage buffer holding a perturbation reference orbit's `Z_n` values.

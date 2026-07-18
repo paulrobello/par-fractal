@@ -588,23 +588,36 @@ impl Uniforms {
     /// the absolute center is unrepresentable in f32 (which is the whole
     /// point of perturbation).
     ///
-    /// `delta_c_origin` is left at `[0.0, 0.0]` (re-zeroed by `update()`):
-    /// Phase A always iterates the reference from the view center, so the
-    /// screen-center Δc is zero by construction.
+    /// `reference_offset` is `c_center − c_ref` for the chosen reference
+    /// orbit (an f32 pair, already computed in f64 on the worker before the
+    /// cast). It flows directly into `delta_c_origin`: the shader computes
+    /// `delta_c = delta_c_origin + uv·delta_c_scale = (c_center − c_ref) +
+    /// (c_pixel − c_center) = c_pixel − c_ref`, which is the per-pixel Δc
+    /// the delta recurrence needs. `[0,0]` when the reference IS the view
+    /// center (the original Phase A behavior).
     pub(crate) fn activate_perturbation(
         &mut self,
         orbit_len: u32,
         ref_escaped_at: u32,
         zoom_2d: f64,
         aspect: f32,
+        reference_offset: [f32; 2],
     ) {
         let inv_zoom_f64 = 2.0 / zoom_2d;
         let aspect_f64 = aspect as f64;
         self.perturbation_enabled = 1;
         self.orbit_len = orbit_len;
+        // Pin the shader's loop to the orbit's length EXACTLY. The orbit is
+        // computed async and LOD's `iteration_scale` varies between spawn
+        // (`App::update`) and render, so an LOD-derived `max_iterations` desyncs
+        // from the uploaded orbit — the 2026-07-18 deep-zoom root cause
+        // (orbit=89 vs shader=329 ⇒ 240 iterations of rebasing ⇒ wrong output).
+        // Pinning here makes orbit and shader agree deterministically, whatever
+        // LOD state either side sees.
+        self.max_iterations = orbit_len;
         self.ref_escaped_at = ref_escaped_at;
         self.delta_c_scale = [(inv_zoom_f64 * aspect_f64) as f32, inv_zoom_f64 as f32];
-        // delta_c_origin already zeroed by update() — Phase A: ref at center.
+        self.delta_c_origin = reference_offset;
     }
 }
 
