@@ -1,5 +1,15 @@
+//! Egui panel and overlay visibility state.
+//!
+//! `UIState` tracks which `egui` windows and collapsible sections are open
+//! plus the FPS / camera-info HUD overlays, so the UI layout survives a
+//! restart. It is serialized inside `Settings`. The `pub(super) fn default_*`
+//! helpers provide serde defaults shared with the `Settings` struct.
+
 use serde::{Deserialize, Serialize};
 
+/// Tracks which egui panels/windows are open and which HUD overlays (FPS,
+/// camera info) are visible. Serialized as part of `Settings` so the UI
+/// layout is restored on the next launch.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UIState {
     pub fractal_type_open: bool,

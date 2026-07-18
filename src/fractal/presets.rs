@@ -1,3 +1,13 @@
+//! Built-in and user-saved fractal presets, camera bookmarks, and app
+//! preferences.
+//!
+//! Presets wrap a full `Settings` snapshot with a name, description, and
+//! category; bookmarks capture just the 3D camera viewpoint; preferences hold
+//! GPU and window defaults. Each value type has an accompanying `*Gallery`
+//! helper that persists it to YAML under the user config directory (or to
+//! `localStorage` on the web build). `sanitize_name` enforces a
+//! path-traversal-safe filename for every write (SEC-007).
+
 use super::{FractalParams, FractalType, Settings};
 use glam::Vec3;
 use serde::{Deserialize, Serialize};
@@ -22,6 +32,9 @@ fn sanitize_name(name: &str) -> String {
         .collect()
 }
 
+/// Coarse classification used to group presets in the picker UI. The
+/// `#[serde(rename = "...")]` attributes pin the on-disk string form so saved
+/// presets do not break if a Rust variant is renamed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum PresetCategory {
@@ -59,6 +72,9 @@ impl PresetCategory {
 }
 
 // Preset system for saving/loading fractal configurations
+/// A named, described fractal configuration: a full `Settings` snapshot tagged
+/// with a category. Built-ins come from `PresetGallery::get_builtin_presets`;
+/// user presets are loaded/saved as YAML in the per-user `presets/` directory.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Preset {
     pub name: String,
@@ -69,6 +85,8 @@ pub struct Preset {
 }
 
 // Camera bookmark for saving viewpoints
+/// A saved 3D camera viewpoint (position, look-at target, FOV) plus a creation
+/// timestamp. Persisted to the per-user `bookmarks/` directory as YAML.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CameraBookmark {
     pub name: String,
@@ -79,6 +97,9 @@ pub struct CameraBookmark {
 }
 
 // Application preferences
+/// User-level preferences that live outside any individual fractal: preferred
+/// GPU index/name and last window size. Loaded from / saved to
+/// `preferences.yaml` in the user config directory.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AppPreferences {
     #[serde(default)]
@@ -182,6 +203,9 @@ impl CameraBookmark {
 }
 
 // Gallery of camera bookmarks
+/// Load, save, list, and delete `CameraBookmark` entries from the per-user
+/// `bookmarks/` config directory. The `wasm32` impl is a stub that reports
+/// these operations as unsupported.
 pub struct BookmarkGallery;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -306,6 +330,9 @@ impl Preset {
 }
 
 // Gallery of built-in presets
+/// Built-in preset catalog plus the YAML-backed load/save/list/delete
+/// operations for user presets in the per-user `presets/` directory. The
+/// `wasm32` variants swap the filesystem for `localStorage`.
 pub struct PresetGallery;
 
 impl PresetGallery {

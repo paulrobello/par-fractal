@@ -1,3 +1,10 @@
+//! The serialized representation of every fractal-render parameter.
+//!
+//! `Settings` is the on-disk shape stored in `settings.yaml`, embedded inside
+//! presets/bookmarks, and round-tripped through serde. The `default_*` helpers
+//! below feed its `#[serde(default = "...")]` attributes so adding a field
+//! does not break older save files.
+
 use super::ui_state::*;
 use super::{
     ChannelSource, ColorMode, FogMode, FractalType, ProceduralPalette, ShadingModel, UIState,
@@ -5,6 +12,14 @@ use super::{
 use crate::lod::LODConfig;
 use serde::{Deserialize, Serialize};
 
+/// The serialized form of all fractal-render parameters: fractal type and
+/// quality, 2D/3D camera, lighting, material, post-processing, LOD, and
+/// strange-attractor accumulation settings.
+///
+/// Round-tripped to `settings.yaml` and embedded inside `Preset`. Fields lean
+/// on `#[serde(default = "...")]` (wired to the `default_*` helpers below) so
+/// that a missing key or a newly added field on an older save file resolves
+/// cleanly rather than failing to deserialize.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Settings {
     pub fractal_type: FractalType,

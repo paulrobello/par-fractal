@@ -1,7 +1,19 @@
+//! Color palettes used by the 2D escape-time path and as fallback coloring
+//! for the 3D pipeline.
+//!
+//! Defines the built-in 8-stop gradients (artistic, scientific-visualization,
+//! and xfractint-imported sets) plus the `CustomPalette` value type and its
+//! disk gallery, which are persisted as YAML under the user config directory.
+
 use glam::Vec3;
 use serde::{Deserialize, Serialize};
 use std::fs;
 
+/// A named 8-stop color gradient sampled by the shader's palette path.
+///
+/// The built-in `const` items below cover artistic, scientific-visualization,
+/// and xfractint-imported sets; the `ALL` slice is the canonical list surfaced
+/// by the palette picker.
 #[derive(Debug, Clone, Copy)]
 pub struct ColorPalette {
     pub colors: [Vec3; 8],
@@ -750,6 +762,11 @@ impl ColorPalette {
 }
 
 // Custom palette that can be saved and loaded
+/// User-defined 8-stop palette that can be serialized to disk and reloaded.
+///
+/// Stored as a name plus an array of `[f32; 3]` RGB triples (linear 0..=1) so
+/// it round-trips through YAML without depending on `glam`. Convertible to and
+/// from `ColorPalette` via `to_color_palette` / `from_current`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CustomPalette {
     pub name: String,
@@ -941,6 +958,9 @@ impl CustomPalette {
 }
 
 // Gallery for managing custom palettes
+/// Load, save, list, and delete `CustomPalette` entries from the per-user
+/// `palettes/` config directory. The `wasm32` impl is a stub that reports
+/// these operations as unsupported.
 pub struct CustomPaletteGallery;
 
 #[cfg(not(target_arch = "wasm32"))]
