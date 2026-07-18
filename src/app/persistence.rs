@@ -1,4 +1,5 @@
 use super::App;
+use crate::platform::{PlatformContext, category};
 
 /// Settings persistence methods
 impl App {
@@ -11,24 +12,22 @@ impl App {
         settings.custom_width = self.ui.custom_width.clone();
         settings.custom_height = self.ui.custom_height.clone();
 
-        if let Some(proj_dirs) = directories::ProjectDirs::from("com", "fractal", "par-fractal") {
-            let config_dir = proj_dirs.config_dir();
-            if let Err(e) = std::fs::create_dir_all(config_dir) {
-                log::error!("Failed to create config directory: {}", e);
-                return;
-            }
-
-            let settings_path = config_dir.join("settings.yaml");
-            match serde_yaml::to_string(&settings) {
-                Ok(yaml) => {
-                    if let Err(e) = std::fs::write(&settings_path, yaml) {
-                        log::error!("Failed to save settings: {}", e);
-                    } else {
-                        log::debug!("Settings auto-saved to {:?}", settings_path);
-                    }
+        match serde_yaml::to_string(&settings) {
+            Ok(yaml) => {
+                // ARC-014: persist via the platform `Storage` abstraction so the
+                // same path works on native (`<config_dir>/settings/settings.yaml`)
+                // and web (localStorage — previously web loaded settings but never
+                // saved them). The load path reads this location first and falls
+                // back to the legacy `<config_dir>/settings.yaml`, so migrating
+                // existing users over is non-destructive.
+                let storage = PlatformContext::new().storage;
+                if let Err(e) = storage.save(category::SETTINGS, "settings", yaml.as_bytes()) {
+                    log::error!("Failed to save settings: {}", e);
+                } else {
+                    log::debug!("Settings auto-saved via platform storage");
                 }
-                Err(e) => log::error!("Failed to serialize settings: {}", e),
             }
+            Err(e) => log::error!("Failed to serialize settings: {}", e),
         }
     }
 
