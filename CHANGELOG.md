@@ -66,6 +66,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fractals / collapsed deep zoom). It remains non-gating; the CI-safe CPU teeth in
   `tests/reference_math.rs` guard deep-zoom math correctness.
 
+### Audit carry-overs (2026-07-16 audit, closed 2026-07-18)
+- **DOC-015** — rustdoc'd the 5 submodules whose pub types rendered on docs.rs
+  without descriptions (`fractal/{types,palettes,settings,ui_state,presets}.rs`):
+  5 module docs + 11 type docs.
+- **ARC-014 (web persistence)** — `save_all_settings` migrated from `std::fs`
+  to the platform `Storage::save` abstraction, so the web target now persists
+  settings to localStorage (it loaded but never saved before). Non-destructive:
+  the load path reads the new platform location first, falls back to the legacy
+  `<config_dir>/settings.yaml`.
+- **QA-027 (winit 0.30 lifecycle)** — automated the resize case via a
+  `--resize-after <s WxH>` agent-operability hook + `make smoke-resize`; the
+  rest (minimize/restore, multi-monitor, HiDPI, mobile/bfcache, web) is a
+  repeatable manual sweep in `docs/release-checklist.md`.
+- **SEC-002 / SEC-003** — verified: SHA-pinned CI actions are in place; the
+  `quick-xml` 0.39 advisories remain upstream-blocked by the
+  `winit→smithay→wayland-scanner` pin and `cargo audit` passes with documented
+  ignores.
+- **ARC-014 (capture dedup) — deferred.** `capture.rs` (native, sync readback)
+  and `capture_web.rs` (web, async `map_async`) share their readback setup and
+  RGBA postprocess (~60%), but diverge on the sync-vs-async wait and the save
+  path. It's a substantial, user-facing, cross-platform refactor that needs web
+  runtime verification; scoped as a dedicated follow-up rather than bundled here.
+
 ## [0.9.0] - 2026-07-17
 
 Full remediation of the 2026-07-16 audit (81 issues across security, architecture, code quality, and documentation). See `git log` for per-commit detail.
