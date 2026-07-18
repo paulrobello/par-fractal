@@ -49,8 +49,11 @@ pub enum FractalKind {
 ///
 /// The fullscreen-quad vertex shader sets `output.uv = input.position` with
 /// `clip_position = (position, 0, 1)` (no transform), so `uv` is clip-space
-/// `[-1, 1]`. Fragments rasterize at pixel centers, so for pixel `(px, py)`:
-/// `uv = 2·(px+0.5)/size − 1`. The fragment coord is then
+/// `[-1, 1]` with `uv.y = +1` at the **top** of the viewport (WebGPU clip space
+/// is y-up). The framebuffer/screenshot reads `py = 0` at the top too, so
+/// `py = 0 ↔ uv.y = +1` — the y term is therefore `1 − 2·(py+0.5)/h` (flipped
+/// vs the x term, because `py` grows downward while `uv.y` grows upward).
+/// Fragments rasterize at pixel centers. The fragment coord is then
 /// `c = center + (uv · 2 / zoom) · (aspect, 1)`, where `aspect = w/h`
 /// (`camera.aspect`, stored as `uniforms.aspect_ratio.x`). Computed in f64
 /// here — strictly more accurate than the GPU's f32 or DF offset.
@@ -58,7 +61,7 @@ pub fn pixel_to_c(px: u32, py: u32, size: (u32, u32), center: (f64, f64), zoom: 
     let (w, h) = (size.0 as f64, size.1 as f64);
     let aspect = w / h;
     let uvx = 2.0 * (px as f64 + 0.5) / w - 1.0;
-    let uvy = 2.0 * (py as f64 + 0.5) / h - 1.0;
+    let uvy = 1.0 - 2.0 * (py as f64 + 0.5) / h;
     let cx = center.0 + (uvx * 2.0 / zoom) * aspect;
     let cy = center.1 + (uvy * 2.0 / zoom);
     (cx, cy)
@@ -507,7 +510,7 @@ pub fn render_df(
     for py in 0..size.1 {
         for px in 0..size.0 {
             let uvx = 2.0 * (px as f64 + 0.5) / w - 1.0;
-            let uvy = 2.0 * (py as f64 + 0.5) / h - 1.0;
+            let uvy = 1.0 - 2.0 * (py as f64 + 0.5) / h;
             // offset is the f32 term the shader adds to the (hi,lo) center.
             let off_x = (uvx * 2.0 / zoom * aspect) as f32;
             let off_y = (uvy * 2.0 / zoom) as f32;
@@ -531,14 +534,16 @@ mod tests {
     use super::*;
 
     /// Coordinate mapping sanity: fragments rasterize at pixel centers, so
-    /// pixel (128,128) in a 256×256 view sits one half-pixel off the geometric
-    /// center (which is at 127.5, 127.5) and samples just inside the +x/+y
-    /// quadrant — matching the shader's `uv = position` (clip-space [-1,1]).
+    /// pixel (128,128) in a 256×256 view sits one half-pixel right and one
+    /// half-pixel below the geometric center (127.5, 127.5). Right is +uvx
+    /// (→ +x); below is +py, and since `uv.y` grows upward while `py` grows
+    /// downward, below is −uvy (→ −y). So the sample lands just inside the
+    /// +x/−y quadrant — matching the shader's clip-space `uv = position`.
     #[test]
     fn pixel_to_c_uses_pixel_center_convention() {
         let (cx, cy) = pixel_to_c(128, 128, (256, 256), (-0.5, 0.0), 1.0);
         assert!((cx - -0.4921875).abs() < 1e-12, "cx={cx}");
-        assert!((cy - 0.0078125).abs() < 1e-12, "cy={cy}");
+        assert!((cy - -0.0078125).abs() < 1e-12, "cy={cy}");
     }
 
     /// Known math facts the reference must satisfy regardless of zoom tier.

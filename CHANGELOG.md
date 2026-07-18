@@ -47,11 +47,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Phase B step 8 (BLA series-approximation tables) is therefore deferred: GPU per-pixel cost
   is sub-frame at every testable zoom, and BLA's benefit only appears at 1e50+ (unverifiable
   today, since the f64 center carries ~15 significant digits).
-- The harness's optional CPU cross-check (`CROSSCHECK=1`, `imgdiff render-ref`) is
-  qualitative only: the CPU reference renderer's y-axis convention is inverted relative to
-  the GPU framebuffer (verified — the known-good 1e5 golden is similarly flipped vs the
-  reference, `r(vflip)=0.73` vs `r(direct)=0.04`), so raw-pixel MAE never aligns even at
-  zoom 1. The CPU teeth, not the cross-check, guard deep-zoom correctness.
+- The harness's optional CPU cross-check (`CROSSCHECK=1`, `imgdiff render-ref`) is now
+  structurally aligned with the GPU framebuffer: `reference::pixel_to_c` maps `py = 0`
+  (the screenshot's top row) to clip-space `uv.y = +1`, matching WebGPU's y-up clip
+  space. Previously the y-axis was inverted, so render-ref rendered a vertically flipped
+  image (the known-good 1e5 golden matched only after a vertical flip, `r(vflip)=0.73`
+  vs `r(direct)=0.04`); after the fix render-ref matches the GPU directly (`r≈0.73` at
+  1e5, `≈0.82` at 1e8 — the residual gap from 1.0 is post-processing: FXAA, color
+  grading, bloom). It remains a qualitative gross-failure check, not a last-bit
+  comparison; the CI-safe CPU teeth in `tests/reference_math.rs` guard deep-zoom
+  correctness.
 
 ## [0.9.0] - 2026-07-17
 
