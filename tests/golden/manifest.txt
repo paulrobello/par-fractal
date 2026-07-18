@@ -18,14 +18,14 @@
 # This is intentionally line-based (not YAML) so `scripts/visual_test.sh` can
 # parse it with a plain `while read` and no `yq`/`python` dependency.
 #
-# SCOPE NOTE: rows are kept at zooms the GPU renders with stable, detailed
-# output. The audit's double-float HP path was found (via this harness's
-# CROSSCHECK mode) to degrade above ~1e5 and render solid black by ~1e7–1e8 —
-# a real deep-zoom GPU rendering failure that is out of scope for ENH-007 (it
-# belongs to the ENH-001 perturbation / progressive-refinement work). Deep-zoom
-# MATH correctness is still guarded by the CI-safe CPU teeth in
-# `tests/reference_math.rs` (DF-vs-f64). Add deeper rows here once that issue
-# is resolved and the goldens can be blessed against correct output.
+# SCOPE NOTE: rows are kept at zooms the GPU renders with stable, detailed output.
+# The double-float HP path is correct through ~1e7 but collapses above ~3e7
+# (root-caused 2026-07-17: fast ~1.2 ms frame, no device-loss, but per-pixel
+# coordinate precision collapses to one shared orbit → near-uniform image; naga's
+# Metal two_prod EFT is intact, so the collapse is downstream Metal FTZ / sub-ULP
+# lo-word loss). Fixed only by perturbation (ENH-001), which iterates plain-f32
+# deltas. Deep-zoom MATH correctness stays guarded by the CI-safe CPU teeth in
+# `tests/reference_math.rs` (DF-vs-f64). Add deeper rows once ENH-001 lands.
 #
 # id                    kind          FractalType     cx             cy             zoom  iters  color_mode  size
 mandel-shallow         mandelbrot    Mandelbrot2D    -0.5           0              1     256    2           256x256

@@ -23,7 +23,7 @@
 
 | ID | Title | Impact | Effort | Depends on | Status (v0.9.0) |
 |----|-------|--------|--------|-----------|-----------------|
-| ENH-007 | Deep-zoom visual regression harness | High (guards every other change) | Low–Medium (~1–2 days) | none — do first | **Done** (CPU teeth + GPU goldens; surfaced a >1e5 HP-rendering failure) |
+| ENH-007 | Deep-zoom visual regression harness | High (guards every other change) | Low–Medium (~1–2 days) | none — do first | **Done** (CPU teeth + GPU goldens; root-caused the >1e7 HP precision collapse → ENH-001) |
 | ENH-002 | Progressive refinement + render-on-demand | High | Medium–High (~1 week) | ARC-006/008 fixes | **Partial** — render-on-demand done (ARC-006) |
 | ENH-003 | Dynamic resolution scaling (wire `render_scale`) | High | Medium (~2–3 days) | ARC-007/008 fixes | Not started (render_scale still inert) |
 | ENH-001 | Perturbation-theory infinite zoom | Transformative | Very High (2–4 weeks) | ARC-001/002 bundle, ENH-007 | Not started (HP prereq landed via ARC-002) |
@@ -115,14 +115,19 @@ converts ENH-003/004/005 and LOD tuning from faith to measurement. **Effort**: ~
   flags `--screenshot-path` / `--window-size` give deterministic captures; `gen-preset` builds
   row presets via the app's own serializer. Skips cleanly on headless boxes.
 
-**Finding surfaced by the harness (out of scope to fix here):** the GPU's double-float HP path
-renders correctly only up to ~1e5; above that the screenshot degrades (1e6 partial, 1e7–1e8
-solid black) while the CPU f64/DF reference shows the expected structure. This is a real
-deep-zoom GPU rendering failure (correctness or Metal-watchdog reset under the ~10–20× slower
-HP shader) — exactly the bug class this harness exists to catch. It belongs to the ENH-001
-perturbation / ENH-002 progressive-refinement work, so the manifest's goldens are kept at
-zooms the GPU renders with stable detail (≤1e5) and deep-zoom *math* correctness is still
-guarded by the CPU DF-vs-f64 teeth. Re-add deeper golden rows once that issue is resolved.
+**Finding surfaced by the harness (root-caused 2026-07-17; fix is ENH-001):** the GPU's
+double-float HP path is *correct* through ~1e7 — it renders proper seahorse structure given
+adequate settle time (the earlier "solid black above 1e5" was a too-short settle / screenshot-
+vs-first-frame race, not a render failure). Above ~3e7 it collapses: the frame is fast (~1.2 ms)
+and the device is NOT lost (verified via a device-lost callback + uncaptured-error handler),
+but per-pixel coordinate precision collapses so the whole frame computes one shared orbit — a
+near-uniform image (3 distinct gray values at 1e8) instead of the seahorse. naga's Metal output
+preserves the `two_prod` error-free transform (no FMA fusion), so the collapse is downstream
+(Metal flush-to-zero / sub-ULP lo-word loss over long near-boundary orbits); the CPU DF mirror
+doesn't collapse, which is why the DF-vs-f64 teeth pass and never caught it. This is a
+fundamental limit of multi-thousand-iteration double-float on Metal — exactly what perturbation
+(ENH-001) eliminates by iterating plain-f32 deltas against a CPU reference orbit. Manifest
+goldens stay at ≤1e5; deep-zoom *math* correctness stays guarded by the CPU teeth.
 
 The audit found four deep-zoom correctness bugs that shipped silently (unreachable hp path, wrong
 DF abs, late threshold, FMA dependence) — precisely the class a screenshot-vs-reference harness

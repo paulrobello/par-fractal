@@ -23,9 +23,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in harness mode); interactive behavior is unchanged.
 
 ### Known issues
-- The GPU's double-float HP path renders correctly only up to ~1e5 zoom; above that
-  the screenshot degrades to solid black by ~1e7–1e8 (the CPU reference shows the
-  expected structure). Surfaced by this harness; tracked under ENH-001/ENH-002.
+- The GPU's double-float HP path is correct through ~1e7 zoom but collapses above ~3e7
+  (root-caused via the harness: a fast ~1.2 ms frame with no device-loss, but per-pixel
+  coordinate precision collapses to one shared orbit → a near-uniform image instead of the
+  fractal; naga's Metal `two_prod` EFT is intact, so the collapse is downstream Metal
+  flush-to-zero / sub-ULP lo-word loss). The CPU f64/DF mirror does not collapse. Fixed only
+  by perturbation theory (ENH-001); until then manifest goldens stay at ≤1e5 and deep-zoom
+  *math* correctness is guarded by the CI-safe CPU teeth.
 
 ## [0.9.0] - 2026-07-17
 
