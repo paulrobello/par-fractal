@@ -18,7 +18,7 @@
 //! path handles deep zoom with its known ceiling and the driver is a no-op.
 
 use crate::deep_zoom::orbit::{
-    ReferenceOrbit, compute_reference_orbit_best, precision_bits_for_zoom,
+    FractalKind, ReferenceOrbit, compute_reference_orbit_best, precision_bits_for_zoom,
 };
 use crate::fractal::{FractalType, RenderMode};
 
@@ -33,17 +33,17 @@ pub const PERTURBATION_LOG2_GATE: f64 = 24.0;
 
 /// True when perturbation should engage for this view.
 ///
-/// Phase A is Mandelbrot-only: the `Δz ← 2·Z_n·Δz + Δz² + Δc` recurrence
-/// assumes the plain Mandelbrot map. Julia, Burning Ship, and Tricorn have
-/// different delta recurrences (Phase B), and 3D / attractor / Buddhabrot
-/// paths don't use the 2D delta shader at all. Below the gate the existing
-/// HP path renders correctly.
+/// Eligible for every 2D escape-time type that maps to a [`FractalKind`]
+/// (Mandelbrot, Julia, Burning Ship, Tricorn — Phase B step 7 lifted the
+/// Mandelbrot-only restriction). 3D / attractor / Buddhabrot paths return
+/// `None` from [`FractalKind::from_fractal_type`] and fall through to their
+/// own renderers. Below the gate the existing HP path renders correctly.
 pub fn perturbation_eligible(
     zoom_2d: f64,
     fractal_type: FractalType,
     render_mode: RenderMode,
 ) -> bool {
-    fractal_type == FractalType::Mandelbrot2D
+    FractalKind::from_fractal_type(fractal_type).is_some()
         && render_mode == RenderMode::TwoD
         && zoom_2d.log2() > PERTURBATION_LOG2_GATE
 }
@@ -55,12 +55,18 @@ pub fn perturbation_eligible(
 /// `aspect` is included because the 3×3 probe grid spreads candidates by
 /// `0.5 * view_half_extent`, which depends on aspect — a window resize that
 /// changes aspect changes the probe locations and must invalidate.
+///
+/// `fractal_type` and `julia_c` are part of the signature (Phase B step 7):
+/// switching fractal type (Mandelbrot ↔ Julia ↔ …) or editing `julia_c`
+/// changes the reference orbit and must invalidate.
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct ViewSignature {
     center: [f64; 2],
     zoom: f64,
     aspect: f32,
     max_iter: u32,
+    fractal_type: FractalType,
+    julia_c: [f32; 2],
 }
 
 /// Schedules the off-render-thread reference-orbit computation.
@@ -118,12 +124,25 @@ impl PerturbationDriver {
     /// always serves the exact budget the shader loop runs. `aspect` is the
     /// camera's width/height — used by the probe-grid selector to spread
     /// candidates across the visible view.
-    pub fn note_view(&mut self, center: [f64; 2], zoom: f64, aspect: f32, max_iter: u32) {
+    ///
+    /// `fractal_type` and `julia_c` are part of the signature (Phase B step
+    /// 7): switching type or editing `julia_c` invalidates the orbit.
+    pub fn note_view(
+        &mut self,
+        center: [f64; 2],
+        zoom: f64,
+        aspect: f32,
+        max_iter: u32,
+        fractal_type: FractalType,
+        julia_c: [f32; 2],
+    ) {
         let sig = ViewSignature {
             center,
             zoom,
             aspect,
             max_iter,
+            fractal_type,
+            julia_c,
         };
         if self.last_view != Some(sig) {
             self.dirty = true;
@@ -141,7 +160,18 @@ impl PerturbationDriver {
     /// lands via [`Self::poll`]. Probing 9 candidates is roughly 9× the
     /// single-orbit cost; the GUI stays responsive because the work happens
     /// off the render thread.
-    pub fn maybe_spawn(&mut self, center: [f64; 2], zoom: f64, aspect: f32, max_iter: u32) -> bool {
+    ///
+    /// `fractal_type` selects the recurrence via [`FractalKind`]; `julia_c`
+    /// is the fixed c for Julia (ignored for the other kinds).
+    pub fn maybe_spawn(
+        &mut self,
+        center: [f64; 2],
+        zoom: f64,
+        aspect: f32,
+        max_iter: u32,
+        fractal_type: FractalType,
+        julia_c: [f32; 2],
+    ) -> bool {
         #[cfg(not(target_arch = "wasm32"))]
         {
             if !self.dirty || self.computing {
@@ -152,6 +182,15 @@ impl PerturbationDriver {
             if zoom.log2() <= PERTURBATION_LOG2_GATE {
                 return false;
             }
+            // Non-eligible type: nothing to compute. Stay non-dirty so we
+            // don't churn; `perturbation_eligible` short-circuits this path
+            // upstream, but the guard is cheap defense-in-depth.
+            let kind = match FractalKind::from_fractal_type(fractal_type) {
+                Some(k) => k,
+                None => {
+                    return false;
+                }
+            };
             let precision_bits = precision_bits_for_zoom(zoom);
             // View half-extent in complex units per axis — matches the
             // shader's `delta_c_scale` derivation so the probe grid lands at
@@ -160,20 +199,23 @@ impl PerturbationDriver {
             let inv_zoom = 2.0 / zoom;
             let view_half_extent_x = inv_zoom * aspect_f64;
             let view_half_extent_y = inv_zoom;
+            let julia_c_f64 = [julia_c[0] as f64, julia_c[1] as f64];
             let (tx, rx) = std::sync::mpsc::channel::<ReferenceOrbit>();
             self.pending = Some(rx);
             self.computing = true;
             self.dirty = false;
             // Move only Copy data into the worker — `center`, the half-extents,
-            // `max_iter`, `precision_bits` — plus the Sender. No GPU handles
-            // cross the thread boundary (the upload happens on the main thread
-            // in `Renderer::set_reference_orbit`).
+            // `max_iter`, `precision_bits`, `kind`, `julia_c_f64` — plus the
+            // Sender. No GPU handles cross the thread boundary (the upload
+            // happens on the main thread in `Renderer::set_reference_orbit`).
             std::thread::spawn(move || {
                 let orbit = compute_reference_orbit_best(
+                    kind,
                     center[0],
                     center[1],
                     view_half_extent_x,
                     view_half_extent_y,
+                    julia_c_f64,
                     max_iter,
                     precision_bits,
                 );
@@ -185,10 +227,10 @@ impl PerturbationDriver {
         }
         #[cfg(target_arch = "wasm32")]
         {
-            // wasm has no `std::thread`; perturbation is native-only for
-            // Phase A. Clear `dirty` so eligible views don't keep churning
-            // the (no-op) spawn path every frame; the HP path renders.
-            let _ = (center, zoom, aspect, max_iter);
+            // wasm has no `std::thread`; perturbation is native-only.
+            // Clear `dirty` so eligible views don't keep churning the
+            // (no-op) spawn path every frame; the HP path renders.
+            let _ = (center, zoom, aspect, max_iter, fractal_type, julia_c);
             self.dirty = false;
             false
         }
@@ -233,15 +275,32 @@ impl PerturbationDriver {
 mod tests {
     use super::*;
 
-    /// Gate engages only for Mandelbrot2D in 2D mode past the zoom threshold.
-    /// The other 2D escape-time fractals (Julia, Burning Ship, etc.) and all
-    /// 3D paths fall back to HP / standard rendering in Phase A.
+    /// Gate engages for every 2D escape-time type that maps to a
+    /// [`FractalKind`] (Mandelbrot, Julia, Burning Ship, Tricorn — Phase B
+    /// step 7 extended the Phase A Mandelbrot-only gate). Other 2D types
+    /// (Phoenix, Newton, …) and all 3D paths fall back to HP / standard
+    /// rendering.
     #[test]
-    fn gate_is_mandelbrot_2d_only() {
+    fn gate_covers_perturbation_eligible_types() {
         let z = 1e8; // well past the gate
         assert!(perturbation_eligible(
             z,
             FractalType::Mandelbrot2D,
+            RenderMode::TwoD
+        ));
+        assert!(perturbation_eligible(
+            z,
+            FractalType::Julia2D,
+            RenderMode::TwoD
+        ));
+        assert!(perturbation_eligible(
+            z,
+            FractalType::BurningShip2D,
+            RenderMode::TwoD
+        ));
+        assert!(perturbation_eligible(
+            z,
+            FractalType::Tricorn2D,
             RenderMode::TwoD
         ));
 
@@ -264,10 +323,10 @@ mod tests {
             RenderMode::TwoD,
         ));
 
-        // Wrong fractal type or mode → ineligible.
+        // Non-perturbation fractal types or modes → ineligible.
         assert!(!perturbation_eligible(
             z,
-            FractalType::Julia2D,
+            FractalType::Phoenix2D,
             RenderMode::TwoD
         ));
         assert!(!perturbation_eligible(
@@ -277,7 +336,7 @@ mod tests {
         ));
     }
 
-    /// `note_view` marks dirty exactly when one of the four signature
+    /// `note_view` marks dirty exactly when one of the signature
     /// fields changes — and never when an identical view is re-recorded.
     /// This is the invalidation contract the driver relies on to avoid
     /// respawning the worker every frame at a still view.
@@ -287,38 +346,114 @@ mod tests {
         // Initial state is dirty (so the first eligible frame spawns).
         assert!(d.dirty);
 
-        d.note_view([-0.5, 0.0], 1e8, 16.0 / 9.0, 1000);
+        d.note_view(
+            [-0.5, 0.0],
+            1e8,
+            16.0 / 9.0,
+            1000,
+            FractalType::Mandelbrot2D,
+            [0.0, 0.0],
+        );
         assert!(d.dirty, "first note is always a change from None");
 
         // Same view: not dirty.
         d.dirty = false;
-        d.note_view([-0.5, 0.0], 1e8, 16.0 / 9.0, 1000);
+        d.note_view(
+            [-0.5, 0.0],
+            1e8,
+            16.0 / 9.0,
+            1000,
+            FractalType::Mandelbrot2D,
+            [0.0, 0.0],
+        );
         assert!(!d.dirty, "identical view must not mark dirty");
 
         // Each field change marks dirty.
-        d.note_view([-0.5, 0.0001], 1e8, 16.0 / 9.0, 1000);
+        d.note_view(
+            [-0.5, 0.0001],
+            1e8,
+            16.0 / 9.0,
+            1000,
+            FractalType::Mandelbrot2D,
+            [0.0, 0.0],
+        );
         assert!(d.dirty, "center change must mark dirty");
         d.dirty = false;
-        d.note_view([-0.5, 0.0001], 2e8, 16.0 / 9.0, 1000);
+        d.note_view(
+            [-0.5, 0.0001],
+            2e8,
+            16.0 / 9.0,
+            1000,
+            FractalType::Mandelbrot2D,
+            [0.0, 0.0],
+        );
         assert!(d.dirty, "zoom change must mark dirty");
         d.dirty = false;
-        d.note_view([-0.5, 0.0001], 2e8, 4.0 / 3.0, 1000);
+        d.note_view(
+            [-0.5, 0.0001],
+            2e8,
+            4.0 / 3.0,
+            1000,
+            FractalType::Mandelbrot2D,
+            [0.0, 0.0],
+        );
         assert!(d.dirty, "aspect change must mark dirty");
         d.dirty = false;
-        d.note_view([-0.5, 0.0001], 2e8, 4.0 / 3.0, 1001);
+        d.note_view(
+            [-0.5, 0.0001],
+            2e8,
+            4.0 / 3.0,
+            1001,
+            FractalType::Mandelbrot2D,
+            [0.0, 0.0],
+        );
         assert!(d.dirty, "max_iter change must mark dirty");
+        d.dirty = false;
+        d.note_view(
+            [-0.5, 0.0001],
+            2e8,
+            4.0 / 3.0,
+            1001,
+            FractalType::Julia2D,
+            [0.0, 0.0],
+        );
+        assert!(d.dirty, "fractal_type change must mark dirty");
+        d.dirty = false;
+        d.note_view(
+            [-0.5, 0.0001],
+            2e8,
+            4.0 / 3.0,
+            1001,
+            FractalType::Julia2D,
+            [-0.7, 0.27015],
+        );
+        assert!(d.dirty, "julia_c change must mark dirty");
     }
 
     /// `maybe_spawn` returns false (and spawns nothing) below the gate even
     /// when stale, and on wasm unconditionally — pinning the native-only
-    /// contract of perturbation in Phase A.
+    /// contract of perturbation.
     #[test]
     fn maybe_spawn_no_op_below_gate_and_no_duplicate_spawns() {
         let mut d = PerturbationDriver::new();
         // dirty, but zoom = 1 (below gate)
-        d.note_view([-0.5, 0.0], 1.0, 16.0 / 9.0, 1000);
+        d.note_view(
+            [-0.5, 0.0],
+            1.0,
+            16.0 / 9.0,
+            1000,
+            FractalType::Mandelbrot2D,
+            [0.0, 0.0],
+        );
 
-        let spawned = d.maybe_spawn([-0.5, 0.0], 1.0, 16.0 / 9.0, 1000);
+        let spawned = d.maybe_spawn(
+            [-0.5, 0.0],
+            1.0,
+            16.0 / 9.0,
+            1000,
+            FractalType::Mandelbrot2D,
+            [0.0, 0.0],
+        );
         // No spawn below the gate on native; on wasm it's always no-op.
         // Either way `spawned` is false and `computing` stays false.
         assert!(!spawned);

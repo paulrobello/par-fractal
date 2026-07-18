@@ -30,5 +30,6 @@ pub use driver::{PerturbationDriver, perturbation_eligible};
 // lib's public API surface is what justifies the re-export.
 #[allow(unused_imports)]
 pub use orbit::{
-    ReferenceOrbit, compute_reference_orbit, compute_reference_orbit_best, precision_bits_for_zoom,
+    FractalKind, ReferenceOrbit, compute_reference_orbit, compute_reference_orbit_best,
+    precision_bits_for_zoom,
 };

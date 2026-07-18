@@ -228,20 +228,31 @@ impl App {
         let aspect = self.camera.aspect;
         let fractal_type = self.fractal_params.settings.fractal_type;
         let render_mode = self.fractal_params.settings.render_mode;
+        let julia_c = self.fractal_params.settings.julia_c;
         // Deterministic (non-LOD) budget: see `perturbation_max_iterations`.
         // A fixed budget means the orbit computes once (no LOD-driven
         // recompute) and lands deterministically.
         let effective_max_iter = perturbation_max_iterations(&self.fractal_params);
 
         // (1) Record view → mark stale on change.
-        self.perturbation_driver
-            .note_view(center, zoom, aspect, effective_max_iter);
+        self.perturbation_driver.note_view(
+            center,
+            zoom,
+            aspect,
+            effective_max_iter,
+            fractal_type,
+            julia_c,
+        );
 
         // (2) Spawn worker if eligible + stale + idle.
-        if self
-            .perturbation_driver
-            .maybe_spawn(center, zoom, aspect, effective_max_iter)
-        {
+        if self.perturbation_driver.maybe_spawn(
+            center,
+            zoom,
+            aspect,
+            effective_max_iter,
+            fractal_type,
+            julia_c,
+        ) {
             self.ui
                 .show_toast("Computing deep-zoom reference…".to_string());
         }

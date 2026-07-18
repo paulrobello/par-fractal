@@ -664,6 +664,175 @@ fn mandelbrot_perturb(delta_c: vec2<f32>) -> f32 {
     return -1.0;
 }
 
+// Perturbation-theory Tricorn (ENH-001 Phase B step 7).
+//
+// Tricorn map: z ← conj(z)² + c. Per-pixel delta recurrence (derived in
+// docs/fable/ENH-001-perturbation-deep-zoom.md step 7): given z = Z + dz and
+// c = c_ref + Δc,
+//
+//     conj(z)² = (conj(Z) + conj(dz))²
+//              = conj(Z)² + 2·conj(Z)·conj(dz) + conj(dz)²
+//
+// so z_{n+1} = conj(Z)² + c + (2·conj(Z)·conj(dz) + conj(dz)²), and since
+// Z_{n+1} = conj(Z)² + c_ref,
+//
+//     dz ← 2·conj(Z)·conj(dz) + conj(dz)² + Δc
+//
+// The reference orbit iterates the tricorn map (CPU-side
+// `compute_reference_orbit(FractalKind::Tricorn, …)`); Δc is the same
+// Mandelbrot-style per-pixel c-offset. Structure mirrors
+// `mandelbrot_perturb` exactly; only the recurrence step differs.
+fn tricorn_perturb(delta_c: vec2<f32>) -> f32 {
+    var dz = vec2<f32>(0.0, 0.0);
+    var z_full = vec2<f32>(0.0, 0.0);
+    var m = 0u;
+
+    for (var i = 0u; i < uniforms.max_iterations; i = i + 1u) {
+        if (m >= uniforms.orbit_len) {
+            dz = z_full;
+            m = 0u;
+        }
+
+        // dz ← 2·conj(Z)·conj(dz) + conj(dz)² + Δc
+        let zref = ref_orbit[m];
+        let conj_z = vec2<f32>(zref.x, -zref.y);
+        let conj_dz = vec2<f32>(dz.x, -dz.y);
+        dz = cmul(2.0 * conj_z, conj_dz) + cmul(conj_dz, conj_dz) + delta_c;
+        m = m + 1u;
+
+        if (m >= uniforms.orbit_len) {
+            z_full = dz;
+        } else {
+            z_full = ref_orbit[m] + dz;
+        }
+
+        let mag2 = dot(z_full, z_full);
+        if (mag2 > 4.0) {
+            return smooth_iteration_count(i, mag2, 2.0, 2.0, uniforms.max_iterations);
+        }
+
+        let ref_exhausted = (m >= uniforms.orbit_len - 1u) ||
+                            (uniforms.ref_escaped_at > 0u && m >= uniforms.ref_escaped_at);
+        if (mag2 < dot(dz, dz) || ref_exhausted) {
+            dz = z_full;
+            m = 0u;
+        }
+    }
+
+    return -1.0;
+}
+
+// Perturbation-theory Julia (ENH-001 Phase B step 7).
+//
+// Julia map: z ← z² + c with c FIXED (uniforms.julia_c). The per-pixel
+// variation is the STARTING z (z_0 = pixel_coord), not c. The reference
+// orbit iterates from Z_0 = view_center with fixed c = julia_c
+// (`compute_reference_orbit(FractalKind::Julia, …)` inverts (c, Z_0) vs the
+// Mandelbrot path). Per-pixel dz_0 = z_0_pixel − Z_0 (the screen offset,
+// reconstructed by the caller and passed in as `initial_dz`). c is identical
+// for every pixel, so the Δc term cancels:
+//
+//     dz ← 2·Z·dz + dz²     (no Δc term)
+//
+// `initial_dz` is computed in `fs_main_2d` from the same `delta_c_origin +
+// uv·delta_c_scale` mapping the Mandelbrot path uses for Δc — same screen
+// geometry, different per-pixel variable.
+fn julia_perturb(initial_dz: vec2<f32>) -> f32 {
+    var dz = initial_dz;
+    var z_full = vec2<f32>(0.0, 0.0);
+    var m = 0u;
+
+    for (var i = 0u; i < uniforms.max_iterations; i = i + 1u) {
+        if (m >= uniforms.orbit_len) {
+            dz = z_full;
+            m = 0u;
+        }
+
+        // dz ← 2·Z·dz + dz²   (NO Δc term — c is identical for every pixel)
+        let zref = ref_orbit[m];
+        dz = cmul(2.0 * zref, dz) + cmul(dz, dz);
+        m = m + 1u;
+
+        if (m >= uniforms.orbit_len) {
+            z_full = dz;
+        } else {
+            z_full = ref_orbit[m] + dz;
+        }
+
+        let mag2 = dot(z_full, z_full);
+        if (mag2 > 4.0) {
+            return smooth_iteration_count(i, mag2, 2.0, 2.0, uniforms.max_iterations);
+        }
+
+        let ref_exhausted = (m >= uniforms.orbit_len - 1u) ||
+                            (uniforms.ref_escaped_at > 0u && m >= uniforms.ref_escaped_at);
+        if (mag2 < dot(dz, dz) || ref_exhausted) {
+            dz = z_full;
+            m = 0u;
+        }
+    }
+
+    return -1.0;
+}
+
+// Perturbation-theory Burning Ship (ENH-001 Phase B step 7).
+//
+// Burning Ship map: z ← (|re(z)| + i|im(z)|)² + c. Define
+// W_m = (|Z_m.re|, |Z_m.im|) and σ_m = sign per component (sign(0) = +1
+// via `select(1.0, -1.0, x < 0.0)`, matching the DF abs fix QA-002). When
+// Z + dz does not cross zero on either axis (the glitch zone — rare
+// off-axis), |re(Z+dz)| = |re(Z)| + σ_re·dz.re, and similarly for im, so
+// w = (|re(z)|, |im(z)|) = W + σ(dz) where σ(dz) = σ·dz per-component.
+// Then w² + c = W² + 2·W·σ(dz) + σ(dz)² + c, and since
+// Z_{n+1} = W² + c_ref:
+//
+//     dz ← 2·W·σ(dz) + σ(dz)² + Δc
+//
+// The reference orbit iterates the burning-ship map on the CPU
+// (`compute_reference_orbit(FractalKind::BurningShip, …)`); W and σ are
+// derived per-iteration from the orbit's Z_m.
+fn burning_ship_perturb(delta_c: vec2<f32>) -> f32 {
+    var dz = vec2<f32>(0.0, 0.0);
+    var z_full = vec2<f32>(0.0, 0.0);
+    var m = 0u;
+
+    for (var i = 0u; i < uniforms.max_iterations; i = i + 1u) {
+        if (m >= uniforms.orbit_len) {
+            dz = z_full;
+            m = 0u;
+        }
+
+        // W = |Z| per component, σ = sign(Z) per component (sign(0) = +1).
+        let zref = ref_orbit[m];
+        let w = abs(zref);
+        let sgn = select(vec2<f32>(1.0), vec2<f32>(-1.0), zref < vec2<f32>(0.0));
+        let sigma_dz = sgn * dz;
+        // dz ← 2·W·σ(dz) + σ(dz)² + Δc
+        dz = cmul(2.0 * w, sigma_dz) + cmul(sigma_dz, sigma_dz) + delta_c;
+        m = m + 1u;
+
+        if (m >= uniforms.orbit_len) {
+            z_full = dz;
+        } else {
+            z_full = ref_orbit[m] + dz;
+        }
+
+        let mag2 = dot(z_full, z_full);
+        if (mag2 > 4.0) {
+            return smooth_iteration_count(i, mag2, 2.0, 2.0, uniforms.max_iterations);
+        }
+
+        let ref_exhausted = (m >= uniforms.orbit_len - 1u) ||
+                            (uniforms.ref_escaped_at > 0u && m >= uniforms.ref_escaped_at);
+        if (mag2 < dot(dz, dz) || ref_exhausted) {
+            dz = z_full;
+            m = 0u;
+        }
+    }
+
+    return -1.0;
+}
+
 // ============================================================================
 // 2D Fractals (Standard Precision)
 // ============================================================================
@@ -3076,16 +3245,24 @@ fn fs_main_2d(input: VertexOutput) -> @location(0) vec4<f32> {
     var t: f32;
     var coord: vec2<f32>;
 
-    // Perturbation-theory path (ENH-001 Phase A): Mandelbrot-only, engaged only
-    // when the CPU driver has uploaded a reference orbit AND flipped
-    // `perturbation_enabled`. Gated by `orbit_len > 0` so a stale enabled flag
-    // with an empty buffer can never index into unpopulated storage. Phase A
-    // step 4 wires the shader; step 5 (driver) actually populates the uniforms.
-    if (uniforms.perturbation_enabled == 1u && uniforms.orbit_len > 0u && uniforms.fractal_type == 0u) {
+    // Perturbation-theory path (ENH-001): engaged only when the CPU driver
+    // has uploaded a reference orbit AND flipped `perturbation_enabled`.
+    // Gated by `orbit_len > 0` so a stale enabled flag with an empty buffer
+    // can never index into unpopulated storage. Phase A covered Mandelbrot;
+    // Phase B step 7 extends the gate to all 2D escape-time types that map
+    // to a perturbation recurrence (0=Mandelbrot, 1=Julia, 4=BurningShip,
+    // 5=Tricorn).
+    let perturb_eligible_type = uniforms.fractal_type == 0u
+                             || uniforms.fractal_type == 1u
+                             || uniforms.fractal_type == 4u
+                             || uniforms.fractal_type == 5u;
+    if (uniforms.perturbation_enabled == 1u && uniforms.orbit_len > 0u && perturb_eligible_type) {
         // Per-pixel Δc derived from screen-space offset × pixel→complex scale.
         // The driver sets `delta_c_scale ≈ (2.0/zoom * aspect, 2.0/zoom)` and
         // `delta_c_origin ≈ (0, 0)` (the screen-center delta from the reference).
         // All f32, all small by construction — never subtract two large coords.
+        // For Julia this same value is the INITIAL dz (per-pixel z_0 offset
+        // from the reference Z_0); the recurrence adds no Δc term.
         let delta_c = uniforms.delta_c_origin + vec2<f32>(
             input.uv.x * uniforms.delta_c_scale.x,
             input.uv.y * uniforms.delta_c_scale.y,
@@ -3096,7 +3273,17 @@ fn fs_main_2d(input: VertexOutput) -> @location(0) vec4<f32> {
         // constant across the view — fine for the aux color modes, which degrade
         // gracefully. The primary palette path (default) colors by `t`, not coord.
         coord = uniforms.center_hi + delta_c;
-        t = mandelbrot_perturb(delta_c);
+        switch uniforms.fractal_type {
+            case 0u: { t = mandelbrot_perturb(delta_c); }
+            case 1u: { t = julia_perturb(delta_c); }
+            case 4u: { t = burning_ship_perturb(delta_c); }
+            case 5u: { t = tricorn_perturb(delta_c); }
+            default: {
+                // Unreachable: `perturb_eligible_type` restricted to {0,1,4,5}.
+                // Fall back to the Mandelbrot recurrence as a safe default.
+                t = mandelbrot_perturb(delta_c);
+            }
+        }
     } else if (uniforms.high_precision == 1u && uniforms.fractal_type <= 5u) {
         // Check if high-precision mode is enabled and fractal supports it.
         // Gate covers types 0..=5 (Mandelbrot, Julia, Sierpinski, SierpinskiTriangle,

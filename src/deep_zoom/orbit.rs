@@ -12,7 +12,88 @@
 //! The tests pin the orbit to a direct f64 iteration so a regression in the
 //! BigFloat walk is caught without a GPU.
 
+use crate::fractal::FractalType;
 use dashu_float::FBig;
+use dashu_float::ops::Abs;
+
+/// Which 2D escape-time map the reference orbit iterates (ENH-001 Phase B
+/// step 7). Each kind has its own per-pixel delta recurrence in
+/// `shaders/fractal.wgsl`; the CPU orbit just iterates the underlying map
+/// (`mandelbrot_hp` / `julia_hp` / `burning_ship_hp` / `tricorn_hp`) in
+/// arbitrary precision, starting from the kind-appropriate initial condition:
+///
+/// - `Mandelbrot` / `Tricorn` / `BurningShip`: `Z_0 = 0`, c = view center.
+///   The per-pixel variable is c (the position); Δc = c_pixel − c_ref.
+/// - `Julia`: `Z_0 = view center`, c = `julia_c` (fixed for the whole view).
+///   The per-pixel variable is z_0 (the starting point); Δz_0 = z_0_pixel −
+///   center. The Δc term in the recurrence cancels because c is identical
+///   for every pixel.
+///
+/// Built from a [`FractalType`] via [`Self::from_fractal_type`]; types that
+/// don't use the 2D perturbation path (attractors, 3D, Buddhabrot) map to
+/// `None`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FractalKind {
+    Mandelbrot,
+    Julia,
+    BurningShip,
+    Tricorn,
+}
+
+impl FractalKind {
+    /// Map a [`FractalType`] to its perturbation kind, or `None` if the type
+    /// doesn't use the 2D perturbation path (handled by other renderers).
+    /// The discriminants match `src/shaders/fractal.wgsl`'s
+    /// `fs_main_2d` perturbation gate (`0, 1, 4, 5`).
+    pub fn from_fractal_type(t: FractalType) -> Option<Self> {
+        match t {
+            FractalType::Mandelbrot2D => Some(Self::Mandelbrot),
+            FractalType::Julia2D => Some(Self::Julia),
+            FractalType::BurningShip2D => Some(Self::BurningShip),
+            FractalType::Tricorn2D => Some(Self::Tricorn),
+            _ => None,
+        }
+    }
+}
+
+/// One step of each map in `FBig`. Used by [`compute_reference_orbit`] so the
+/// BigFloat walk matches the shader's `*_hp` recurrence exactly.
+///
+/// - Mandelbrot / Julia: `Z² + c`
+/// - Tricorn: `conj(Z)² + c = (re² − im², −2·re·im) + c`
+/// - Burning Ship: `(|re| + i|im|)² + c = (re² − im², 2·|re|·|im|) + c`
+///   (the imaginary part is non-negative because |re|, |im| ≥ 0).
+fn step_complex(
+    kind: FractalKind,
+    zr: &FBig,
+    zi: &FBig,
+    cr: &FBig,
+    ci: &FBig,
+    two: &FBig,
+) -> (FBig, FBig) {
+    match kind {
+        FractalKind::Mandelbrot | FractalKind::Julia => {
+            let nr = zr.clone() * zr.clone() - zi.clone() * zi.clone() + cr.clone();
+            let ni = (zr.clone() * zi.clone()) * two.clone() + ci.clone();
+            (nr, ni)
+        }
+        FractalKind::Tricorn => {
+            // conj(z)² + c: real part is re² − im² (same as Mandelbrot),
+            // imaginary part is −2·re·im.
+            let nr = zr.clone() * zr.clone() - zi.clone() * zi.clone() + cr.clone();
+            let ni = ci.clone() - (zr.clone() * zi.clone()) * two.clone();
+            (nr, ni)
+        }
+        FractalKind::BurningShip => {
+            // (|re| + i|im|)² = (re² − im², 2·|re|·|im|); apply abs first.
+            let ar = zr.clone().abs();
+            let ai = zi.clone().abs();
+            let nr = ar.clone() * ar.clone() - ai.clone() * ai.clone() + cr.clone();
+            let ni = (ar * ai) * two.clone() + ci.clone();
+            (nr, ni)
+        }
+    }
+}
 
 /// Precision (mantissa bits) the reference orbit needs at a given zoom.
 ///
@@ -56,20 +137,30 @@ pub struct ReferenceOrbit {
     pub reference_offset: [f32; 2],
 }
 
-/// Compute the Mandelbrot reference orbit at center `(c_re, c_im)`.
+/// Compute the reference orbit at center `(center_re, center_im)`.
 ///
-/// `Z_0 = 0`, `Z_{n+1} = Z_n² + C`, stopping at `|Z|² > 4` (escape) or
-/// `max_iter`. Each `Z_n` is emitted as an f32 pair. `precision_bits` controls
-/// the `FBig` mantissa (use [`precision_bits_for_zoom`]).
+/// Iterates the map selected by `kind` (Mandelbrot / Julia / Burning Ship /
+/// Tricorn), stopping at `|Z|² > 4` (escape) or `max_iter`. Each `Z_n` is
+/// emitted as an f32 pair. `precision_bits` controls the `FBig` mantissa
+/// (use [`precision_bits_for_zoom`]).
 ///
-/// `c_re`/`c_im` are f64 here (Phase A enters from the existing f64 center). A
-/// later phase stores the center as a decimal string and parses it straight to
-/// `FBig` so precision is not bounded by f64 — but even from f64, raising the
-/// `FBig` precision lets the *iteration* carry guard bits f64 cannot, which is
-/// what keeps the orbit valid past the ~1e11 f64 ceiling.
+/// **Per-kind initial condition.** For Mandelbrot / Tricorn / Burning Ship
+/// the per-pixel variable is `c`, so `Z_0 = 0` and `c = (center_re,
+/// center_im)`. For Julia the per-pixel variable is `z_0` (the starting
+/// point), so `Z_0 = (center_re, center_im)` and `c = julia_c` (fixed for
+/// the whole view — passed as the `julia_c` parameter, ignored for the
+/// other kinds).
+///
+/// `center_re`/`center_im` are f64 here (Phase A enters from the existing f64
+/// center). A later phase stores the center as a decimal string and parses it
+/// straight to `FBig` so precision is not bounded by f64 — but even from f64,
+/// raising the `FBig` precision lets the *iteration* carry guard bits f64
+/// cannot, which is what keeps the orbit valid past the ~1e11 f64 ceiling.
 pub fn compute_reference_orbit(
-    c_re: f64,
-    c_im: f64,
+    kind: FractalKind,
+    center_re: f64,
+    center_im: f64,
+    julia_c: [f64; 2],
     max_iter: u32,
     precision_bits: usize,
 ) -> ReferenceOrbit {
@@ -83,19 +174,34 @@ pub fn compute_reference_orbit(
             .with_precision(p)
             .value()
     };
-    let cr = with_p(c_re);
-    let ci = with_p(c_im);
+    // Per-kind (c, Z_0). Julia inverts the role: c is the fixed `julia_c`
+    // and Z_0 is the view center; the other kinds put c at the view center
+    // and start Z_0 at zero.
+    let (cr, ci, z0r, z0i) = match kind {
+        FractalKind::Julia => (
+            with_p(julia_c[0]),
+            with_p(julia_c[1]),
+            with_p(center_re),
+            with_p(center_im),
+        ),
+        _ => (
+            with_p(center_re),
+            with_p(center_im),
+            with_p(0.0),
+            with_p(0.0),
+        ),
+    };
     let two = with_p(2.0);
     let four = with_p(4.0);
 
-    let mut zr = with_p(0.0);
-    let mut zi = with_p(0.0);
+    let mut zr = z0r;
+    let mut zi = z0i;
 
     let mut z: Vec<[f32; 2]> = Vec::with_capacity(max_iter as usize);
     let mut escaped_at: Option<u32> = None;
 
     for i in 0..max_iter {
-        // Emit Z_i (z[0] = Z_0 = 0). Done before the escape test so the
+        // Emit Z_i (z[0] = Z_0). Done before the escape test so the
         // shader has the value whose magnitude is being tested.
         z.push([zr.to_f64().value() as f32, zi.to_f64().value() as f32]);
 
@@ -105,9 +211,8 @@ pub fn compute_reference_orbit(
             break;
         }
 
-        // Z_{n+1} = Z_n² + C:  new_re = re² − im² + c_re,  new_im = 2·re·im + c_im.
-        let nr = zr.clone() * zr.clone() - zi.clone() * zi.clone() + cr.clone();
-        let ni = (zr.clone() * zi.clone()) * two.clone() + ci.clone();
+        // Z_{n+1} = step(Z_n, c).
+        let (nr, ni) = step_complex(kind, &zr, &zi, &cr, &ci, &two);
         zr = nr;
         zi = ni;
     }
@@ -162,11 +267,14 @@ pub fn compute_reference_orbit(
 /// `reference_offset` on the returned orbit is `(c_center − c_ref)` cast to an
 /// f32 pair — this IS the shader's `delta_c_origin` (re-derived: per-pixel
 /// `delta_c = c_pixel − c_ref = (c_center − c_ref) + uv·scale`).
+#[allow(clippy::too_many_arguments)] // 8 args: kind + center + 2 half-extents + julia_c + iter + precision — all individually meaningful; a struct would obscure the call sites.
 pub fn compute_reference_orbit_best(
+    kind: FractalKind,
     center_re: f64,
     center_im: f64,
     view_half_extent_x: f64,
     view_half_extent_y: f64,
+    julia_c: [f64; 2],
     max_iter: u32,
     precision_bits: usize,
 ) -> ReferenceOrbit {
@@ -184,7 +292,8 @@ pub fn compute_reference_orbit_best(
         for dx in [-1.0_f64, 0.0, 1.0] {
             let cand_re = center_re + dx * step_x;
             let cand_im = center_im + dy * step_y;
-            let orbit = compute_reference_orbit(cand_re, cand_im, max_iter, precision_bits);
+            let orbit =
+                compute_reference_orbit(kind, cand_re, cand_im, julia_c, max_iter, precision_bits);
 
             let picks_this = match &best {
                 None => true,
@@ -194,6 +303,11 @@ pub fn compute_reference_orbit_best(
                 // Patch reference_offset to (c_center − c_ref), computed in f64
                 // then cast to f32 — this preserves the offset's precision down
                 // to f32-ULP, well within the delta noise floor.
+                //
+                // For Julia, `cand` is the candidate Z_0 (not c — c is the
+                // fixed julia_c for every candidate). The shader's per-pixel
+                // variable for Julia is z_0, so the same offset semantics
+                // carry: `delta_c_origin = z_0_center − z_0_ref`.
                 let offset: [f32; 2] = [(center_re - cand_re) as f32, (center_im - cand_im) as f32];
                 let mut chosen = orbit;
                 chosen.reference_offset = offset;
@@ -235,7 +349,7 @@ mod tests {
     /// `c = 0` is the fixed point: the orbit stays at the origin and never escapes.
     #[test]
     fn orbit_origin_is_stationary() {
-        let orbit = compute_reference_orbit(0.0, 0.0, 50, 128);
+        let orbit = compute_reference_orbit(FractalKind::Mandelbrot, 0.0, 0.0, [0.0, 0.0], 50, 128);
         assert_eq!(orbit.escaped_at, None);
         assert_eq!(orbit.z.len(), 50);
         for &z in &orbit.z {
@@ -248,7 +362,7 @@ mod tests {
     #[test]
     fn orbit_escapes_and_marks_index() {
         // c = 2: Z_0=0, Z_1=2 (|Z|²=4, not >4), Z_2=6 (|Z|²=36>4) → escape at i=2.
-        let orbit = compute_reference_orbit(2.0, 0.0, 64, 128);
+        let orbit = compute_reference_orbit(FractalKind::Mandelbrot, 2.0, 0.0, [0.0, 0.0], 64, 128);
         let escaped = orbit.escaped_at.expect("should escape");
         assert_eq!(orbit.z[0], [0.0, 0.0]);
         let [re, im] = orbit.z[escaped as usize];
@@ -265,7 +379,14 @@ mod tests {
     #[test]
     fn orbit_matches_f64_recurrence() {
         let max_iter = 100u32;
-        let orbit = compute_reference_orbit(-0.5, 0.0, max_iter, 200);
+        let orbit = compute_reference_orbit(
+            FractalKind::Mandelbrot,
+            -0.5,
+            0.0,
+            [0.0, 0.0],
+            max_iter,
+            200,
+        );
 
         // Direct f64 walk of the same recurrence.
         let (mut zr, mut zi): (f64, f64) = (0.0, 0.0);
@@ -288,7 +409,8 @@ mod tests {
     #[test]
     fn orbit_escape_matches_f64_at_seahorse() {
         let (cr, ci, max_iter) = (-0.7436438870, 0.1318259042, 1000u32);
-        let orbit = compute_reference_orbit(cr, ci, max_iter, 200);
+        let orbit =
+            compute_reference_orbit(FractalKind::Mandelbrot, cr, ci, [0.0, 0.0], max_iter, 200);
 
         // f64 escape iteration (mirror of the shader's HP walk).
         let (mut zr, mut zi): (f64, f64) = (0.0, 0.0);
@@ -313,7 +435,8 @@ mod tests {
     /// overrides this; the plain constructor never does.
     #[test]
     fn single_orbit_reference_offset_is_zero() {
-        let orbit = compute_reference_orbit(-0.5, 0.0, 50, 128);
+        let orbit =
+            compute_reference_orbit(FractalKind::Mandelbrot, -0.5, 0.0, [0.0, 0.0], 50, 128);
         assert_eq!(orbit.reference_offset, [0.0, 0.0]);
     }
 
@@ -326,7 +449,16 @@ mod tests {
     /// (the center minus the chosen reference).
     #[test]
     fn selector_picks_bounded_candidate_with_correct_offset() {
-        let orbit = compute_reference_orbit_best(2.0, 0.0, 4.0, 4.0, 32, 128);
+        let orbit = compute_reference_orbit_best(
+            FractalKind::Mandelbrot,
+            2.0,
+            0.0,
+            4.0,
+            4.0,
+            [0.0, 0.0],
+            32,
+            128,
+        );
         assert_eq!(
             orbit.escaped_at, None,
             "must pick the bounded c=0 candidate"
@@ -350,13 +482,113 @@ mod tests {
     fn selector_breaks_tie_toward_center() {
         // All candidates near c=1 escape between i≈1 and i≈3; center is one
         // of the latest escapers, and the tie-break favors first-visited.
-        let orbit = compute_reference_orbit_best(1.0, 0.0, 0.0, 0.0, 16, 128);
+        let orbit = compute_reference_orbit_best(
+            FractalKind::Mandelbrot,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            [0.0, 0.0],
+            16,
+            128,
+        );
         // zero half-extent → every candidate IS the center → bounded check
         // gives the same answer the single-orbit constructor would.
         assert_eq!(
             orbit.escaped_at,
-            compute_reference_orbit(1.0, 0.0, 16, 128).escaped_at
+            compute_reference_orbit(FractalKind::Mandelbrot, 1.0, 0.0, [0.0, 0.0], 16, 128)
+                .escaped_at
         );
         assert_eq!(orbit.reference_offset, [0.0, 0.0]);
+    }
+
+    // --- Phase B step 7: per-kind orbit sanity ----------------------------
+
+    /// `from_fractal_type` maps exactly the four eligible 2D escape-time
+    /// types and nothing else. Anything off-path returns `None`.
+    #[test]
+    fn fractal_kind_from_type_maps_eligible_types() {
+        assert_eq!(
+            FractalKind::from_fractal_type(FractalType::Mandelbrot2D),
+            Some(FractalKind::Mandelbrot)
+        );
+        assert_eq!(
+            FractalKind::from_fractal_type(FractalType::Julia2D),
+            Some(FractalKind::Julia)
+        );
+        assert_eq!(
+            FractalKind::from_fractal_type(FractalType::BurningShip2D),
+            Some(FractalKind::BurningShip)
+        );
+        assert_eq!(
+            FractalKind::from_fractal_type(FractalType::Tricorn2D),
+            Some(FractalKind::Tricorn)
+        );
+        // Non-eligible types fall through.
+        assert_eq!(FractalKind::from_fractal_type(FractalType::Phoenix2D), None);
+        assert_eq!(
+            FractalKind::from_fractal_type(FractalType::Mandelbulb3D),
+            None
+        );
+    }
+
+    /// Julia's orbit starts at Z_0 = center (not zero) and iterates against
+    /// the fixed `julia_c`. Pin the first few Z_n to the direct f64 walk to
+    /// confirm the (c, Z_0) inversion is correct: with `Z_0 = (0, 0)` and
+    /// `julia_c = (-0.7, 0.27015)`, `Z_1 = julia_c`.
+    #[test]
+    fn julia_orbit_starts_at_center_uses_fixed_c() {
+        let julia_c = [-0.7_f64, 0.27015_f64];
+        let orbit = compute_reference_orbit(FractalKind::Julia, 0.0, 0.0, julia_c, 16, 128);
+        // Z_0 = center = (0, 0).
+        assert_eq!(orbit.z[0], [0.0, 0.0]);
+        // Z_1 = Z_0² + julia_c = julia_c (within f32 cast).
+        let [r, i] = orbit.z[1];
+        assert!((r - julia_c[0] as f32).abs() < 1e-6, "Z_1.re={r}");
+        assert!((i - julia_c[1] as f32).abs() < 1e-6, "Z_1.im={i}");
+    }
+
+    /// Tricorn's orbit iterates `conj(Z)² + c`: with `c = 0` and `Z_0 = 0`
+    /// the orbit stays at the origin (same as Mandelbrot at c=0); but with
+    /// `c = (1, 0)` the imaginary part should flip sign each step (the
+    /// `−2·re·im` term), distinguishing it from the Mandelbrot recurrence.
+    #[test]
+    fn tricorn_orbit_uses_conjugate_square() {
+        let orbit = compute_reference_orbit(FractalKind::Tricorn, 1.0, 1.0, [0.0, 0.0], 8, 128);
+        // Z_0 = 0. Z_1 = conj(0)² + (1,1) = (1, 1).
+        assert_eq!(orbit.z[0], [0.0, 0.0]);
+        let [r1, i1] = orbit.z[1];
+        assert!(
+            (r1 - 1.0).abs() < 1e-6 && (i1 - 1.0).abs() < 1e-6,
+            "Z_1=( {r1}, {i1} )"
+        );
+        // Z_2 = conj(Z_1)² + c = (1, -1)² + (1, 1) = (1 - 1 + 1, -2 + 1) = (1, -1).
+        let [r2, i2] = orbit.z[2];
+        assert!((r2 - 1.0).abs() < 1e-6, "Z_2.re={r2}");
+        assert!(
+            (i2 - (-1.0)).abs() < 1e-6,
+            "Z_2.im={i2} (conj square negates im)"
+        );
+    }
+
+    /// Burning Ship's orbit iterates `(|re| + i|im|)² + c`: at `c = (1, 0)`
+    /// starting from `Z_0 = 0`, `Z_1 = (1, 0)`; then `|Z_1| = (1, 0)`,
+    /// `Z_2 = (1, 0)² + (1, 0) = (2, 0)`. Real-axis walk — confirms abs is
+    /// applied before squaring.
+    #[test]
+    fn burning_ship_orbit_applies_abs_before_square() {
+        let orbit = compute_reference_orbit(FractalKind::BurningShip, 1.0, 0.0, [0.0, 0.0], 8, 128);
+        assert_eq!(orbit.z[0], [0.0, 0.0]);
+        let [r1, i1] = orbit.z[1];
+        assert!(
+            (r1 - 1.0).abs() < 1e-6 && (i1 - 0.0).abs() < 1e-6,
+            "Z_1=({r1}, {i1})"
+        );
+        let [r2, i2] = orbit.z[2];
+        // |1|² + 1 = 2 on re; im stays 0.
+        assert!(
+            (r2 - 2.0).abs() < 1e-6 && (i2 - 0.0).abs() < 1e-6,
+            "Z_2=({r2}, {i2})"
+        );
     }
 }
