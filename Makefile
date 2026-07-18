@@ -41,6 +41,7 @@ help:
 	@echo "  t                  - Shortcut for test"
 	@echo "  visual-test        - GPU golden-image regression harness (local; ENH-007)"
 	@echo "  visual-bless       - (Re)write golden tiles from current output"
+	@echo "  smoke-resize       - winit resize-lifecycle smoke test (local; QA-027)"
 	@echo ""
 	@echo "Code Quality:"
 	@echo "  fmt                - Format Rust code"
@@ -161,6 +162,14 @@ visual-test:
 visual-bless:
 	@echo "Blessing visual goldens…"
 	@BLESS=1 bash scripts/visual_test.sh
+
+# QA-027: winit 0.30 resize-lifecycle smoke test (local; needs a display).
+# Launches at 256x256, resizes to 512x512 mid-run, asserts the screenshot is
+# the new size. The rest of the lifecycle is a manual sweep — see
+# docs/release-checklist.md.
+smoke-resize:
+	@echo "Running resize-lifecycle smoke test (QA-027)…"
+	@bash scripts/resize_smoke.sh
 
 # ============================================================================
 # Code Quality

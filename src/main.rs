@@ -41,6 +41,7 @@ fn print_help() {
     println!("  --exit-delay <s>         Exit application after N seconds");
     println!("  --screenshot-path <path> Write the screenshot to this exact path (no timestamp)");
     println!("  --window-size <WxH>      Force the window to WxH physical pixels");
+    println!("  --resize-after <s WxH>   Resize the window to WxH after N seconds (QA-027)");
     println!("  --help, -h               Show this help message");
 }
 
@@ -153,6 +154,9 @@ fn main() {
     let mut quality_level: Option<usize> = None;
     let mut screenshot_path: Option<std::path::PathBuf> = None;
     let mut window_size: Option<(u32, u32)> = None;
+    // QA-027: resize the window mid-run to exercise the winit 0.30 resize
+    // lifecycle (surface reconfigure + redraw) without driving a human input.
+    let mut resize_after: Option<(f32, u32, u32)> = None;
 
     let mut i = 1;
     while i < args.len() {
@@ -276,6 +280,37 @@ fn main() {
                     return;
                 }
             }
+            "--resize-after" => {
+                // QA-027: `--resize-after <secs> <WxH>` resizes the window after
+                // a delay (two tokens). Powers the lifecycle smoke test.
+                if i + 2 < args.len() {
+                    match (args[i + 1].parse::<f32>(), args[i + 2].split_once('x')) {
+                        (Ok(secs), Some((w, h))) => match (w.parse::<u32>(), h.parse::<u32>()) {
+                            (Ok(width), Ok(height)) => {
+                                resize_after = Some((secs, width, height));
+                                i += 3;
+                            }
+                            _ => {
+                                eprintln!(
+                                    "Invalid --resize-after size '{}' (expected WxH)",
+                                    args[i + 2]
+                                );
+                                print_help();
+                                return;
+                            }
+                        },
+                        _ => {
+                            eprintln!("Invalid --resize-after (expected <secs WxH>)");
+                            print_help();
+                            return;
+                        }
+                    }
+                } else {
+                    eprintln!("--resize-after requires <secs WxH>");
+                    print_help();
+                    return;
+                }
+            }
             "--list-presets" => {
                 list_presets();
                 return;
@@ -313,6 +348,9 @@ fn main() {
         quality_level,
         screenshot_path,
         initial_window_size,
+        resize_after,
+        start: None,
+        resize_taken: false,
         app: None,
     };
 
@@ -334,6 +372,13 @@ struct AppHandler {
     quality_level: Option<usize>,
     screenshot_path: Option<std::path::PathBuf>,
     initial_window_size: (u32, u32),
+    /// QA-027: `(delay_secs, width, height)` — request a window resize after
+    /// the delay to exercise the resize lifecycle without a human.
+    resize_after: Option<(f32, u32, u32)>,
+    /// Process start time (set in `resumed`); the resize-delay origin.
+    start: Option<std::time::Instant>,
+    /// QA-027: tracks that the deferred resize has fired (idempotent).
+    resize_taken: bool,
     app: Option<App>,
 }
 
@@ -370,6 +415,9 @@ impl ApplicationHandler for AppHandler {
             self.quality_level,
             self.screenshot_path.clone(),
         ));
+        // QA-027: the resize-delay origin is when the app is ready to render,
+        // not process start (App::new blocks on GPU init).
+        self.start = Some(std::time::Instant::now());
         self.app = Some(app);
     }
 
@@ -401,9 +449,30 @@ impl ApplicationHandler for AppHandler {
     }
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        // QA-027: decide the deferred resize from self state first, before the
+        // &mut app borrow below, so the field borrows stay disjoint. The resize
+        // fires once the delay elapses; until then the loop must keep ticking
+        // (a parked ControlFlow::Wait loop would otherwise sleep past it).
+        let resize_due = matches!(
+            (self.resize_after, self.resize_taken, self.start),
+            (Some((delay, _, _)), false, Some(s))
+                if s.elapsed() >= std::time::Duration::from_secs_f32(delay)
+        );
+        let resize_pending = self.resize_after.is_some() && (!self.resize_taken);
+
         let Some(app) = self.app.as_mut() else {
             return;
         };
+        if resize_due {
+            if let Some((_, w, h)) = self.resize_after {
+                // request_inner_size returns the constrained size; the actual
+                // size arrives via the Resized event, which drives app.resize.
+                let _ = app
+                    .window()
+                    .request_inner_size(winit::dpi::PhysicalSize::new(w, h));
+            }
+            self.resize_taken = true;
+        }
         // Check if app should exit (from CLI delay option)
         if app.should_exit() {
             event_loop.exit();
@@ -422,7 +491,8 @@ impl ApplicationHandler for AppHandler {
         // A pending CLI timer (--screenshot-delay/--exit-delay) also keeps the
         // loop ticking: that timer is evaluated inside update() on the redraw
         // path, so without a redraw it would never fire under ControlFlow::Wait.
-        if app.should_render_next_frame() || app.has_pending_cli_timer() {
+        // QA-027: a pending --resize-after does too.
+        if app.should_render_next_frame() || app.has_pending_cli_timer() || resize_pending {
             app.window().request_redraw();
         }
     }
