@@ -12,31 +12,30 @@
 > ideas below build on that foundation. Ordering assumes the AUDIT Phase 1–2 fixes land first
 > (especially the ARC-002 deep-zoom correctness bundle and ARC-008 LOD ownership).
 
-> **Status — verified 2026-07-17 at HEAD `8cdd915` (v0.9.0):** The v0.9.0 audit
-> remediation shipped several ENH *prerequisites* (ARC-002 HP math, ARC-005 bloom gating,
-> ARC-006 render-on-demand, ARC-010 offset tests) but no complete enhancement. Net result:
-> **1 of 8 fully done (ENH-007); 2 partial (ENH-002, ENH-004); 5 not started.** Per-item
-> verdicts with file:line evidence appear under each entry below, and the priority table
-> has a Status column.
+> **Status — verified 2026-07-18 at HEAD `48f4427`:** ENH-007 (visual regression harness)
+> shipped complete and was **removed from this list** — its CPU teeth (`tests/reference_math.rs`)
+> and GPU goldens (`tests/golden/`) remain the regression backbone for every remaining item.
+> Of the 7 still open: **3 partial (ENH-001, ENH-002, ENH-004); 4 not started (ENH-003, ENH-005,
+> ENH-006, ENH-008); 0 fully done.** Per-item verdicts with file:line evidence appear under each
+> entry below, and the priority table has a Status column.
 
 ## Priority order
 
-| ID | Title | Impact | Effort | Depends on | Status (v0.9.0) |
-|----|-------|--------|--------|-----------|-----------------|
-| ENH-007 | Deep-zoom visual regression harness | High (guards every other change) | Low–Medium (~1–2 days) | none — do first | **Done** (CPU teeth + GPU goldens; root-caused the >1e7 HP precision collapse → ENH-001) |
-| ENH-002 | Progressive refinement + render-on-demand | High | Medium–High (~1 week) | ARC-006/008 fixes | **Partial** — render-on-demand done (ARC-006) |
-| ENH-003 | Dynamic resolution scaling (wire `render_scale`) | High | Medium (~2–3 days) | ARC-007/008 fixes | Not started (render_scale still inert) |
-| ENH-001 | Perturbation-theory infinite zoom | Transformative | Very High (2–4 weeks) | ARC-001/002 bundle, ENH-007 | **Phase A + breadth done** (Mandelbrot/Julia/BurningShip/Tricorn); 1e8 golden pinned & deterministic; BLA deferred (orbit is already ~1.5 ms) |
+| ID | Title | Impact | Effort | Depends on | Status (2026-07-18) |
+|----|-------|--------|--------|-----------|---------------------|
+| ENH-002 | Progressive refinement + render-on-demand | High | Medium–High (~1 week) | ARC-006/008 fixes | **Partial** — render-on-demand done (ARC-006); idle refinement not started |
+| ENH-003 | Dynamic resolution scaling (wire `render_scale`) | High | Medium (~2–3 days) | ARC-007/008 fixes | Not started (`render_scale` still inert) |
+| ENH-001 | Perturbation-theory infinite zoom | Transformative | Very High (2–4 weeks) | ARC-001/002 bundle; harness ✓ (ENH-007 shipped) | **Partial — Phase A + breadth done** (Mandelbrot/Julia/BurningShip/Tricorn); 1e8 golden pinned & deterministic; BLA deferred (orbit ~1.5 ms) |
 | ENH-006 | GPU frame profiler (timestamp queries + HUD) | Medium (enables tuning) | Medium (~2 days) | none | Not started |
 | ENH-005 | Half-resolution bloom pipeline | Medium | Low–Medium (~1 day) | ARC-005 (bloom gating) | Not started (bloom gating done via ARC-005) |
-| ENH-004 | Per-fractal pipeline specialization | Medium | Medium (~3 days) | ENH-006 (to measure) | **Partial** — 2D/3D split done |
+| ENH-004 | Per-fractal pipeline specialization | Medium | Medium (~3 days) | ENH-006 (to measure) | **Partial** — 2D/3D entry-point split done; per-type specialization not |
 | ENH-008 | `encase`-based uniform layout automation | Medium (kills the #1 crash class) | Medium (~2 days) | ARC-010 (offset tests as safety net) | Not started (offset tests landed via ARC-010) |
 
 ---
 
 ### ENH-001 — Perturbation-theory infinite zoom
 **Plan**: `docs/fable/ENH-001-perturbation-deep-zoom.md`
-**Status (2026-07-18, post-v0.9.0):** Phase A + Phase B breadth landed. `dashu-float` is in `Cargo.toml`; `src/deep_zoom/{orbit,driver}.rs` compute the arbitrary-precision reference orbit off-thread and upload it to a GPU storage buffer; `mandelbrot_perturb` / `julia_perturb` / `tricorn_perturb` / `burning_ship_perturb` in `shaders/fractal.wgsl` iterate per-pixel f32 deltas; a `PERTURBATION_LOG2_GATE = 24` uniform engages it past zoom ~1.6e7. The original >1e7 HP collapse is fixed and pinned by a deterministic 1e8 golden (`mandel-seahorse-1e8`, MAE 0.0 run-to-run). The recurrence math is CPU-verified against direct f64 in `tests/perturb_math.rs` (all four kinds). **Deferred — Phase B step 8 (BLA series-approximation tables):** measured the reference orbit at ~1.5 ms single / ~7.5 ms for the 9× probe at 1e8 (91 bits), scaling gently to ~1.9 ms at 1e30 — an earlier "~15–20 s" estimate was the pre-fix LOD-churn (orbit recomputed every frame), not the per-orbit cost, and is already resolved by the deterministic `perturbation_max_iterations` budget. GPU per-pixel cost is sub-frame at every testable zoom, so BLA's stated benefit (1e50+ "fast") is unverifiable today (f64 center carries ~15 digits; no 1e50 golden). Re-open when a >1e15 precise-center path exists AND GPU per-pixel cost is measured as the bottleneck. Remaining: Phase B step 9 (progressive integration with ENH-002), Phase C (UX: 10ˣ zoom, decimal-string centers).
+**Status (2026-07-18, HEAD `48f4427`):** Phase A + Phase B breadth landed. `dashu-float` is in `Cargo.toml`; `src/deep_zoom/{orbit,driver}.rs` compute the arbitrary-precision reference orbit off-thread and upload it to a GPU storage buffer; `mandelbrot_perturb` / `julia_perturb` / `tricorn_perturb` / `burning_ship_perturb` in `shaders/fractal.wgsl` iterate per-pixel f32 deltas; a `PERTURBATION_LOG2_GATE = 24` uniform engages it past zoom ~1.6e7. The original >1e7 HP collapse is fixed and pinned by a deterministic 1e8 golden (`mandel-seahorse-1e8`, MAE 0.0 run-to-run). The recurrence math is CPU-verified against direct f64 in `tests/perturb_math.rs` (all four kinds). **Deferred — Phase B step 8 (BLA series-approximation tables):** measured the reference orbit at ~1.5 ms single / ~7.5 ms for the 9× probe at 1e8 (91 bits), scaling gently to ~1.9 ms at 1e30 — an earlier "~15–20 s" estimate was the pre-fix LOD-churn (orbit recomputed every frame), not the per-orbit cost, and is already resolved by the deterministic `perturbation_max_iterations` budget. GPU per-pixel cost is sub-frame at every testable zoom, so BLA's stated benefit (1e50+ "fast") is unverifiable today (f64 center carries ~15 digits; no 1e50 golden). Re-open when a >1e15 precise-center path exists AND GPU per-pixel cost is measured as the bottleneck. Remaining: Phase B step 9 (progressive integration with ENH-002), Phase C (UX: 10ˣ zoom, decimal-string centers).
 
 The current double-float pipeline hard-caps near zoom ~1e11 (AUDIT ARC-001). Perturbation theory
 removes the cap: compute ONE reference orbit per view in arbitrary precision on the CPU, upload it
@@ -49,7 +48,7 @@ actual infinite zoom. **Effort**: very high; phased plan delivers Mandelbrot-onl
 
 ### ENH-002 — Progressive refinement + render-on-demand
 **Plan**: `docs/fable/ENH-002-progressive-refinement.md`
-**Status (2026-07-17, v0.9.0):** Partial. The render-on-demand half landed via ARC-006 (`scene_dirty` flag + `ControlFlow::Wait`, `src/app/mod.rs:87`). The progressive-refinement half (idle quality ramp / tile convergence) is not — `src/app/mod.rs:86` explicitly defers it to ENH-002, and the scene pass is a single full-frame render (`src/app/render.rs:82-114`).
+**Status (2026-07-18, HEAD `48f4427`):** Partial. The render-on-demand half landed via ARC-006 (`scene_dirty` flag + `ControlFlow::Wait`, `src/app/mod.rs:94`). The progressive-refinement half (idle quality ramp / tile convergence) is not — `src/app/mod.rs:93` explicitly defers it to ENH-002, and the scene pass is a single full-frame render (`src/app/render.rs:82`, "Pass 1: Render fractal to scene_texture").
 
 After the dirty-flag fix (ARC-006) stops idle re-rendering, invert the remaining tradeoff: during
 interaction render cheap (low iterations / low scale), and while idle *converge* — re-render at
@@ -72,7 +71,7 @@ quarter-resolution during motion ≈ 4–16× fragment-cost reduction, impercept
 
 ### ENH-004 — Per-fractal pipeline specialization
 **Plan**: `docs/fable/ENH-004-pipeline-specialization.md`
-**Status (2026-07-17, v0.9.0):** Partial. Stage 1 (2D/3D entry-point split — `fs_main_2d`/`fs_main_3d`, `src/renderer/initialization.rs:242-324`) landed. Stage 2 (per-fractal WGSL `override` constants + lazy per-type pipeline cache) did not — there are no `override` declarations, no `PipelineCompilationOptions.constants`, and all 3D fractals still share one `pipeline_3d`.
+**Status (2026-07-18, HEAD `48f4427`):** Partial. Stage 1 (2D/3D entry-point split — `fs_main_2d`/`fs_main_3d`, `src/renderer/initialization.rs:277-343`) landed. Stage 2 (per-fractal WGSL `override` constants + lazy per-type pipeline cache) did not — there are no `override` declarations, no `PipelineCompilationOptions.constants`, and all 3D fractals still share one `pipeline_3d` (`src/renderer/initialization.rs:327`, stored once at line 967).
 
 One 3,119-line ubershader compiles all 28+ fractals, DF variants, and the full 3D lighting stack
 into a single fragment pipeline; the simple Mandelbrot path pays worst-case register/occupancy
@@ -100,42 +99,6 @@ composite, FXAA, egui, compute) in timestamp pairs and show a per-pass ms breakd
 overlay (the LOD overlay pattern at `ui/overlays.rs:348` is the template), plus CSV dump via a CLI
 flag for agent-driven regression checks. **Impact**: medium directly, high as an enabler — it
 converts ENH-003/004/005 and LOD tuning from faith to measurement. **Effort**: ~2 days.
-
-### ENH-007 — Deep-zoom visual regression harness
-**Plan**: `docs/fable/ENH-007-visual-regression-harness.md`
-**Status (2026-07-17, v0.9.0):** **Done.** Two-layer harness shipped:
-- **CPU teeth (CI-safe, `tests/reference_math.rs` + `src/reference.rs`):** an f64 escape-time
-  reference renderer + a byte-for-byte Rust mirror of the shader's double-float primitives
-  (`two_prod`/`two_sum`/`df_mul`/`df2_square`/abs). Tests pin the EFT property of `two_prod`/
-  `two_sum` (catches FMA-collapse deterministically), known points, a blessed smooth-value
-  drift table, and DF-vs-f64 agreement on 32×32 deep-zoom tiles. Mutation-verified: collapsing
-  `df_mul` to plain f32 fails the Mandelbrot deep-zoom test at ~200× the threshold.
-- **GPU golden layer (local, `scripts/visual_test.sh` / `make visual-test`):** `imgdiff` bin
-  compares the real binary's screenshots against committed `tests/golden/*.png` tiles; new CLI
-  flags `--screenshot-path` / `--window-size` give deterministic captures; `gen-preset` builds
-  row presets via the app's own serializer. Skips cleanly on headless boxes.
-
-**Finding surfaced by the harness (root-caused 2026-07-17; fix is ENH-001):** the GPU's
-double-float HP path is *correct* through ~1e7 — it renders proper seahorse structure given
-adequate settle time (the earlier "solid black above 1e5" was a too-short settle / screenshot-
-vs-first-frame race, not a render failure). Above ~3e7 it collapses: the frame is fast (~1.2 ms)
-and the device is NOT lost (verified via a device-lost callback + uncaptured-error handler),
-but per-pixel coordinate precision collapses so the whole frame computes one shared orbit — a
-near-uniform image (3 distinct gray values at 1e8) instead of the seahorse. naga's Metal output
-preserves the `two_prod` error-free transform (no FMA fusion), so the collapse is downstream
-(Metal flush-to-zero / sub-ULP lo-word loss over long near-boundary orbits); the CPU DF mirror
-doesn't collapse, which is why the DF-vs-f64 teeth pass and never caught it. This is a
-fundamental limit of multi-thousand-iteration double-float on Metal — exactly what perturbation
-(ENH-001) eliminates by iterating plain-f32 deltas against a CPU reference orbit. Manifest
-goldens stay at ≤1e5; deep-zoom *math* correctness stays guarded by the CPU teeth.
-
-The audit found four deep-zoom correctness bugs that shipped silently (unreachable hp path, wrong
-DF abs, late threshold, FMA dependence) — precisely the class a screenshot-vs-reference harness
-catches. Build a CPU f64 reference renderer (tiny: escape-time only, ~100 lines), render small
-tiles at fixed deep-zoom coordinates via the existing `--screenshot-delay`/`--exit-delay` flags,
-and compare with perceptual + per-pixel tolerance in `cargo test` / CI. **Impact**: high — it
-guards ENH-001 and the ARC-002 bundle, and every future shader edit. **Effort**: low–medium
-(~1–2 days). **Do this one first.**
 
 ### ENH-008 — `encase`-based uniform layout automation
 **Plan**: `docs/fable/ENH-008-encase-uniform-layout.md`
