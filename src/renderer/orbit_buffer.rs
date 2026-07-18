@@ -16,6 +16,29 @@
 //!
 //! [`shaders/fractal.wgsl`]: ../../shaders/fractal.wgsl
 
+/// Metadata for the currently-active reference orbit, held on the
+/// [`Renderer`] alongside the [`OrbitBuffer`] that stores the `Z_n` values.
+///
+/// `Some` on the renderer means perturbation is live for the frame: the
+/// orbit has been computed, uploaded, and the view still meets the
+/// activation gate. The CPU-side `z` vector itself is NOT retained — once
+/// uploaded to the GPU, only the length and escape index are needed to
+/// populate the matching uniforms and let the shader bounds-check.
+///
+/// (ENH-001 Phase A step 5.)
+#[derive(Debug, Clone, Copy)]
+pub struct ActiveOrbit {
+    /// Number of `Z_n` entries actually populated in the buffer. The shader
+    /// uses this (via the `orbit_len` uniform) to bounds-check iteration
+    /// indices — `arrayLength` would report the over-allocated capacity.
+    pub len: u32,
+    /// First index at which the reference escaped (`|Z|² > 4`), or `0` if
+    /// the reference stayed bounded through `max_iter`. The `0` sentinel is
+    /// safe for the bounded case because the shader's per-pixel delta orbit
+    /// never needs to rebase before iteration 0.
+    pub escaped_at: u32,
+}
+
 /// GPU storage buffer holding a perturbation reference orbit's `Z_n` values.
 ///
 /// One entry per iteration: `z[n] = (Z_n.re, Z_n.im)` as f32 pairs (the
@@ -34,7 +57,6 @@ pub struct OrbitBuffer {
     /// allocated; the placeholder created by [`Self::new_placeholder`] holds
     /// a single zeroed entry so the bind group is valid even before the
     /// first real orbit is uploaded.
-    #[allow(dead_code)]
     pub capacity: usize,
 }
 
@@ -79,7 +101,6 @@ impl OrbitBuffer {
     ///
     /// ENH-001 step 3: unused until step 5 (CPU driver) calls it on the
     /// first real orbit upload.
-    #[allow(dead_code)]
     pub fn ensure_capacity(&mut self, device: &wgpu::Device, len: usize) -> bool {
         if len <= self.capacity {
             return false;
@@ -113,7 +134,6 @@ impl OrbitBuffer {
     ///
     /// ENH-001 step 3: unused until step 5 (CPU driver) calls it to upload
     /// a computed reference orbit.
-    #[allow(dead_code)]
     pub fn write(&self, queue: &wgpu::Queue, z: &[[f32; 2]]) {
         queue.write_buffer(&self.buffer, 0, bytemuck::cast_slice(z));
     }

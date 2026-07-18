@@ -14,6 +14,7 @@ mod persistence;
 use camera_transition::CameraTransition;
 
 use crate::camera::{Camera, CameraController};
+use crate::deep_zoom::PerturbationDriver;
 use crate::fractal::{FractalParams, RenderMode};
 use crate::platform::{PlatformContext, category};
 use crate::renderer::{GpuInfo, Renderer};
@@ -103,6 +104,12 @@ pub struct App {
     /// and the UI's "Scanning…" label is set/cleared synchronously.
     #[cfg(not(target_arch = "wasm32"))]
     gpu_scan_receiver: Option<std::sync::mpsc::Receiver<Vec<GpuInfo>>>,
+    /// ENH-001 Phase A step 5: schedules the off-render-thread reference
+    /// orbit compute at deep zoom. Polled each frame from `App::update`:
+    /// `note_view` records the current view, `maybe_spawn` kicks off the
+    /// worker when stale + gate-met, and `poll` drains the result. Native
+    /// only (no-op stub on wasm — HP path handles deep zoom there).
+    perturbation_driver: PerturbationDriver,
 }
 
 impl App {
@@ -420,6 +427,7 @@ impl App {
             input_pending: false,
             #[cfg(not(target_arch = "wasm32"))]
             gpu_scan_receiver: None,
+            perturbation_driver: PerturbationDriver::new(),
         }
     }
 

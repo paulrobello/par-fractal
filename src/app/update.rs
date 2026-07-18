@@ -13,6 +13,15 @@ impl App {
         // instant the worker thread finishes, without blocking the loop.
         self.poll_gpu_scan();
 
+        // ENH-001 Phase A step 5: drive the perturbation reference-orbit
+        // worker. Records the current view (marking the orbit stale on
+        // pan/zoom/iter change), spawns a worker when stale + gate-met, and
+        // drains any completed orbit onto the GPU. Runs BEFORE
+        // `renderer.update` so the uploaded orbit is reflected in this
+        // frame's uniform write. Cheap when the gate isn't met (the worker
+        // never spawns below log2(zoom) > 24).
+        self.update_perturbation();
+
         // Update FPS counter
         self.frame_count += 1;
         let fps_elapsed = (now - self.fps_timer).as_secs_f32();
@@ -185,5 +194,77 @@ impl App {
 
         // Update renderer uniforms
         self.renderer.update(&self.camera, &self.fractal_params);
+    }
+
+    /// ENH-001 Phase A step 5: drive the perturbation reference-orbit worker.
+    ///
+    /// Per-frame sequence (no-ops below the gate, cheap):
+    /// 1. Record the current view (`center_2d`, `zoom_2d`, effective
+    ///    `max_iter`) so the driver can mark the orbit stale on change.
+    /// 2. If stale AND eligible (Mandelbrot2D + 2D + log2(zoom) > 24) AND
+    ///    no worker is in flight, spawn one. Show a "computing…" toast only
+    ///    on the transition (the driver returns true exactly once per spawn).
+    /// 3. Drain any completed orbit onto the GPU via
+    ///    `Renderer::set_reference_orbit` (handles capacity-grow + bind
+    ///    group rebuild + upload). The shader's perturbation path activates
+    ///    on this same frame.
+    /// 4. If the gate is no longer met (zoom dropped, fractal type
+    ///    changed), clear the active orbit so the shader falls back to HP.
+    ///
+    /// The `max_iter` passed to the worker matches the GPU shader's
+    /// effective iteration count (zoom bonus + LOD scale) via the shared
+    /// `effective_2d_max_iterations` helper — keeping them in lockstep is
+    /// the correctness invariant that lets the shader's `orbit_len` always
+    /// index a fully-served iteration budget.
+    fn update_perturbation(&mut self) {
+        use crate::deep_zoom::perturbation_eligible;
+        use crate::renderer::uniforms::effective_2d_max_iterations;
+
+        let center = self.fractal_params.settings.center_2d;
+        let zoom = self.fractal_params.settings.zoom_2d;
+        let fractal_type = self.fractal_params.settings.fractal_type;
+        let render_mode = self.fractal_params.settings.render_mode;
+        let effective_max_iter = effective_2d_max_iterations(&self.fractal_params);
+
+        // (1) Record view → mark stale on change.
+        self.perturbation_driver
+            .note_view(center, zoom, effective_max_iter);
+
+        // (2) Spawn worker if eligible + stale + idle.
+        if self
+            .perturbation_driver
+            .maybe_spawn(center, zoom, effective_max_iter)
+        {
+            self.ui
+                .show_toast("Computing deep-zoom reference…".to_string());
+        }
+
+        // (3) Drain a completed orbit onto the GPU. The upload + bind-group
+        //     rebuild + uniform population all happen on this thread (the
+        //     render-thread owner of device/queue).
+        if let Some(orbit) = self.perturbation_driver.poll() {
+            self.renderer.set_reference_orbit(&orbit);
+            // Re-render once the orbit lands so the perturbation path
+            // actually shows up — otherwise ARC-006's render-on-demand might
+            // leave the stale HP frame on screen.
+            self.mark_scene_dirty();
+        }
+
+        // (4) Drop the active orbit when the gate is no longer met so the
+        //     shader falls back to the HP / f32 path. The driver itself
+        //     stays ready (a new orbit will be computed if the user zooms
+        //     back past the gate).
+        if !perturbation_eligible(zoom, fractal_type, render_mode)
+            && self.renderer.active_orbit.is_some()
+        {
+            self.renderer.clear_reference_orbit();
+            self.mark_scene_dirty();
+        }
+
+        // Keep the render loop alive while the worker is in flight so the
+        // orbit lands promptly and the "computing…" toast expires normally.
+        if self.perturbation_driver.computing {
+            self.mark_scene_dirty();
+        }
     }
 }

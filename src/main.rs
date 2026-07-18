@@ -1,6 +1,10 @@
 mod app;
 mod camera;
 mod command_palette;
+/// ENH-001 perturbation-theory deep-zoom subsystem: arbitrary-precision
+/// reference orbit (CPU foundation) + the off-render-thread driver that
+/// recomputes it on view change.
+mod deep_zoom;
 mod fractal;
 mod lod;
 // `platform` is dormant infrastructure being incrementally wired up via the

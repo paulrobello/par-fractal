@@ -969,6 +969,7 @@ impl Renderer {
             uniform_buffer,
             uniform_bind_group,
             orbit_buffer,
+            active_orbit: None,
             uniforms,
             start_time: web_time::Instant::now(),
 

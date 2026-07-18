@@ -26,6 +26,30 @@ pub(crate) fn zoom_iteration_bonus(zoom_2d: f64) -> u32 {
     (zoom_2d.max(1.0).log2() * 15.0) as u32
 }
 
+/// The effective 2D iteration count the GPU shader's per-pixel loop runs,
+/// combining the user's slider with the zoom bonus and the active LOD
+/// quality's `iteration_scale` (then floored at 16 so deep zoom-out never
+/// produces a blank render). 3D returns the user value unchanged — 3D cost
+/// is dominated by `max_steps`, not iterations.
+///
+/// The CPU reference orbit (ENH-001 Phase A step 5) MUST be computed against
+/// this same value: if it diverges, the shader's `orbit_len` either
+/// under-serves the per-pixel loop (pixels needing more iterations than the
+/// reference served rebase to noise) or over-serves it (wasted CPU work).
+/// Centralizing the derivation here keeps the two paths locked. (QA-019 /
+/// ENH-001.)
+pub(crate) fn effective_2d_max_iterations(params: &FractalParams) -> u32 {
+    let q = params.effective_quality();
+    if params.settings.render_mode == crate::fractal::RenderMode::TwoD {
+        let zoom_bonus = zoom_iteration_bonus(params.settings.zoom_2d);
+        let scaled =
+            ((params.settings.max_iterations + zoom_bonus) as f32 * q.iteration_scale) as u32;
+        scaled.max(16)
+    } else {
+        params.settings.max_iterations
+    }
+}
+
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct Uniforms {
@@ -363,15 +387,14 @@ impl Uniforms {
         // AFTER the zoom bonus (so deep zoom does not re-lose detail it just
         // paid for) and floored at ≥16 to avoid blank renders at low quality.
         // 2D-only: 3D ray-march cost is dominated by `max_steps`, not iters.
+        //
+        // ENH-001 Phase A step 5: the CPU reference orbit (deep_zoom driver)
+        // is computed against this same value via `effective_2d_max_iterations`,
+        // so the shader's `orbit_len` always indexes a fully-served budget.
+        // The shared helper is the single source of truth — keeping the
+        // inline math here would let the two paths drift.
         let q = params.effective_quality();
-        if params.settings.render_mode == crate::fractal::RenderMode::TwoD {
-            let zoom_bonus = zoom_iteration_bonus(params.settings.zoom_2d);
-            let scaled =
-                ((params.settings.max_iterations + zoom_bonus) as f32 * q.iteration_scale) as u32;
-            self.max_iterations = scaled.max(16);
-        } else {
-            self.max_iterations = params.settings.max_iterations;
-        }
+        self.max_iterations = effective_2d_max_iterations(params);
         self.julia_c = params.settings.julia_c;
 
         // QA-017: enum→u32 via `#[repr(u32)]` discriminants (see
@@ -524,12 +547,14 @@ impl Uniforms {
         self.lod_zone2 = params.lod.lod_config.distance_zones[1];
         self.lod_zone3 = params.lod.lod_config.distance_zones[2];
 
-        // ENH-001 Phase A step 3: perturbation uniforms plumbed but OFF.
-        // Step 5 (CPU driver) will populate these from a computed
-        // `ReferenceOrbit` and flip `perturbation_enabled` to 1 when
-        // `log2_zoom > 34`. Leaving them at zero keeps the perturbation
-        // shader branch disabled and `orbit_len` short-circuits any
-        // accidental orbit read.
+        // ENH-001 Phase A step 5: perturbation uniforms default to OFF here.
+        // `Renderer::update` overlays non-zero values AFTER this call when
+        // an active orbit has been uploaded (`Renderer::active_orbit`) AND
+        // the gate is met (`perturbation_eligible`). Leaving them at zero
+        // keeps the perturbation shader branch disabled (and `orbit_len`
+        // short-circuits any accidental orbit read) on frames where the
+        // orbit is stale, the gate isn't met, or the worker is still
+        // computing — the HP path renders those frames.
         self.perturbation_enabled = 0;
         self.orbit_len = 0;
         self.ref_escaped_at = 0;
@@ -544,6 +569,42 @@ impl Uniforms {
         let mut uniforms = Self::new();
         uniforms.update(camera, params, time);
         uniforms
+    }
+
+    /// ENH-001 Phase A step 5: populate the perturbation uniforms for an
+    /// active orbit + the current view.
+    ///
+    /// Called by [`crate::renderer::Renderer::update`] AFTER [`Self::update`]
+    /// when an orbit has been uploaded AND the activation gate is met; on
+    /// every other frame `update()` leaves these zeroed and the shader's
+    /// delta path stays disabled (HP / f32 path renders).
+    ///
+    /// `delta_c_scale` is the per-pixel Δc magnitude. It matches the
+    /// shader's existing HP coordinate mapping — `uv * 2/zoom * aspect` for
+    /// x, `uv * 2/zoom` for y — but computed here on the CPU so the value
+    /// is identical to what the shader uses for its non-perturbation offset.
+    /// The `2.0 / zoom` term is computed in f64 FIRST and cast to f32 only
+    /// at the end: the spacing is small but representable in f32, and only
+    /// the absolute center is unrepresentable in f32 (which is the whole
+    /// point of perturbation).
+    ///
+    /// `delta_c_origin` is left at `[0.0, 0.0]` (re-zeroed by `update()`):
+    /// Phase A always iterates the reference from the view center, so the
+    /// screen-center Δc is zero by construction.
+    pub(crate) fn activate_perturbation(
+        &mut self,
+        orbit_len: u32,
+        ref_escaped_at: u32,
+        zoom_2d: f64,
+        aspect: f32,
+    ) {
+        let inv_zoom_f64 = 2.0 / zoom_2d;
+        let aspect_f64 = aspect as f64;
+        self.perturbation_enabled = 1;
+        self.orbit_len = orbit_len;
+        self.ref_escaped_at = ref_escaped_at;
+        self.delta_c_scale = [(inv_zoom_f64 * aspect_f64) as f32, inv_zoom_f64 as f32];
+        // delta_c_origin already zeroed by update() — Phase A: ref at center.
     }
 }
 

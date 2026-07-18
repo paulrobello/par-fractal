@@ -1,5 +1,6 @@
 use super::{BloomUniforms, PostProcessUniforms, Renderer};
 use crate::camera::Camera;
+use crate::deep_zoom::{ReferenceOrbit, perturbation_eligible};
 use crate::fractal::FractalParams;
 
 /// Update and helper methods
@@ -191,6 +192,30 @@ impl Renderer {
     pub fn update(&mut self, camera: &Camera, params: &FractalParams) {
         let time = self.start_time.elapsed().as_secs_f32();
         self.uniforms.update(camera, params, time);
+
+        // ENH-001 Phase A step 5: overlay perturbation uniforms when an
+        // active orbit has been uploaded AND the gate is met. `Uniforms::update`
+        // just zeroed these; we repopulate them here so the shader's delta
+        // path renders. While the worker is in flight (no active orbit yet),
+        // while the gate isn't met (non-Mandelbrot, 3D, or below the zoom
+        // threshold), or after the view drops below the gate, the uniforms
+        // stay at zero and the HP path renders — perturbation is purely
+        // additive and the DF / f32 paths remain intact below the gate.
+        if let Some(active) = self.active_orbit
+            && perturbation_eligible(
+                params.settings.zoom_2d,
+                params.settings.fractal_type,
+                params.settings.render_mode,
+            )
+        {
+            self.uniforms.activate_perturbation(
+                active.len,
+                active.escaped_at,
+                params.settings.zoom_2d,
+                camera.aspect,
+            );
+        }
+
         self.queue.write_buffer(
             &self.uniform_buffer,
             0,
@@ -248,5 +273,71 @@ impl Renderer {
             );
             self.cached_composite_uniforms = Some(composite_uniforms);
         }
+    }
+
+    /// ENH-001 Phase A step 5: upload a freshly-computed reference orbit and
+    /// mark it active.
+    ///
+    /// Grows the storage buffer when the new orbit exceeds the current
+    /// capacity, and — critically — rebuilds `uniform_bind_group` in that
+    /// case so binding(1) points at the new buffer. The bind group held the
+    /// placeholder buffer from initialization; without this rebuild the
+    /// shader would keep reading the (zeroed) placeholder and the delta path
+    /// would render as if `orbit_len == 0`.
+    ///
+    /// GPU-only side of the driver: the CPU computation happened on the
+    /// worker thread (`deep_zoom::driver`); this method runs on the
+    /// render-thread owner of `device`/`queue` (the only thread allowed to
+    /// touch GPU state). After this returns, `Renderer::update` will see
+    /// `active_orbit = Some(...)` and populate the perturbation uniforms on
+    /// the next frame (and every frame until the view changes again).
+    pub fn set_reference_orbit(&mut self, orbit: &ReferenceOrbit) {
+        log::info!(
+            "deep-zoom reference orbit uploaded: {} entries, escaped_at={:?}, precision_bits={}",
+            orbit.z.len(),
+            orbit.escaped_at,
+            orbit.precision_bits,
+        );
+        let grew = self
+            .orbit_buffer
+            .ensure_capacity(&self.device, orbit.z.len());
+        if grew {
+            // Re-create the bind group so binding(1) references the new
+            // (larger) orbit buffer. Layout comes from the render pipeline,
+            // which was built against `uniform_bind_group_layout` in
+            // `initialization.rs` — both pipelines share that one layout.
+            let layout = self.pipeline_2d.get_bind_group_layout(0);
+            self.uniform_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("Uniform Bind Group (post-orbit-realloc)"),
+                layout: &layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: self.uniform_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: self.orbit_buffer.buffer.as_entire_binding(),
+                    },
+                ],
+            });
+        }
+        self.orbit_buffer.write(&self.queue, &orbit.z);
+        self.active_orbit = Some(super::orbit_buffer::ActiveOrbit {
+            len: orbit.z.len() as u32,
+            escaped_at: orbit.escaped_at.unwrap_or(0),
+        });
+    }
+
+    /// ENH-001 Phase A step 5: drop the active orbit so the shader's
+    /// perturbation branch turns off on the next frame.
+    ///
+    /// Called when the view drops below the activation gate (zoom too low,
+    /// fractal type changed away from Mandelbrot, or render mode switched to
+    /// 3D). The GPU buffer contents are left in place — `orbit_len == 0` in
+    /// the uniforms (re-zeroed by `Uniforms::update` next frame)
+    /// short-circuits any read, so stale buffer contents are never sampled.
+    pub fn clear_reference_orbit(&mut self) {
+        self.active_orbit = None;
     }
 }

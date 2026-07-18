@@ -17,7 +17,7 @@ use compute::{
     AccumulationDisplayUniforms, AccumulationTexture, AttractorComputePipeline,
     BuddhabrotAccumulationBuffer, BuddhabrotComputePipeline,
 };
-use orbit_buffer::OrbitBuffer;
+use orbit_buffer::{ActiveOrbit, OrbitBuffer};
 use uniforms::*;
 
 /// User-facing description of the selected physical GPU.
@@ -62,10 +62,16 @@ pub struct Renderer {
     pub uniform_bind_group: wgpu::BindGroup,
     /// ENH-001 Phase A step 3: storage buffer for the perturbation reference
     /// orbit. Bound at `@group(0) @binding(1)` so it shares group 0 with
-    /// the uniforms. Step 5 will write a real orbit here; for now it holds
-    /// a one-entry placeholder so the bind group validates.
-    #[allow(dead_code)]
+    /// the uniforms. Step 5 (CPU driver) uploads a real orbit here; before
+    /// the first deep-zoom view it holds a one-entry placeholder so the bind
+    /// group validates.
     pub orbit_buffer: OrbitBuffer,
+    /// ENH-001 Phase A step 5: metadata of the currently-uploaded orbit, or
+    /// `None` when perturbation is off (no orbit yet, the gate isn't met, or
+    /// the view dropped below the gate). The buffer contents may still be
+    /// present; this field is the live/not-live switch that
+    /// `Renderer::update` reads to populate `perturbation_enabled`.
+    pub active_orbit: Option<ActiveOrbit>,
     uniforms: Uniforms,
     pub start_time: web_time::Instant,
 
