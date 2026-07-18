@@ -4,8 +4,10 @@ mod input;
 mod render;
 mod update;
 
+// Shared GPU-readback helpers for both capture paths (ARC-014 dedup).
 #[cfg(feature = "native")]
 mod capture;
+mod capture_common;
 #[cfg(target_arch = "wasm32")]
 mod capture_web;
 #[cfg(feature = "native")]

@@ -1,11 +1,10 @@
 //! Native capture and recording (screenshots, hi-res renders, video).
 //!
-//! TODO(ARC-014): this module and `capture_web.rs` are a near-duplicate pair
-//! (734 vs 659 lines) that should be deduplicated behind the `platform::`
-//! `Capture` / `FileDialog` traits, mirroring the constructor merge already
-//! done on `App::new` / `App::new_async`. The capture dedup is deliberately
-//! out of scope for the ARC-014 constructor pass — see `AUDIT.md` and
-//! `AUDIT-REMEDIATION-PLAN.md` (Phase 3b, ARC-014) for the playbook.
+//! The GPU readback setup (staging buffer + texture→buffer copy + submit) and
+//! the RGBA post-processing (strip 256-byte row padding + BGRA→RGBA swap) are
+//! shared with `capture_web.rs` via [`super::capture_common`] (ARC-014 dedup).
+//! What stays native-specific here: the synchronous `device.poll(Wait)`
+//! readback wait, and the filesystem save path (PNG + optional auto-open).
 
 use super::App;
 
@@ -15,52 +14,15 @@ impl App {
         let width = self.renderer.config.width;
         let height = self.renderer.config.height;
 
-        // Calculate buffer size with proper alignment
-        let bytes_per_row = (width * 4 + 255) & !255; // Align to 256 bytes
-        let buffer_size = (bytes_per_row * height) as wgpu::BufferAddress;
-
-        // Create buffer to copy texture to
-        let buffer = self.renderer.device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Screenshot Buffer"),
-            size: buffer_size,
-            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
-            mapped_at_creation: false,
-        });
-
-        // Create encoder for copy operation
-        let mut encoder =
-            self.renderer
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Screenshot Encoder"),
-                });
-
-        // Copy texture to buffer
-        encoder.copy_texture_to_buffer(
-            wgpu::TexelCopyTextureInfo {
-                texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            wgpu::TexelCopyBufferInfo {
-                buffer: &buffer,
-                layout: wgpu::TexelCopyBufferLayout {
-                    offset: 0,
-                    bytes_per_row: Some(bytes_per_row),
-                    rows_per_image: Some(height),
-                },
-            },
-            wgpu::Extent3d {
-                width,
-                height,
-                depth_or_array_layers: 1,
-            },
+        let (buffer, bytes_per_row) = super::capture_common::copy_texture_to_readback_buffer(
+            &self.renderer.device,
+            &self.renderer.queue,
+            texture,
+            width,
+            height,
+            "Screenshot Buffer",
+            "Screenshot Encoder",
         );
-
-        self.renderer
-            .queue
-            .submit(std::iter::once(encoder.finish()));
 
         // Map buffer and save to file
         let buffer_slice = buffer.slice(..);
@@ -86,28 +48,11 @@ impl App {
         };
         if recv_result.is_ok() {
             let data = buffer_slice.get_mapped_range();
-
-            // Convert from padded buffer to image
-            let mut image_data = Vec::with_capacity((width * height * 4) as usize);
-            for row in 0..height {
-                let row_start = (row * bytes_per_row) as usize;
-                let row_data = &data[row_start..row_start + (width * 4) as usize];
-                image_data.extend_from_slice(row_data);
-            }
-
+            let mut image_data =
+                super::capture_common::strip_row_padding(&data, width, height, bytes_per_row);
             drop(data);
             buffer.unmap();
-
-            // Convert BGRA to RGBA if surface format is Bgra
-            // (macOS/Windows typically use Bgra8UnormSrgb)
-            let format = self.renderer.config.format;
-            if format == wgpu::TextureFormat::Bgra8Unorm
-                || format == wgpu::TextureFormat::Bgra8UnormSrgb
-            {
-                for pixel in image_data.chunks_exact_mut(4) {
-                    pixel.swap(0, 2); // Swap B and R
-                }
-            }
+            super::capture_common::swap_bgra_channels(&mut image_data, self.renderer.config.format);
 
             // Deep-zoom investigation (harness mode only): a pixel-value
             // histogram distinguishes a structured frame from a NaN/Inf-flooded
@@ -187,52 +132,15 @@ impl App {
         let width = self.renderer.config.width;
         let height = self.renderer.config.height;
 
-        // Calculate buffer size with proper alignment
-        let bytes_per_row = (width * 4 + 255) & !255; // Align to 256 bytes
-        let buffer_size = (bytes_per_row * height) as wgpu::BufferAddress;
-
-        // Create buffer to copy texture to
-        let buffer = self.renderer.device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Video Frame Buffer"),
-            size: buffer_size,
-            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
-            mapped_at_creation: false,
-        });
-
-        // Create encoder for copy operation
-        let mut encoder =
-            self.renderer
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Video Frame Encoder"),
-                });
-
-        // Copy texture to buffer
-        encoder.copy_texture_to_buffer(
-            wgpu::TexelCopyTextureInfo {
-                texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            wgpu::TexelCopyBufferInfo {
-                buffer: &buffer,
-                layout: wgpu::TexelCopyBufferLayout {
-                    offset: 0,
-                    bytes_per_row: Some(bytes_per_row),
-                    rows_per_image: Some(height),
-                },
-            },
-            wgpu::Extent3d {
-                width,
-                height,
-                depth_or_array_layers: 1,
-            },
+        let (buffer, bytes_per_row) = super::capture_common::copy_texture_to_readback_buffer(
+            &self.renderer.device,
+            &self.renderer.queue,
+            texture,
+            width,
+            height,
+            "Video Frame Buffer",
+            "Video Frame Encoder",
         );
-
-        self.renderer
-            .queue
-            .submit(std::iter::once(encoder.finish()));
 
         // Map buffer and add frame to video recorder
         let buffer_slice = buffer.slice(..);
@@ -258,27 +166,11 @@ impl App {
         };
         if recv_result.is_ok() {
             let data = buffer_slice.get_mapped_range();
-
-            // Convert from padded buffer to unpadded RGBA data
-            let mut frame_data = Vec::with_capacity((width * height * 4) as usize);
-            for row in 0..height {
-                let row_start = (row * bytes_per_row) as usize;
-                let row_data = &data[row_start..row_start + (width * 4) as usize];
-                frame_data.extend_from_slice(row_data);
-            }
-
+            let mut frame_data =
+                super::capture_common::strip_row_padding(&data, width, height, bytes_per_row);
             drop(data);
             buffer.unmap();
-
-            // Convert BGRA to RGBA if surface format is Bgra
-            let format = self.renderer.config.format;
-            if format == wgpu::TextureFormat::Bgra8Unorm
-                || format == wgpu::TextureFormat::Bgra8UnormSrgb
-            {
-                for pixel in frame_data.chunks_exact_mut(4) {
-                    pixel.swap(0, 2); // Swap B and R
-                }
-            }
+            super::capture_common::swap_bgra_channels(&mut frame_data, self.renderer.config.format);
 
             // Add frame to video recorder
             if let Err(e) = self.video_recorder.add_frame(frame_data) {
@@ -737,22 +629,11 @@ impl App {
 
         if receiver.recv()?.is_ok() {
             let data = buffer_slice.get_mapped_range();
-
-            // Convert from padded buffer to image
-            let mut image_data = Vec::with_capacity((width * height * 4) as usize);
-            for row in 0..height {
-                let row_start = (row * bytes_per_row) as usize;
-                let row_data = &data[row_start..row_start + (width * 4) as usize];
-                image_data.extend_from_slice(row_data);
-            }
-
+            let mut image_data =
+                super::capture_common::strip_row_padding(&data, width, height, bytes_per_row);
             drop(data);
             buffer.unmap();
-
-            // Convert BGRA to RGBA (surface format is Bgra8UnormSrgb)
-            for pixel in image_data.chunks_exact_mut(4) {
-                pixel.swap(0, 2); // Swap B and R
-            }
+            super::capture_common::swap_bgra_channels(&mut image_data, self.renderer.config.format);
 
             // Generate filename with fractal type, resolution, and timestamp
             let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");

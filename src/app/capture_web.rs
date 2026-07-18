@@ -1,11 +1,15 @@
 //! Web capture implementation using WebGPU buffer readback.
 //!
-//! TODO(ARC-014): this module and `capture.rs` are a near-duplicate pair
-//! (659 vs 734 lines) that should be deduplicated behind the `platform::`
-//! `Capture` / `FileDialog` traits, mirroring the constructor merge already
-//! done on `App::new` / `App::new_async`. The capture dedup is deliberately
-//! out of scope for the ARC-014 constructor pass — see `AUDIT.md` and
-//! `AUDIT-REMEDIATION-PLAN.md` (Phase 3b, ARC-014) for the playbook.
+//! The GPU readback setup (staging buffer + texture→buffer copy + submit) and
+//! the RGBA post-processing (strip 256-byte row padding + BGRA→RGBA swap) are
+//! shared with `capture.rs` via [`super::capture_common`] (ARC-014 dedup).
+//! What stays web-specific here: the asynchronous `map_async` +
+//! `spawn_local` readback wait, and the download-via-`platform::Capture` save.
+//!
+//! NOTE: `capture_screenshot_web` does not apply the BGRA→RGBA swap (unlike
+//! the native screenshot + both high-res paths) — preserved as-is during the
+//! dedup so behavior was unchanged; revisit if web screenshots ever show
+//! swapped red/blue channels.
 
 use crate::camera::Camera;
 use crate::fractal::FractalParams;
@@ -33,47 +37,15 @@ pub fn capture_screenshot_web(
     fractal_name: String,
     show_toast: Box<dyn Fn(String) + Send + 'static>,
 ) {
-    // Calculate buffer size with proper alignment
-    let bytes_per_row = (width * 4 + 255) & !255; // Align to 256 bytes
-    let buffer_size = (bytes_per_row * height) as wgpu::BufferAddress;
-
-    // Create buffer to copy texture to
-    let buffer = device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("Screenshot Buffer"),
-        size: buffer_size,
-        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
-        mapped_at_creation: false,
-    });
-
-    // Create encoder for copy operation
-    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-        label: Some("Screenshot Encoder"),
-    });
-
-    // Copy texture to buffer
-    encoder.copy_texture_to_buffer(
-        wgpu::TexelCopyTextureInfo {
-            texture,
-            mip_level: 0,
-            origin: wgpu::Origin3d::ZERO,
-            aspect: wgpu::TextureAspect::All,
-        },
-        wgpu::TexelCopyBufferInfo {
-            buffer: &buffer,
-            layout: wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(bytes_per_row),
-                rows_per_image: Some(height),
-            },
-        },
-        wgpu::Extent3d {
-            width,
-            height,
-            depth_or_array_layers: 1,
-        },
+    let (buffer, bytes_per_row) = super::capture_common::copy_texture_to_readback_buffer(
+        device,
+        queue,
+        texture,
+        width,
+        height,
+        "Screenshot Buffer",
+        "Screenshot Encoder",
     );
-
-    queue.submit(std::iter::once(encoder.finish()));
 
     // Use Arc<Mutex<>> for thread-safe state (required for Send bound on callback)
     let buffer = Arc::new(buffer);
@@ -119,14 +91,8 @@ pub fn capture_screenshot_web(
             Some(Ok(())) => {
                 let buffer_slice = buffer_for_async.slice(..);
                 let data = buffer_slice.get_mapped_range();
-
-                // Convert from padded buffer to image data
-                let mut image_data = Vec::with_capacity((width * height * 4) as usize);
-                for row in 0..height {
-                    let row_start = (row * bytes_per_row) as usize;
-                    let row_data = &data[row_start..row_start + (width * 4) as usize];
-                    image_data.extend_from_slice(row_data);
-                }
+                let image_data =
+                    super::capture_common::strip_row_padding(&data, width, height, bytes_per_row);
 
                 drop(data);
                 buffer_for_async.unmap();
@@ -569,10 +535,6 @@ pub fn render_high_resolution_web(
 
     renderer.queue.submit(std::iter::once(encoder.finish()));
 
-    // Check if we need BGRA to RGBA conversion
-    let needs_bgra_swap = output_format == wgpu::TextureFormat::Bgra8Unorm
-        || output_format == wgpu::TextureFormat::Bgra8UnormSrgb;
-
     // Async buffer mapping and download
     let buffer = Arc::new(buffer);
     let buffer_for_async = Arc::clone(&buffer);
@@ -613,24 +575,11 @@ pub fn render_high_resolution_web(
             Some(Ok(())) => {
                 let buffer_slice = buffer_for_async.slice(..);
                 let data = buffer_slice.get_mapped_range();
-
-                // Convert from padded buffer to image data
-                let mut image_data = Vec::with_capacity((width * height * 4) as usize);
-                for row in 0..height {
-                    let row_start = (row * bytes_per_row) as usize;
-                    let row_data = &data[row_start..row_start + (width * 4) as usize];
-                    image_data.extend_from_slice(row_data);
-                }
-
+                let mut image_data =
+                    super::capture_common::strip_row_padding(&data, width, height, bytes_per_row);
                 drop(data);
                 buffer_for_async.unmap();
-
-                // Convert BGRA to RGBA if needed
-                if needs_bgra_swap {
-                    for pixel in image_data.chunks_exact_mut(4) {
-                        pixel.swap(0, 2); // Swap B and R
-                    }
-                }
+                super::capture_common::swap_bgra_channels(&mut image_data, output_format);
 
                 // Generate filename with resolution
                 let filename_prefix = format!("{}_{}x{}", fractal_name, width, height);

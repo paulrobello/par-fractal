@@ -83,11 +83,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `quick-xml` 0.39 advisories remain upstream-blocked by the
   `winit→smithay→wayland-scanner` pin and `cargo audit` passes with documented
   ignores.
-- **ARC-014 (capture dedup) — deferred.** `capture.rs` (native, sync readback)
-  and `capture_web.rs` (web, async `map_async`) share their readback setup and
-  RGBA postprocess (~60%), but diverge on the sync-vs-async wait and the save
-  path. It's a substantial, user-facing, cross-platform refactor that needs web
-  runtime verification; scoped as a dedicated follow-up rather than bundled here.
+- **ARC-014 (capture dedup).** Extracted the shared GPU-readback setup (staging
+  buffer + texture→buffer copy + submit) and RGBA post-processing (strip
+  256-byte row padding + BGRA→RGBA swap) into `app/capture_common.rs`, used by
+  both `capture.rs` (native, sync `device.poll(Wait)`) and `capture_web.rs`
+  (web, async `map_async`). The wait and save path stay per-target. Verified:
+  native `make visual-test` pixel-identical (5/5) + web `cargo check` compiles.
+  Surfaced a latent gap — `capture_screenshot_web` skips the BGRA swap the other
+  paths do — preserved as-is (behavior-neutral) and flagged in the release
+  checklist.
 
 ## [0.9.0] - 2026-07-17
 

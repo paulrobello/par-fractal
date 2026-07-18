@@ -37,6 +37,11 @@ Run `make r` and verify each survives and re-renders correctly:
 - [ ] **Screenshot** (hotkey) — saves a PNG at the right size; auto-open works.
 - [ ] **Hi-res render** — a custom-resolution render completes and opens.
 - [ ] **Video record** (native) — start/stop produces a non-empty file.
+- [ ] **Web screenshot + hi-res** (`make web-serve`) — both download, and colors
+      are correct (red/blue not swapped). *Note: `capture_screenshot_web` does
+      not apply the BGRA→RGBA swap that native + hi-res paths do — if web
+      screenshots look color-swapped, that's the gap to fix in
+      `src/app/capture_web.rs`.*
 
 ## Manual web sweep (`make web-serve` + browser)
 
