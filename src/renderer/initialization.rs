@@ -1,6 +1,6 @@
 use super::{
     AccumulationDisplayUniforms, AccumulationTexture, AttractorComputePipeline, BloomUniforms,
-    BlurUniforms, BuddhabrotAccumulationBuffer, BuddhabrotComputePipeline, GpuInfo,
+    BlurUniforms, BuddhabrotAccumulationBuffer, BuddhabrotComputePipeline, GpuInfo, OrbitBuffer,
     PostProcessUniforms, Renderer, Uniforms,
 };
 use wgpu::util::DeviceExt;
@@ -208,28 +208,61 @@ impl Renderer {
 
         let uniform_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                entries: &[wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: Some(
-                            std::num::NonZeroU64::new(std::mem::size_of::<Uniforms>() as u64)
-                                .unwrap(),
-                        ),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: Some(
+                                std::num::NonZeroU64::new(std::mem::size_of::<Uniforms>() as u64)
+                                    .unwrap(),
+                            ),
+                        },
+                        count: None,
                     },
-                    count: None,
-                }],
+                    // ENH-001 Phase A step 3: perturbation reference orbit
+                    // (read-only storage). FRAGMENT-only — only the 2D path
+                    // will read it (step 4); the 3D path declares but does
+                    // not use it. `min_binding_size` of one vec2<f32> matches
+                    // the placeholder buffer allocated below; larger orbits
+                    // just grow the buffer (step 5).
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Storage { read_only: true },
+                            has_dynamic_offset: false,
+                            min_binding_size: std::num::NonZeroU64::new(
+                                std::mem::size_of::<[f32; 2]>() as u64,
+                            ),
+                        },
+                        count: None,
+                    },
+                ],
                 label: Some("uniform_bind_group_layout"),
             });
 
+        // ENH-001 Phase A step 3: placeholder orbit buffer so the storage
+        // binding is valid from the very first frame. One zeroed vec2<f32>
+        // entry; the shader gates on `orbit_len == 0` and never indexes into
+        // this. Step 5 will swap in a capacity-sized buffer (and rebuild
+        // this bind group) when the first real orbit is computed.
+        let orbit_buffer = OrbitBuffer::new_placeholder(&device);
+
         let uniform_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &uniform_bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: uniform_buffer.as_entire_binding(),
-            }],
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: orbit_buffer.buffer.as_entire_binding(),
+                },
+            ],
             label: Some("uniform_bind_group"),
         });
 
@@ -935,6 +968,7 @@ impl Renderer {
             vertex_buffer,
             uniform_buffer,
             uniform_bind_group,
+            orbit_buffer,
             uniforms,
             start_time: web_time::Instant::now(),
 

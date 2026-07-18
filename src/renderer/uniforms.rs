@@ -167,6 +167,16 @@ pub struct Uniforms {
 
     // Padding for 16-byte alignment (reduced to accommodate procedural palette)
     _padding_end: [f32; 8], // 32 bytes
+
+    // Perturbation uniforms (ENH-001 Phase A step 3 — plumbing only;
+    // perturbation stays OFF, step 5 populates these and uploads a real
+    // orbit). Mirrored byte-for-byte by the WGSL `Uniforms` declaration.
+    perturbation_enabled: u32, // 0 = OFF (default), 1 = use perturbation delta path
+    orbit_len: u32,            // entries of ref_orbit actually populated
+    ref_escaped_at: u32,       // index where the reference escaped (0 if bounded)
+    _padding_perturb: u32,     // align delta_c_scale to vec2<f32>'s 8-byte boundary
+    delta_c_scale: [f32; 2],   // pixel → Δc mapping (per-pixel delta magnitude)
+    delta_c_origin: [f32; 2],  // screen-center Δc (normally 0)
 }
 
 impl Default for Uniforms {
@@ -293,6 +303,15 @@ impl Uniforms {
             procedural_phase: [0.0, 0.333, 0.667, 0.0],
 
             _padding_end: [0.0; 8],
+
+            // ENH-001 Phase A step 3: perturbation OFF by default. Step 5
+            // will populate these from a computed reference orbit.
+            perturbation_enabled: 0,
+            orbit_len: 0,
+            ref_escaped_at: 0,
+            _padding_perturb: 0,
+            delta_c_scale: [0.0, 0.0],
+            delta_c_origin: [0.0, 0.0],
         }
     }
 
@@ -504,6 +523,18 @@ impl Uniforms {
         self.lod_zone1 = params.lod.lod_config.distance_zones[0];
         self.lod_zone2 = params.lod.lod_config.distance_zones[1];
         self.lod_zone3 = params.lod.lod_config.distance_zones[2];
+
+        // ENH-001 Phase A step 3: perturbation uniforms plumbed but OFF.
+        // Step 5 (CPU driver) will populate these from a computed
+        // `ReferenceOrbit` and flip `perturbation_enabled` to 1 when
+        // `log2_zoom > 34`. Leaving them at zero keeps the perturbation
+        // shader branch disabled and `orbit_len` short-circuits any
+        // accidental orbit read.
+        self.perturbation_enabled = 0;
+        self.orbit_len = 0;
+        self.ref_escaped_at = 0;
+        self.delta_c_scale = [0.0, 0.0];
+        self.delta_c_origin = [0.0, 0.0];
     }
 
     /// Creates a new Uniforms struct populated from camera and fractal parameters.
@@ -518,8 +549,8 @@ impl Uniforms {
 
 // Compile-time assertion to ensure struct size matches WGSL expectations
 const _: () = assert!(
-    std::mem::size_of::<Uniforms>() == 864,
-    "Uniforms struct must be exactly 864 bytes"
+    std::mem::size_of::<Uniforms>() == 896,
+    "Uniforms struct must be exactly 896 bytes"
 );
 
 // Post-processing uniform structs
@@ -565,11 +596,11 @@ mod layout_tests {
     use std::mem::offset_of;
 
     /// Locks the `Uniforms` Rust struct to the WGSL `Uniforms` declaration in
-    /// `src/shaders/fractal.wgsl` (lines 1-134). Any field reorder, add, or
+    /// `src/shaders/fractal.wgsl` (lines 1-148). Any field reorder, add, or
     /// remove breaks this test, forcing the change to be deliberate and paired
     /// with a matching WGSL edit.
     ///
-    /// The compile-time `size_of == 864` assert above catches total-size
+    /// The compile-time `size_of == 896` assert above catches total-size
     /// drift but misses equal-size field swaps; offset asserts catch those.
     ///
     /// Expected offsets were cross-checked against the WGSL declaration by
@@ -585,7 +616,7 @@ mod layout_tests {
     /// so an insertion anywhere shifts at least one of them.
     #[test]
     fn wgsl_layout_contract() {
-        assert_eq!(std::mem::size_of::<Uniforms>(), 864);
+        assert_eq!(std::mem::size_of::<Uniforms>(), 896);
 
         // 2D-params row: center vec2 (8) + zoom f32 (4) + max_iterations u32 (4),
         // preceded by camera_pos vec3 + _padding1 = offset 144.
@@ -610,6 +641,19 @@ mod layout_tests {
         // procedural_phase: last vec4 in the procedural-palette block, just
         // before the trailing 32B _padding_end.
         assert_eq!(offset_of!(Uniforms, procedural_phase), 816);
+
+        // ENH-001 Phase A step 3: perturbation block, appended after
+        // _padding_end (which ends at offset 832 + 32 = 864). The three
+        // u32 flags pack into the first 16B row; `_padding_perturb` is the
+        // explicit 4B pad that lifts `delta_c_scale` to vec2<f32>'s 8-byte
+        // alignment boundary (Rust's `#[repr(C)]` aligns `[f32; 2]` to 4,
+        // so without this pad the Rust and WGSL layouts would diverge).
+        assert_eq!(offset_of!(Uniforms, perturbation_enabled), 864);
+        assert_eq!(offset_of!(Uniforms, orbit_len), 868);
+        assert_eq!(offset_of!(Uniforms, ref_escaped_at), 872);
+        assert_eq!(offset_of!(Uniforms, _padding_perturb), 876);
+        assert_eq!(offset_of!(Uniforms, delta_c_scale), 880);
+        assert_eq!(offset_of!(Uniforms, delta_c_origin), 888);
     }
 }
 

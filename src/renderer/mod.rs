@@ -3,6 +3,11 @@
 /// Buddhabrot) and their GPU buffers/textures.
 pub mod compute;
 mod initialization;
+/// GPU storage buffer for the perturbation reference orbit (ENH-001 Phase A
+/// step 3). Holds `Z_n` f32 pairs uploaded from a CPU-computed
+/// [`crate::deep_zoom::ReferenceOrbit`] for the per-pixel delta shader to
+/// read in fragment stage.
+pub mod orbit_buffer;
 /// GPU uniform buffer definitions. The `Uniforms` struct here must stay
 /// byte-identical to the `Uniforms` struct in `shaders/fractal.wgsl`.
 pub mod uniforms;
@@ -12,6 +17,7 @@ use compute::{
     AccumulationDisplayUniforms, AccumulationTexture, AttractorComputePipeline,
     BuddhabrotAccumulationBuffer, BuddhabrotComputePipeline,
 };
+use orbit_buffer::OrbitBuffer;
 use uniforms::*;
 
 /// User-facing description of the selected physical GPU.
@@ -54,6 +60,12 @@ pub struct Renderer {
     pub vertex_buffer: wgpu::Buffer,
     pub uniform_buffer: wgpu::Buffer,
     pub uniform_bind_group: wgpu::BindGroup,
+    /// ENH-001 Phase A step 3: storage buffer for the perturbation reference
+    /// orbit. Bound at `@group(0) @binding(1)` so it shares group 0 with
+    /// the uniforms. Step 5 will write a real orbit here; for now it holds
+    /// a one-entry placeholder so the bind group validates.
+    #[allow(dead_code)]
+    pub orbit_buffer: OrbitBuffer,
     uniforms: Uniforms,
     pub start_time: web_time::Instant,
 

@@ -131,10 +131,29 @@ struct Uniforms {
 
     // Padding to align struct to 864 bytes (54 × 16)
     _padding_end: array<vec4<f32>, 2>,  // 32 bytes
+
+    // Perturbation uniforms (ENH-001 Phase A step 3 — plumbing only;
+    // perturbation stays OFF here, step 5 populates these and uploads a
+    // real orbit). Mirrored byte-for-byte by the Rust `Uniforms` struct.
+    perturbation_enabled: u32, // 0 = OFF (default), 1 = use perturbation delta path
+    orbit_len: u32,            // entries of ref_orbit actually populated
+    ref_escaped_at: u32,       // index where the reference escaped (0 if bounded)
+    _padding_perturb: u32,     // align delta_c_scale to vec2<f32>'s 8-byte boundary
+    delta_c_scale: vec2<f32>,  // pixel → Δc mapping (per-pixel delta magnitude)
+    delta_c_origin: vec2<f32>, // screen-center Δc (normally 0)
 }
 
 @group(0) @binding(0)
 var<uniform> uniforms: Uniforms;
+
+// ENH-001 Phase A step 3: perturbation reference orbit storage buffer.
+// Read-only; bound at group(0) binding(1) so it shares the same bind group
+// as the uniforms (both pipeline_2d and pipeline_3d share group 0).
+// `fs_main_2d` will read this when `perturbation_enabled == 1` (step 4);
+// `fs_main_3d` declares but does not use it (dead-code-eliminated per
+// entry point). Unused in step 3 — perturbation is OFF.
+@group(0) @binding(1)
+var<storage, read> ref_orbit: array<vec2<f32>>;
 
 struct VertexInput {
     @location(0) position: vec2<f32>,
