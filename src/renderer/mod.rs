@@ -8,6 +8,10 @@ mod initialization;
 /// [`crate::deep_zoom::ReferenceOrbit`] for the per-pixel delta shader to
 /// read in fragment stage.
 pub mod orbit_buffer;
+/// ENH-006 Task 1: GPU frame profiler. Per-pass timestamp queries with a
+/// 3-deep staging ring for ~2-frame-latent, non-blocking readback, exposing
+/// `GpuProfiler::timings_ms` for the HUD (Task 2) and CLI dump (Task 3).
+pub mod profiler;
 /// GPU uniform buffer definitions. The `Uniforms` struct here must stay
 /// byte-identical to the `Uniforms` struct in `shaders/fractal.wgsl`.
 pub mod uniforms;
@@ -18,6 +22,7 @@ use compute::{
     BuddhabrotAccumulationBuffer, BuddhabrotComputePipeline,
 };
 use orbit_buffer::{ActiveOrbit, OrbitBuffer};
+use profiler::GpuProfiler;
 use uniforms::*;
 
 /// User-facing description of the selected physical GPU.
@@ -132,6 +137,13 @@ pub struct Renderer {
     /// of the persistent-zero-buffer fallback. Always false on wasm (WebGPU
     /// does not expose the feature).
     pub clear_texture_supported: bool,
+
+    /// ENH-006: GPU frame profiler. Owns the timestamp `QuerySet` (or `None`
+    /// when the device lacks `Features::TIMESTAMP_QUERY`), the resolve buffer,
+    /// and the 3-deep staging ring. Public so `App::render` can call
+    /// `pass_writes` / `end_frame` / `poll_results` directly each frame; read
+    /// `timings_ms` for the HUD (Task 2) and CLI dump (Task 3).
+    pub profiler: GpuProfiler,
 
     /// ARC-017: cached `BloomUniforms` from the last upload; the buffer write
     /// is skipped when the value hasn't changed. `None` until first upload.

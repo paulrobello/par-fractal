@@ -520,10 +520,11 @@ impl AttractorComputePipeline {
         encoder: &mut wgpu::CommandEncoder,
         accumulation_bind_group: &wgpu::BindGroup,
         num_workgroups: u32,
+        timestamp_writes: Option<wgpu::ComputePassTimestampWrites<'_>>,
     ) {
         let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
             label: Some("Attractor Compute Pass"),
-            timestamp_writes: None,
+            timestamp_writes,
         });
 
         compute_pass.set_pipeline(&self.pipeline);
@@ -647,10 +648,11 @@ impl BuddhabrotComputePipeline {
         encoder: &mut wgpu::CommandEncoder,
         accumulation_bind_group: &wgpu::BindGroup,
         num_workgroups: u32,
+        timestamp_writes: Option<wgpu::ComputePassTimestampWrites<'_>>,
     ) {
         let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
             label: Some("Buddhabrot Compute Pass"),
-            timestamp_writes: None,
+            timestamp_writes,
         });
 
         compute_pass.set_pipeline(&self.pipeline);

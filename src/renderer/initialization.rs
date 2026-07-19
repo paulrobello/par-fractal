@@ -143,11 +143,22 @@ impl Renderer {
         // so the fallback path is the norm on wasm.
         let available_features = adapter.features();
         let clear_texture_supported = available_features.contains(wgpu::Features::CLEAR_TEXTURE);
-        let required_features = if clear_texture_supported {
+        // ENH-006: request TIMESTAMP_QUERY (for the GPU frame profiler) only
+        // when the adapter already advertises it — never hard-require it, so
+        // the profiler degrades to no-op mode on backends/drivers that don't
+        // expose timestamp queries (notably WebGPU without the
+        // `timestamp-query` feature). Combined with CLEAR_TEXTURE above into
+        // one `required_features` set so we issue a single device request.
+        let timestamp_query_supported =
+            available_features.contains(wgpu::Features::TIMESTAMP_QUERY);
+        let mut required_features = if clear_texture_supported {
             wgpu::Features::CLEAR_TEXTURE
         } else {
             wgpu::Features::empty()
         };
+        if timestamp_query_supported {
+            required_features |= wgpu::Features::TIMESTAMP_QUERY;
+        }
 
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
@@ -958,6 +969,12 @@ impl Renderer {
             ],
         });
 
+        // ENH-006: construct the GPU frame profiler. `timestamp_query_supported`
+        // was determined above from `adapter.features()`; pass it through so
+        // the profiler goes no-op on backends without timestamp queries.
+        let profiler =
+            crate::renderer::profiler::GpuProfiler::new(&device, &queue, timestamp_query_supported);
+
         Self {
             surface,
             device,
@@ -1023,6 +1040,10 @@ impl Renderer {
 
             // ARC-012: whether `clear_texture` is available on this device.
             clear_texture_supported,
+
+            // ENH-006: GPU frame profiler; no-op when `TIMESTAMP_QUERY` was
+            // not available on the adapter.
+            profiler,
 
             // ARC-017: uniform-write change-detection caches start empty so the
             // first frame's write always happens.

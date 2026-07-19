@@ -120,7 +120,7 @@ impl App {
                         })],
                         depth_stencil_attachment: None,
                         occlusion_query_set: None,
-                        timestamp_writes: None,
+                        timestamp_writes: self.renderer.profiler.pass_writes("scene"),
                         multiview_mask: None,
                     });
 
@@ -234,9 +234,22 @@ impl App {
         let (actions, ui_mutated_scene) = self.render_ui(&mut encoder, &view);
         self.handle_ui_actions(actions);
 
+        // ENH-006: profiler end-of-frame. Resolve the frame's timestamp
+        // queries into `resolve_buf` and copy into the next staging ring
+        // slot. Runs on the same encoder as the last pass so the resolve
+        // happens after every query write in queue order (the screenshot
+        // fork path submits the fractal encoder earlier; its queries are
+        // already in the QuerySet by the time this runs).
+        self.renderer.profiler.end_frame(&mut encoder);
+
         self.renderer
             .queue
             .submit(std::iter::once(encoder.finish()));
+
+        // ENH-006: drain any completed `map_async` from a previous frame and
+        // issue a new one for the slot just written. No `device.poll(Wait)` —
+        // queue.submit above already fired ready callbacks.
+        self.renderer.profiler.poll_results(&self.renderer.device);
 
         output.present();
 
@@ -306,7 +319,9 @@ impl App {
                 })],
                 depth_stencil_attachment: None,
                 occlusion_query_set: None,
-                timestamp_writes: None,
+                // ENH-006: tile refinement is mutually exclusive with the
+                // main scene pass above, so it reuses the "scene" scope.
+                timestamp_writes: self.renderer.profiler.pass_writes("scene"),
                 multiview_mask: None,
             });
             let mut render_pass = render_pass.forget_lifetime();
@@ -444,7 +459,12 @@ impl App {
                     // Each workgroup (256 threads) tests multiple samples
                     let num_workgroups =
                         (self.fractal_params.settings.attractor_iterations_per_frame / 256).max(1);
-                    compute.dispatch(encoder, &buffer.compute_bind_group, num_workgroups);
+                    compute.dispatch(
+                        encoder,
+                        &buffer.compute_bind_group,
+                        num_workgroups,
+                        self.renderer.profiler.compute_writes("compute_accum"),
+                    );
 
                     // Copy from atomic buffer to texture for display
                     let has_copy_pipeline = self.renderer.buddhabrot_copy_pipeline.is_some();
@@ -458,7 +478,10 @@ impl App {
                         let mut copy_pass =
                             encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
                                 label: Some("Buddhabot Copy Pass"),
-                                timestamp_writes: None,
+                                timestamp_writes: self
+                                    .renderer
+                                    .profiler
+                                    .compute_writes("buddhabrot_copy"),
                             });
                         copy_pass.set_pipeline(copy_pipeline);
                         copy_pass.set_bind_group(0, copy_bind_group, &[]);
@@ -518,7 +541,12 @@ impl App {
                     // Simplify: dispatch enough to cover all iterations
                     let num_workgroups =
                         (self.fractal_params.settings.attractor_iterations_per_frame / 256).max(1);
-                    compute.dispatch(encoder, &accum_tex.compute_bind_group, num_workgroups);
+                    compute.dispatch(
+                        encoder,
+                        &accum_tex.compute_bind_group,
+                        num_workgroups,
+                        self.renderer.profiler.compute_writes("compute_accum"),
+                    );
                 }
 
                 // Update total iterations counter
@@ -571,7 +599,7 @@ impl App {
                 })],
                 depth_stencil_attachment: None,
                 occlusion_query_set: None,
-                timestamp_writes: None,
+                timestamp_writes: self.renderer.profiler.pass_writes("scene"),
                 multiview_mask: None,
             });
 
@@ -627,7 +655,7 @@ impl App {
                     })],
                     depth_stencil_attachment: None,
                     occlusion_query_set: None,
-                    timestamp_writes: None,
+                    timestamp_writes: self.renderer.profiler.pass_writes("bloom_extract"),
                     multiview_mask: None,
                 });
 
@@ -655,7 +683,7 @@ impl App {
                     })],
                     depth_stencil_attachment: None,
                     occlusion_query_set: None,
-                    timestamp_writes: None,
+                    timestamp_writes: self.renderer.profiler.pass_writes("bloom_h"),
                     multiview_mask: None,
                 });
 
@@ -700,7 +728,7 @@ impl App {
                     })],
                     depth_stencil_attachment: None,
                     occlusion_query_set: None,
-                    timestamp_writes: None,
+                    timestamp_writes: self.renderer.profiler.pass_writes("bloom_v"),
                     multiview_mask: None,
                 });
 
@@ -762,7 +790,7 @@ impl App {
                 })],
                 depth_stencil_attachment: None,
                 occlusion_query_set: None,
-                timestamp_writes: None,
+                timestamp_writes: self.renderer.profiler.pass_writes("composite"),
                 multiview_mask: None,
             });
 
@@ -790,7 +818,7 @@ impl App {
                 })],
                 depth_stencil_attachment: None,
                 occlusion_query_set: None,
-                timestamp_writes: None,
+                timestamp_writes: self.renderer.profiler.pass_writes("fxaa"),
                 multiview_mask: None,
             });
 
@@ -962,7 +990,7 @@ impl App {
                 })],
                 depth_stencil_attachment: None,
                 occlusion_query_set: None,
-                timestamp_writes: None,
+                timestamp_writes: self.renderer.profiler.pass_writes("egui"),
                 multiview_mask: None,
             });
 
