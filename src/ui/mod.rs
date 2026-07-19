@@ -198,6 +198,9 @@ pub struct UI {
     pub show_fps: bool,
     pub show_camera_info: bool,
     pub show_performance_overlay: bool,
+    /// ENH-006: GPU profile HUD overlay visibility. Mirrored to
+    /// `UIState::show_gpu_profile` for persistence.
+    pub show_gpu_profile: bool,
     pub ui_state: UIState,
     // Command palette
     pub command_palette: CommandPalette,
@@ -278,6 +281,7 @@ impl UI {
             show_fps: false,
             show_camera_info: false,
             show_performance_overlay: false,
+            show_gpu_profile: false,
             ui_state: UIState::default(),
             command_palette: CommandPalette::new(),
             frame_times: Vec::with_capacity(120),
@@ -410,6 +414,7 @@ impl UI {
     pub fn load_ui_state(&mut self, ui_state: UIState) {
         self.show_fps = ui_state.show_fps;
         self.show_camera_info = ui_state.show_camera_info;
+        self.show_gpu_profile = ui_state.show_gpu_profile;
         self.ui_state = ui_state;
     }
 

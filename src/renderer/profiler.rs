@@ -183,7 +183,6 @@ impl GpuProfiler {
     ///
     /// Task 2's HUD reads this to decide between showing the timing table
     /// versus a "timestamp queries unavailable" banner.
-    #[allow(dead_code)]
     pub fn is_enabled(&self) -> bool {
         self.query_set.is_some()
     }

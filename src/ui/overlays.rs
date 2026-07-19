@@ -1,5 +1,6 @@
 use super::UI;
 use crate::fractal::FractalParams;
+use crate::renderer::profiler::GpuProfiler;
 use egui::Context;
 use glam::Vec3;
 
@@ -611,6 +612,170 @@ impl UI {
                                     .size(11.0),
                             );
                         }
+                    });
+            });
+    }
+
+    /// ENH-006: GPU frame profiler HUD. Renders a per-scope timing table
+    /// (scope | ms EMA | proportional bar), a total-GPU-ms row, and a CPU
+    /// frame-ms row for contrast (read from `self.frame_times`, the same
+    /// history `render_performance_overlay` consumes — no second timer). When
+    /// the profiler is disabled (`!is_enabled()`), shows a single
+    /// "timestamp queries unavailable" line so the overlay is informative
+    /// even on devices without the feature. Handles empty `timings_ms`
+    /// (first frames, before any EMA has seeded) without panic.
+    pub fn render_gpu_profile_overlay(&self, ctx: &Context, profiler: &GpuProfiler) {
+        if !self.show_gpu_profile {
+            return;
+        }
+
+        // CPU frame ms comes from the existing UI-side frame-time history
+        // (`update_frame_time` is fed by `App::update` from `dt`); the
+        // performance overlay already reads this same vec.
+        let cpu_frame_ms = self.frame_times.last().copied();
+
+        egui::Area::new(egui::Id::new("gpu_profile_overlay"))
+            .anchor(egui::Align2::RIGHT_TOP, egui::vec2(-10.0, 10.0))
+            .show(ctx, |ui| {
+                ui.set_max_width(260.0);
+                egui::Frame::NONE
+                    .fill(egui::Color32::from_black_alpha(245))
+                    .inner_margin(10.0)
+                    .corner_radius(6.0)
+                    .show(ui, |ui| {
+                        ui.set_max_width(240.0);
+
+                        // Title
+                        ui.label(
+                            egui::RichText::new("GPU Profile")
+                                .color(egui::Color32::from_rgb(255, 255, 255))
+                                .size(16.0)
+                                .strong(),
+                        );
+
+                        ui.add_space(6.0);
+
+                        if !profiler.is_enabled() {
+                            // Feature absent on this device — show the
+                            // informative banner instead of the table.
+                            ui.label(
+                                egui::RichText::new(
+                                    "GPU timestamp queries\nunavailable on this device",
+                                )
+                                .color(egui::Color32::from_rgb(255, 200, 100))
+                                .size(12.0),
+                            );
+                            return;
+                        }
+
+                        // Column header
+                        ui.horizontal(|ui| {
+                            ui.label(
+                                egui::RichText::new("scope")
+                                    .color(egui::Color32::from_rgb(150, 150, 150))
+                                    .size(11.0)
+                                    .strong(),
+                            );
+                            ui.label(
+                                egui::RichText::new("ms (EMA)")
+                                    .color(egui::Color32::from_rgb(150, 150, 150))
+                                    .size(11.0)
+                                    .strong(),
+                            );
+                        });
+
+                        // Iterate scopes by descending ms so the dominant
+                        // pass is first. Bars scale to the max scope ms so
+                        // the dominant pass is also the longest bar.
+                        let mut scopes: Vec<(&'static str, f32)> =
+                            profiler.timings_ms.iter().map(|(k, v)| (*k, *v)).collect();
+                        scopes.sort_by(|a, b| {
+                            b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
+                        });
+
+                        let max_ms = scopes
+                            .iter()
+                            .map(|(_, ms)| *ms)
+                            .fold(0.0f32, f32::max)
+                            .max(1e-6);
+
+                        let total_ms: f32 = scopes.iter().map(|(_, ms)| *ms).sum();
+
+                        for (name, ms) in &scopes {
+                            ui.horizontal(|ui| {
+                                ui.label(
+                                    egui::RichText::new(*name)
+                                        .color(egui::Color32::from_rgb(200, 220, 255))
+                                        .size(12.0),
+                                );
+                                ui.label(
+                                    egui::RichText::new(format!("{:>6.3}", ms))
+                                        .color(egui::Color32::from_rgb(220, 220, 220))
+                                        .size(12.0)
+                                        .monospace(),
+                                );
+                            });
+
+                            // Proportional bar — manual rect like the LOD
+                            // overlay's transition-progress indicator.
+                            let (rect, _response) = ui
+                                .allocate_exact_size(egui::vec2(220.0, 4.0), egui::Sense::hover());
+                            ui.painter().rect_filled(
+                                rect,
+                                2.0,
+                                egui::Color32::from_rgb(40, 40, 50),
+                            );
+                            let fill_width = rect.width() * (ms / max_ms).clamp(0.0, 1.0);
+                            ui.painter().rect_filled(
+                                egui::Rect::from_min_size(
+                                    rect.min,
+                                    egui::vec2(fill_width, rect.height()),
+                                ),
+                                2.0,
+                                egui::Color32::from_rgb(100, 200, 255),
+                            );
+                        }
+
+                        ui.add_space(4.0);
+                        ui.separator();
+                        ui.add_space(4.0);
+
+                        // Totals
+                        ui.horizontal(|ui| {
+                            ui.label(
+                                egui::RichText::new("Total GPU:")
+                                    .color(egui::Color32::from_rgb(180, 180, 180))
+                                    .size(12.0)
+                                    .strong(),
+                            );
+                            ui.label(
+                                egui::RichText::new(format!("{:.3} ms", total_ms))
+                                    .color(egui::Color32::from_rgb(255, 220, 120))
+                                    .size(12.0)
+                                    .strong()
+                                    .monospace(),
+                            );
+                        });
+
+                        ui.horizontal(|ui| {
+                            ui.label(
+                                egui::RichText::new("CPU frame:")
+                                    .color(egui::Color32::from_rgb(180, 180, 180))
+                                    .size(12.0)
+                                    .strong(),
+                            );
+                            let cpu_text = match cpu_frame_ms {
+                                Some(ms) => format!("{:.3} ms", ms),
+                                None => "—".to_string(),
+                            };
+                            ui.label(
+                                egui::RichText::new(cpu_text)
+                                    .color(egui::Color32::from_rgb(200, 255, 200))
+                                    .size(12.0)
+                                    .strong()
+                                    .monospace(),
+                            );
+                        });
                     });
             });
     }

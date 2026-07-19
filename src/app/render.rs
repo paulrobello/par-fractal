@@ -944,6 +944,11 @@ impl App {
             );
             // No recording indicator on web - video recording not supported
             self.ui.render_lod_debug_overlay(ctx, &self.fractal_params);
+            // ENH-006 Task 2: GPU frame profiler HUD. Reads
+            // `self.renderer.profiler.timings_ms` / `is_enabled()`; CPU
+            // frame ms is read from `self.ui.frame_times` inside the overlay.
+            self.ui
+                .render_gpu_profile_overlay(ctx, &self.renderer.profiler);
         });
 
         self.egui_state

@@ -30,6 +30,11 @@ pub struct UIState {
     pub about_window_open: bool,
     pub show_fps: bool,
     pub show_camera_info: bool,
+    /// ENH-006: GPU profile HUD overlay (per-scope GPU timings + CPU frame
+    /// ms). `#[serde(default)]` so older `settings.yaml`/presets that predate
+    /// the field still deserialize.
+    #[serde(default)]
+    pub show_gpu_profile: bool,
 }
 
 pub(super) fn default_dof_samples() -> u32 {
@@ -113,6 +118,7 @@ impl Default for UIState {
             about_window_open: false,
             show_fps: false,
             show_camera_info: false,
+            show_gpu_profile: false,
         }
     }
 }

@@ -173,6 +173,21 @@ impl UI {
                                 ui.separator();
                                 ui.label("Settings: ~/.config/par-fractal/settings.yaml")
                                     .on_hover_text("Configuration file location");
+
+                                // ENH-006: GPU profile HUD overlay toggle.
+                                // Global (any render mode); the checkbox is
+                                // mirrored to `UIState` for persistence.
+                                ui.separator();
+                                ui.heading("Diagnostics");
+                                if ui
+                                    .checkbox(&mut self.show_gpu_profile, "Show GPU Profile Overlay")
+                                    .on_hover_text(
+                                        "Display per-scope GPU timings and CPU frame ms [Shift+G]",
+                                    )
+                                    .changed()
+                                {
+                                    self.ui_state.show_gpu_profile = self.show_gpu_profile;
+                                }
                             });
         self.ui_state.settings_open = response.openness > 0.0;
     }

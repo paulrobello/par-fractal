@@ -372,6 +372,21 @@ impl App {
                     return true;
                 }
                 KeyCode::KeyG => {
+                    if self.shift_pressed {
+                        // Shift+G: toggle ENH-006 GPU profile HUD overlay
+                        // (mirrors the Shift+D LOD-debug-visualization pattern).
+                        self.ui.show_gpu_profile = !self.ui.show_gpu_profile;
+                        self.ui.ui_state.show_gpu_profile = self.ui.show_gpu_profile;
+                        log::info!(
+                            "GPU Profile Overlay: {}",
+                            if self.ui.show_gpu_profile {
+                                "ON"
+                            } else {
+                                "OFF"
+                            }
+                        );
+                        return true;
+                    }
                     self.fractal_params.settings.show_floor =
                         !self.fractal_params.settings.show_floor;
                     self.mark_scene_dirty();
