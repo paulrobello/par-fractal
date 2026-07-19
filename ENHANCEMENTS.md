@@ -12,18 +12,18 @@
 > ideas below build on that foundation. Ordering assumes the AUDIT Phase 1–2 fixes land first
 > (especially the ARC-002 deep-zoom correctness bundle and ARC-008 LOD ownership).
 
-> **Status — verified 2026-07-18 at HEAD `1c92fd2`:** ENH-007 (visual regression harness)
+> **Status — verified 2026-07-18 at HEAD `615fb26`:** ENH-007 (visual regression harness)
 > shipped complete and was **removed from this list** — its CPU teeth (`tests/reference_math.rs`)
 > and GPU goldens (`tests/golden/`) remain the regression backbone for every remaining item.
-> Of the 7 still open: **3 partial (ENH-001, ENH-002, ENH-004); 3 not started (ENH-005,
-> ENH-006, ENH-008); 1 fully done (ENH-003).** Per-item verdicts with file:line evidence appear
+> Of the 7 still open: **2 partial (ENH-001, ENH-004); 3 not started (ENH-005, ENH-006,
+> ENH-008); 2 fully done (ENH-002, ENH-003).** Per-item verdicts with file:line evidence appear
 > under each entry below, and the priority table has a Status column.
 
 ## Priority order
 
 | ID | Title | Impact | Effort | Depends on | Status (2026-07-18) |
 |----|-------|--------|--------|-----------|---------------------|
-| ENH-002 | Progressive refinement + render-on-demand | High | Medium–High (~1 week) | ARC-006/008 fixes | **Partial — v1 Converged fast-path done** (commit `1c92fd2`); settle-then-refine steps + v2 tile-convergence not started |
+| ENH-002 | Progressive refinement + render-on-demand | High | Medium–High (~1 week) | ARC-006/008 fixes | **Done** — v1 Converged fast-path (`1c92fd2`) + v2 tile-progressive refinement (`615fb26`); plan's explicit settle-timer/LOD-bypass steps redundant with LOD's existing restore |
 | ENH-003 | Dynamic resolution scaling (wire `render_scale`) | High | Medium (~2–3 days) | ARC-007/008 fixes | **Done** (commit `6c2079b`) — viewport + `scene_uv_scale` remap; no-op at scale 1.0 |
 | ENH-001 | Perturbation-theory infinite zoom | Transformative | Very High (2–4 weeks) | ARC-001/002 bundle; harness ✓ (ENH-007 shipped) | **Partial — Phase A + breadth done** (Mandelbrot/Julia/BurningShip/Tricorn); 1e8 golden pinned & deterministic; BLA deferred (orbit ~1.5 ms) |
 | ENH-006 | GPU frame profiler (timestamp queries + HUD) | Medium (enables tuning) | Medium (~2 days) | none | Not started |
@@ -48,24 +48,41 @@ actual infinite zoom. **Effort**: very high; phased plan delivers Mandelbrot-onl
 
 ### ENH-002 — Progressive refinement + render-on-demand
 **Plan**: `docs/fable/ENH-002-progressive-refinement.md`
-**Status (2026-07-18, HEAD `1c92fd2`):** v1 **Converged fast-path shipped** (commit `1c92fd2`). The
-non-redundant half of v1: ARC-006 parks the loop when idle, but `should_render_next_frame()`
-still triggers a render on every egui repaint, and `render()` ran the fractal scene pass
-unconditionally — so hovering over a static deep-zoom view at high iterations re-rendered the
-whole fractal every mouse-move frame. Now a `scene_converged` flag (`src/app/mod.rs`) — set at
-the end of `render()` once a frame completes clean + no continuous animation (which is always a
-full-quality frame: LOD restores to ultra when idle, LOD-off is always full quality), cleared by
-`mark_scene_dirty` — lets converged UI-only repaints **skip the fractal pass** and re-composite the
-cached `scene_texture` (`src/app/render.rs`, guarded by `should_skip_scene_pass`; capture forces a
-fresh pass). Pure decision logic is unit-tested (`app::enh_002_tests`, 3 tests, native + web); the
-performance overlay gained a `Scene: Idle/Active` row (`src/ui/overlays.rs`). GPU golden harness
-5/5 bit-identical (each row runs 8 s post-convergence before capture). **Deferred — v1 steps 2–4
-(explicit settle timer + LOD bypass) and v2 (tile-progressive refinement):** the settle→full-quality
-ramp is *already* provided by LOD's restore + ARC-006's animation tracking, so a parallel settle
-timer is redundant, and an LOD-bypass "Refining" frame would risk desyncing ENH-001's perturbation
-`max_iter` lockstep (orbit vs shader read the same LOD `iteration_scale`). v2 (scissor-rect tiling
-with `LoadOp::Load` for extreme deep-zoom views) remains the transformative follow-on — that is the
-runtime foundation ENH-001 Phase B step 9 calls out.
+**Status (2026-07-18, HEAD `615fb26`):** **Done** — v1 Converged fast-path (`1c92fd2`) + v2
+tile-progressive refinement (`615fb26`) both shipped.
+
+**v1 — Converged fast-path (`1c92fd2`):** ARC-006 parks the loop when idle, but
+`should_render_next_frame()` still triggered a render on every egui repaint, and `render()` ran the
+fractal scene pass unconditionally — so hovering over a static deep-zoom view at high iterations
+re-rendered the whole fractal every mouse-move frame. A `scene_converged` flag (set at the end of
+`render()` once a frame completes clean + no continuous animation — always a full-quality frame,
+since LOD restores to ultra when idle and LOD-off is always full quality; cleared by
+`mark_scene_dirty`) lets converged UI-only repaints **skip the fractal pass** and re-composite the
+cached `scene_texture` (`should_skip_scene_pass` in `src/app/mod.rs`; capture forces a fresh pass).
+Pure decision logic unit-tested (`app::enh_002_tests`); the perf overlay gained a `Scene: Idle/Active`
+row.
+
+**v2 — Tile-progressive refinement (`615fb26`):** the remaining cost was the single full-quality
+frame rendered when a deep-zoom view settles — at high iterations it froze the UI for tens to
+hundreds of ms. v2 splits it: once a 2D view settles it renders tile-by-tile center-out at full
+quality, one scissor-rect tile per frame with `LoadOp::Load` on `scene_texture` (finished tiles
+persist), so detail pours in smoothly instead of one costly pop. New pure module
+`src/app/refine.rs` holds the math (cost→grid, center-out order, tile-rect geometry — 10 unit
+tests). `maybe_start_refinement` engages when settled (>150 ms since the last change), 2D,
+non-accumulation, `scene_texture` initialized, and the extrapolated full-quality cost (last frame
+ms ÷ render_scale²) exceeds one tile budget. At deep zoom the perturbation path pins iterations to
+the orbit length (`activate_perturbation`), so only the pixel term applies and tiling needs no LOD
+bypass — no orbit desync. `mark_scene_dirty` / capture abort in-flight refinement for a fresh full
+pass; `Renderer.refining` forces `scene_render_scale = 1.0` during refinement. Diagnostic hook
+`PAR_REFINE_FORCE_SIDE=<n>` (read once at startup) forces a grid to exercise the path. Verified:
+golden harness 5/5 bit-identical; runtime smoke at zoom 1e8 with `PAR_REFINE_FORCE_SIDE=4` confirms
+refinement engages across cycles with no wgpu validation errors and no crash.
+
+**Not done (deferred as redundant):** the plan's v1 steps 2–4 (an explicit settle timer + LOD-bypass
+"Refining" frame) are redundant with LOD's existing restore + ARC-006's animation tracking, and an
+LOD bypass would risk desyncing ENH-001's perturbation `max_iter` lockstep. The settle contract they
+described is delivered by v1+v2 without a parallel settle mechanism. This is the runtime foundation
+ENH-001 Phase B step 9 (progressive integration) calls out.
 
 After the dirty-flag fix (ARC-006) stops idle re-rendering, invert the remaining tradeoff: during
 interaction render cheap (low iterations / low scale), and while idle *converge* — re-render at
