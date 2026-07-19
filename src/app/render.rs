@@ -234,17 +234,6 @@ impl App {
         let (actions, ui_mutated_scene) = self.render_ui(&mut encoder, &view);
         self.handle_ui_actions(actions);
 
-        // ARC-006: a UI action mutated scene state (slider edit, preset load,
-        // bookmark, reset, screenshot, hi-res render, recording toggle, or
-        // command-palette action). Mark dirty so the next frame renders and
-        // (for non-animating changes) the loop returns to idle after that one
-        // frame. `render_ui` computes the flag instead of marking dirty
-        // in-place because the egui closure holds an immutable borrow on
-        // `self.egui_state` for the duration of `run_ui`.
-        if ui_mutated_scene {
-            self.mark_scene_dirty();
-        }
-
         self.renderer
             .queue
             .submit(std::iter::once(encoder.finish()));
@@ -258,6 +247,20 @@ impl App {
         // returning `is_scene_animation_active() == true` from
         // `should_render_next_frame()`.
         self.after_render_frame();
+
+        // ARC-006 / ENH-002: a UI action mutated scene state DURING this render
+        // — after Pass 1 already drew with the previous params. Mark dirty
+        // AFTER `after_render_frame` so the flag survives to drive a follow-up
+        // render of the new params. (Before this, `after_render_frame` cleared
+        // the flag the UI action just set, so with the v1 Converged fast-path
+        // the next repaint skipped the fractal pass and the change never
+        // appeared until an unrelated click forced a redraw.) `render_ui`
+        // computes the flag instead of marking dirty in-place because the egui
+        // closure holds an immutable borrow on `self.egui_state` for the
+        // duration of `run_ui`.
+        if ui_mutated_scene {
+            self.mark_scene_dirty();
+        }
     }
 
     /// ENH-002 v2: render one tile of the in-flight refinement into
