@@ -411,12 +411,15 @@ impl Renderer {
         // Create intermediate render textures
         let (scene_texture, scene_view) =
             Self::create_render_texture(&device, size.width, size.height, "Scene Texture");
+        // ENH-005: bloom extract + both blur passes run at half resolution
+        // (see `Renderer::bloom_size`); scene + composite stay full-res.
+        let (bw, bh) = Self::bloom_size(size.width, size.height);
         let (bright_texture, bright_view) =
-            Self::create_render_texture(&device, size.width, size.height, "Bright Texture");
+            Self::create_render_texture(&device, bw, bh, "Bright Texture");
         let (blur_temp_texture, blur_temp_view) =
-            Self::create_render_texture(&device, size.width, size.height, "Blur Temp Texture");
+            Self::create_render_texture(&device, bw, bh, "Blur Temp Texture");
         let (bloom_texture, bloom_view) =
-            Self::create_render_texture(&device, size.width, size.height, "Bloom Texture");
+            Self::create_render_texture(&device, bw, bh, "Bloom Texture");
         let (composite_texture, composite_view) =
             Self::create_render_texture(&device, size.width, size.height, "Composite Texture");
 

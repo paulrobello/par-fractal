@@ -33,6 +33,17 @@ impl Renderer {
         (texture, view)
     }
 
+    /// ENH-005: bloom extract + both blur passes run at half the surface
+    /// resolution. Blur is a low-pass filter, so downsampling first is visually
+    /// near-lossless and cuts bloom bandwidth/fragment work ~4×; composite
+    /// upsamples bilinearly. The blur shader derives its texel offset from
+    /// `textureDimensions` of the (now half-size) bound texture, so no texel-
+    /// size uniform needs updating. Halved dims clamped to ≥1 keep odd/tiny
+    /// window sizes valid as GPU texture dimensions.
+    pub(super) fn bloom_size(width: u32, height: u32) -> (u32, u32) {
+        ((width / 2).max(1), (height / 2).max(1))
+    }
+
     // Helper: Recreate all intermediate textures (for resize)
     fn recreate_textures(&mut self) {
         let (scene_texture, scene_view) = Self::create_render_texture(
@@ -44,30 +55,22 @@ impl Renderer {
         self.scene_texture = scene_texture;
         self.scene_view = scene_view;
 
-        let (bright_texture, bright_view) = Self::create_render_texture(
-            &self.device,
-            self.size.width,
-            self.size.height,
-            "Bright Texture",
-        );
+        // ENH-005: bloom extract + both blur passes run at half resolution
+        // (see `bloom_size`); scene + composite stay full-res.
+        let (bw, bh) = Self::bloom_size(self.size.width, self.size.height);
+
+        let (bright_texture, bright_view) =
+            Self::create_render_texture(&self.device, bw, bh, "Bright Texture");
         self.bright_texture = bright_texture;
         self.bright_view = bright_view;
 
-        let (blur_temp_texture, blur_temp_view) = Self::create_render_texture(
-            &self.device,
-            self.size.width,
-            self.size.height,
-            "Blur Temp Texture",
-        );
+        let (blur_temp_texture, blur_temp_view) =
+            Self::create_render_texture(&self.device, bw, bh, "Blur Temp Texture");
         self.blur_temp_texture = blur_temp_texture;
         self.blur_temp_view = blur_temp_view;
 
-        let (bloom_texture, bloom_view) = Self::create_render_texture(
-            &self.device,
-            self.size.width,
-            self.size.height,
-            "Bloom Texture",
-        );
+        let (bloom_texture, bloom_view) =
+            Self::create_render_texture(&self.device, bw, bh, "Bloom Texture");
         self.bloom_texture = bloom_texture;
         self.bloom_view = bloom_view;
 
@@ -384,5 +387,29 @@ impl Renderer {
     /// short-circuits any read, so stale buffer contents are never sampled.
     pub fn clear_reference_orbit(&mut self) {
         self.active_orbit = None;
+    }
+}
+
+#[cfg(test)]
+mod enh_005_tests {
+    use super::Renderer;
+
+    /// ENH-005: `bloom_size` must integer-divide by 2 and never return 0
+    /// (a 0-dim GPU texture panics at creation). Locks the floor, the
+    /// truncation-on-odd behavior, and the w/h pairing against a future edit
+    /// that drops `.max(1)` or swaps the components.
+    #[test]
+    fn bloom_size_floors_and_halves() {
+        // Zero / one px → floored to 1 (the crash guard).
+        assert_eq!(Renderer::bloom_size(0, 0), (1, 1));
+        assert_eq!(Renderer::bloom_size(1, 1), (1, 1));
+        assert_eq!(Renderer::bloom_size(2, 2), (1, 1));
+        // Odd dims truncate down (integer division), never round past half.
+        assert_eq!(Renderer::bloom_size(3, 3), (1, 1));
+        assert_eq!(Renderer::bloom_size(4, 4), (2, 2));
+        // Real-world odd window: 1101×733 → 550×366 (truncated, not floored).
+        assert_eq!(Renderer::bloom_size(1101, 733), (550, 366));
+        // Width and height are independent (no swap).
+        assert_eq!(Renderer::bloom_size(1920, 1080), (960, 540));
     }
 }

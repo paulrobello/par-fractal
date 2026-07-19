@@ -59,6 +59,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   writes the EMA timings to YAML once after a 120-frame warmup, exposed as `make profile`; the
   prior Linux `perf`-based `make profile` target is now `make profile-cpu`.
 
+### Performance
+- **Half-resolution bloom pipeline (ENH-005).** Bloom extract and both blur
+  passes now run at half the surface resolution; composite upsamples bilinearly.
+  The blur shader derives its texel offset from the bound texture's own
+  `textureDimensions`, so no texel-size uniform needed updating — the entire
+  change is the three bloom textures (`bright`/`blur_temp`/`bloom`) created via
+  the new `Renderer::bloom_size` helper in `src/renderer/{update,initialization}.rs`.
+  Cuts bloom bandwidth/fragment work ~4× and reclaims ~¾ of the bloom-chain
+  memory at 4K. Scoped to the interactive renderer textures only — the high-res
+  capture path (`src/app/capture.rs`) keeps full-res bloom, so screenshots and
+  goldens are byte-identical. A/B on an actively-blooming 3D preset (Mandelbox
+  Cubic) is pixel-identical (corr 1.0, MAE 0.0); the bloom-OFF path is
+  structurally untouched (ARC-005 gating). No threshold tweak needed.
+
 ### Changed
 - `capture_screenshot` honors `--screenshot-path` (no timestamp / toast / auto-open
   in harness mode); interactive behavior is unchanged.

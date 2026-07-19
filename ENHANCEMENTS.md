@@ -12,11 +12,11 @@
 > ideas below build on that foundation. Ordering assumes the AUDIT Phase 1–2 fixes land first
 > (especially the ARC-002 deep-zoom correctness bundle and ARC-008 LOD ownership).
 
-> **Status — verified 2026-07-19 at HEAD `afb8cbe`:** ENH-007 (visual regression harness)
+> **Status — verified 2026-07-19 at HEAD `5580784`:** ENH-007 (visual regression harness)
 > shipped complete and was **removed from this list** — its CPU teeth (`tests/reference_math.rs`)
 > and GPU goldens (`tests/golden/`) remain the regression backbone for every remaining item.
-> Of the 7 still open: **3 effectively done (ENH-001, ENH-002, ENH-003); ENH-006 done;
-> 1 partial (ENH-004); 2 not started (ENH-005, ENH-008).** ENH-001's remaining work
+> Of the 7 still open: **3 effectively done (ENH-001, ENH-002, ENH-003); ENH-005 and
+> ENH-006 done; 1 partial (ENH-004); 1 not started (ENH-008).** ENH-001's remaining work
 > (BLA series-approximation) is a deferred perf optimization whose prerequisite — the
 > ENH-006 profiler — is now shipped, so BLA can be revisited once per-pixel cost is
 > measured as the bottleneck; it is not a correctness gap. Per-item verdicts with file:line evidence appear
@@ -30,7 +30,7 @@
 | ENH-003 | Dynamic resolution scaling (wire `render_scale`) | High | Medium (~2–3 days) | ARC-007/008 fixes | **Done** (commit `6c2079b`) — viewport + `scene_uv_scale` remap; no-op at scale 1.0 |
 | ENH-001 | Perturbation-theory infinite zoom | Transformative | Very High (2–4 weeks) | ARC-001/002 bundle; harness ✓ (ENH-007 shipped) | **Phases A + B + C done** — all 4 kinds; 1e8 golden pinned & deterministic; decimal-string precise center (Phase C); BLA deferred (perf optimization, awaits ENH-006 profiler) |
 | ENH-006 | GPU frame profiler (timestamp queries + HUD) | Medium (enables tuning) | Medium (~2 days) | none | **Done** — `GpuProfiler` (`src/renderer/profiler.rs`) + per-pass `timestamp_writes` + EMA HUD (`Shift+G`) + `--profile-dump`/`make profile` (commits `48a4ec0`→`afb8cbe`); degrades cleanly when `TIMESTAMP_QUERY` absent |
-| ENH-005 | Half-resolution bloom pipeline | Medium | Low–Medium (~1 day) | ARC-005 (bloom gating) | Not started (bloom gating done via ARC-005) |
+| ENH-005 | Half-resolution bloom pipeline | Medium | Low–Medium (~1 day) | ARC-005 (bloom gating) | **Done** — 3 bloom textures halved via `Renderer::bloom_size` (`src/renderer/{update,initialization}.rs`); blur self-corrects via `textureDimensions`; A/B pixel-identical (corr 1.0); capture path kept full-res |
 | ENH-004 | Per-fractal pipeline specialization | Medium | Medium (~3 days) | ENH-006 (to measure) | **Partial** — 2D/3D entry-point split done; per-type specialization not |
 | ENH-008 | `encase`-based uniform layout automation | Medium (kills the #1 crash class) | Medium (~2 days) | ARC-010 (offset tests as safety net) | Not started (offset tests landed via ARC-010) |
 
@@ -132,7 +132,29 @@ ENH-006 first). **Effort**: ~3 days.
 
 ### ENH-005 — Half-resolution bloom pipeline
 **Plan**: `docs/fable/ENH-005-half-res-bloom.md`
-**Status (2026-07-17, v0.9.0):** Not started. Bloom is gated off by default (ARC-005), but the extract and both blur passes still run at full scene resolution (`src/renderer/initialization.rs:360-365`, `src/app/render.rs:489-594`); no half/quarter-res downsample of the bloom intermediates.
+**Status (2026-07-19, HEAD `5580784`):** **Done.** The three bloom intermediates
+(`bright`/`blur_temp`/`bloom`) now render at half the surface resolution via a new
+`Renderer::bloom_size(width, height)` helper (`src/renderer/update.rs`), used at both
+the init site (`src/renderer/initialization.rs`) and the resize site
+(`src/renderer/update.rs`); scene + composite stay full-res. The plan's "one real bug
+surface" — stale texel-size uniforms — turned out to be a non-issue in the current code:
+`fs_blur` derives its texel offset from `textureDimensions(t_scene)` of the bound
+(now half-size) texture (`src/shaders/postprocess.wgsl:76-77`), composite upsamples via
+`textureSample` (line 237), extract downsamples via `textureSample` (line 44), and the
+single shared sampler is already `Linear`/`Linear` (`src/renderer/initialization.rs:405-406`)
+— so plan steps 2–4 were automatic no-ops and no shader/uniform/sampler changes were needed.
+**Scoped to the interactive renderer textures only**: the high-res capture path
+(`src/app/capture.rs`, `src/app/capture_web.rs`) keeps full-res bloom, so screenshots and
+goldens are byte-identical (capture = max-quality path). **Verification:** `make checkall`
+green (fmt + clippy + 120 tests, incl. new `bloom_size_floors_and_halves` unit test locking
+the `≥1` floor + odd-dim truncation); `make visual-test` identical with vs. without the
+change (the 3 pre-existing FAILs are unrelated golden drift present on clean HEAD; the 2
+deterministic deep-zoom goldens pass); A/B on an actively-blooming 3D preset (Mandelbox
+Cubic, 1024×768, bloom ON — ENH-006 profiler confirms `bloom_extract`/`bloom_h`/`bloom_v`
+execute at 0.04/0.06/0.08 ms) is pixel-identical (corr 1.0, MAE 0.0); odd window 1101×733
+and the 1×1 worst case (bloom textures floored to 1×1) render with no wgpu validation
+errors. Plan step 5 (threshold tweak) not needed — half-res bloom is bit-identical to
+full-res, so there is no dimming to compensate.
 
 After ARC-005 gates bloom off-by-default cost to zero, make bloom cheap when it IS on: extract and
 blur at half (or quarter) resolution — the standard technique; blur is a low-pass filter, so
