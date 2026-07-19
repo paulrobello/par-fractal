@@ -204,6 +204,10 @@ pub struct UI {
     // Performance tracking
     frame_times: Vec<f32>, // Last N frame times in milliseconds
     max_frame_history: usize,
+    /// ENH-002: mirrors `App::scene_converged` each frame so the performance
+    /// overlay can report whether the fractal pass ran (Active) or was skipped
+    /// because the cached full-quality frame was reused (Idle/Converged).
+    pub scene_converged: bool,
     // Preset UI state
     preset_name: String,
     preset_description: String,
@@ -276,6 +280,7 @@ impl UI {
             command_palette: CommandPalette::new(),
             frame_times: Vec::with_capacity(120),
             max_frame_history: 120,
+            scene_converged: false,
             preset_name: String::new(),
             preset_description: String::new(),
             preset_category: PresetCategory::All,

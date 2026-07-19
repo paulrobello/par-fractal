@@ -92,6 +92,19 @@ pub struct App {
     /// `ControlFlow::Wait` and the app sleeps until the next OS event.
     /// Progressive refinement while idle is ENH-002, NOT this flag.
     scene_dirty: bool,
+    /// ENH-002: Converged fast-path. True when `scene_texture` already holds a
+    /// stable, full-quality frame and no image-affecting change is pending.
+    /// While true, a redraw requested only for UI (egui hover/animation, input
+    /// processing over a static fractal) skips the expensive fractal scene pass
+    /// and re-composites the cached `scene_texture` through the post chain — so
+    /// a deep-zoom view at high iterations no longer re-renders the fractal on
+    /// every mouse-move frame. Set at the end of `render()` once a frame has
+    /// completed with no dirty flag and no continuous animation (which means it
+    /// was rendered at full quality: LOD always restores to ultra when idle, and
+    /// LOD-off is always full quality); cleared by `mark_scene_dirty`. The
+    /// settle-then-refine ramp itself is provided by LOD's restore + ARC-006's
+    /// animation tracking — this flag is the skip-the-stable-pass half of v1.
+    scene_converged: bool,
     /// ARC-006: set by any unprocessed input event (pointer/keyboard/touch/wheel)
     /// and OR'd into the redraw decision. Forces a redraw so egui (and the
     /// fractal) get to process the event. Without this, render-on-demand parks
@@ -112,6 +125,32 @@ pub struct App {
     /// worker when stale + gate-met, and `poll` drains the result. Native
     /// only (no-op stub on wasm — HP path handles deep zoom there).
     perturbation_driver: PerturbationDriver,
+}
+
+/// ENH-002: pure core of the Converged fast-path decision. True when the
+/// cached `scene_texture` holds a stable full-quality frame (`scene_converged`)
+/// and this redraw was requested only for UI, so the fractal scene pass may be
+/// skipped and the post chain can re-composite the cached frame. Any pending
+/// change (`scene_dirty`), continuous animation (LOD ramp, auto-orbit, palette,
+/// camera transition, attractor accumulation, recording), or capture request
+/// forces a fresh full pass. Kept pure so the lifecycle is unit-testable
+/// without a GPU/`App`.
+fn scene_pass_can_be_skipped(
+    scene_converged: bool,
+    scene_dirty: bool,
+    animation_active: bool,
+    capturing: bool,
+) -> bool {
+    scene_converged && !scene_dirty && !animation_active && !capturing
+}
+
+/// ENH-002: pure core of the post-render convergence update. A frame that
+/// renders to completion with no pending change and no continuous animation
+/// leaves `scene_texture` holding a stable full-quality image → Converged
+/// (`true`). Anything still in flight keeps it non-converged so the next frame
+/// re-renders the fractal.
+fn scene_converged_after_frame(scene_dirty: bool, animation_active: bool) -> bool {
+    !scene_dirty && !animation_active
 }
 
 impl App {
@@ -426,6 +465,7 @@ impl App {
             should_exit: false,
             bloom_texture_cleared: false,
             scene_dirty: true,
+            scene_converged: false,
             input_pending: false,
             #[cfg(not(target_arch = "wasm32"))]
             gpu_scan_receiver: None,
@@ -459,6 +499,9 @@ impl App {
     /// `should_render_next_frame`.
     pub fn mark_scene_dirty(&mut self) {
         self.scene_dirty = true;
+        // ENH-002: an image-affecting change invalidates the cached frame —
+        // the fractal pass must run again before UI-only repaints can skip it.
+        self.scene_converged = false;
     }
 
     /// ARC-006: true when something is animating the scene continuously,
@@ -543,9 +586,31 @@ impl App {
         // The input event has now been processed by this render (egui `run`
         // consumed it); clear it so the flag is set fresh by the next event.
         self.input_pending = false;
-        if !self.is_scene_animation_active() {
+        let animation_active = self.is_scene_animation_active();
+        if !animation_active {
             self.scene_dirty = false;
         }
+        // ENH-002: a frame that completes with no pending change and no
+        // continuous animation leaves `scene_texture` holding a stable
+        // full-quality image (LOD restores to ultra when idle; LOD-off is
+        // always full quality) → mark Converged so UI-only repaints can skip
+        // the fractal pass. Animation in flight means the image is still
+        // changing, so stay non-converged.
+        self.scene_converged = scene_converged_after_frame(self.scene_dirty, animation_active);
+    }
+
+    /// ENH-002 v1: whether the fractal scene pass may be skipped this frame.
+    /// True only when the cached `scene_texture` already holds a stable
+    /// full-quality frame (`scene_converged`), nothing has invalidated it
+    /// (`!scene_dirty`, no continuous animation), and no capture needs a fresh
+    /// full pass. Consulted at the top of the fractal-pass block in `render`.
+    pub fn should_skip_scene_pass(&self) -> bool {
+        scene_pass_can_be_skipped(
+            self.scene_converged,
+            self.scene_dirty,
+            self.is_scene_animation_active(),
+            self.save_screenshot || self.save_hires_render.is_some(),
+        )
     }
 
     /// ARC-018: drain the background GPU-enumeration result if it has landed.
@@ -633,5 +698,76 @@ impl App {
                     CameraController::new(self.fractal_params.settings.camera_speed);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod enh_002_tests {
+    //! Tests for the ENH-002 v1 Converged fast-path. The lifecycle is kept in
+    //! pure free functions (`scene_pass_can_be_skipped`,
+    //! `scene_converged_after_frame`) so the transition logic is unit-testable
+    //! without a GPU or an `App`. The `mark_scene_dirty`-clears-convergence
+    //! rule is also pinned here at the contract level.
+    use super::*;
+
+    #[test]
+    fn scene_pass_skipped_only_when_stable_idle_and_not_capturing() {
+        // The one case that skips: converged, no pending change, nothing
+        // animating, no capture in flight — a UI-only repaint over a static
+        // full-quality frame.
+        assert!(scene_pass_can_be_skipped(true, false, false, false));
+
+        // Every other combination forces a fresh fractal pass.
+        assert!(
+            !scene_pass_can_be_skipped(false, false, false, false),
+            "not yet converged → must render"
+        );
+        assert!(
+            !scene_pass_can_be_skipped(true, true, false, false),
+            "pending change (dirty) → must render"
+        );
+        assert!(
+            !scene_pass_can_be_skipped(true, false, true, false),
+            "continuous animation (LOD ramp / orbit / palette) → must render"
+        );
+        assert!(
+            !scene_pass_can_be_skipped(true, false, false, true),
+            "capture (screenshot / hi-res) → must render a fresh full pass"
+        );
+    }
+
+    #[test]
+    fn scene_converges_only_after_a_clean_idle_frame() {
+        // A frame that completes with no pending change and no animation leaves
+        // a stable full-quality image in scene_texture → Converged.
+        assert!(scene_converged_after_frame(false, false));
+
+        // Still dirty (a change arrived during the frame) → keep rendering.
+        assert!(
+            !scene_converged_after_frame(true, false),
+            "dirty after render → not converged"
+        );
+        // Animation in flight (LOD still restoring, auto-orbit, palette,
+        // camera transition, attractor accumulation, recording) → not
+        // converged; the image is still changing.
+        assert!(
+            !scene_converged_after_frame(false, true),
+            "animation active → not converged"
+        );
+        assert!(
+            !scene_converged_after_frame(true, true),
+            "dirty AND animating → not converged"
+        );
+    }
+
+    /// `mark_scene_dirty` must invalidate convergence so the next UI repaint
+    /// can't skip the fractal pass after an image-affecting change. This pins
+    /// the contract at the pure-decision level: once dirty, the skip is false
+    /// regardless of the (stale) converged flag.
+    #[test]
+    fn dirty_change_overrides_prior_convergence() {
+        // Even if `scene_converged` was true a frame ago, a dirty flag (set by
+        // `mark_scene_dirty`) forces the pass to run again.
+        assert!(!scene_pass_can_be_skipped(true, true, false, false));
     }
 }

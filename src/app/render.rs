@@ -74,61 +74,72 @@ impl App {
         let use_accumulation = self.fractal_params.settings.attractor_accumulation_enabled
             && (is_attractor || is_buddhabrot);
 
+        // ENH-002 v1 — Converged fast-path: if scene_texture already holds a
+        // stable full-quality frame and this redraw was requested only for UI
+        // (egui hover/animation/input over a static fractal), skip the fractal
+        // pass entirely. The post chain below re-composites the cached
+        // scene_texture, so a deep-zoom view at high iterations no longer
+        // re-renders on every mouse-move frame. Any image-affecting change,
+        // continuous animation, or capture request forces a fresh full pass.
+        let skip_scene_pass = self.should_skip_scene_pass();
+
         // Pass 1: fractal pass (accumulation compute chain OR the standard scene render).
-        if use_accumulation {
-            self.dispatch_accumulation(&mut encoder);
-        } else {
-            // Multi-pass rendering pipeline
-            // Pass 1: Render fractal to scene_texture
-            {
-                let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: Some("Scene Render Pass"),
-                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: &self.renderer.scene_view,
-                        depth_slice: None,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                            store: wgpu::StoreOp::Store,
-                        },
-                    })],
-                    depth_stencil_attachment: None,
-                    occlusion_query_set: None,
-                    timestamp_writes: None,
-                    multiview_mask: None,
-                });
+        if !skip_scene_pass {
+            if use_accumulation {
+                self.dispatch_accumulation(&mut encoder);
+            } else {
+                // Multi-pass rendering pipeline
+                // Pass 1: Render fractal to scene_texture
+                {
+                    let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        label: Some("Scene Render Pass"),
+                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                            view: &self.renderer.scene_view,
+                            depth_slice: None,
+                            resolve_target: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                                store: wgpu::StoreOp::Store,
+                            },
+                        })],
+                        depth_stencil_attachment: None,
+                        occlusion_query_set: None,
+                        timestamp_writes: None,
+                        multiview_mask: None,
+                    });
 
-                let mut render_pass = render_pass.forget_lifetime();
+                    let mut render_pass = render_pass.forget_lifetime();
 
-                // ARC-009: select 2D vs 3D pipeline by fractal type. Both
-                // pipelines share one layout and uniform bind group.
-                let pipeline = if self.fractal_params.settings.fractal_type.is_3d() {
-                    &self.renderer.pipeline_3d
-                } else {
-                    &self.renderer.pipeline_2d
-                };
-                render_pass.set_pipeline(pipeline);
+                    // ARC-009: select 2D vs 3D pipeline by fractal type. Both
+                    // pipelines share one layout and uniform bind group.
+                    let pipeline = if self.fractal_params.settings.fractal_type.is_3d() {
+                        &self.renderer.pipeline_3d
+                    } else {
+                        &self.renderer.pipeline_2d
+                    };
+                    render_pass.set_pipeline(pipeline);
 
-                // ENH-003: during LOD motion the fractal renders into the
-                // top-left `floor(size*scale)` sub-rect of scene_texture; the
-                // post chain upsamples (scene_uv_scale). The fullscreen-quad
-                // vertices carry NDC uv, so shrinking the viewport scales the
-                // raster without cropping the view. scale==1.0 (idle / LOD off)
-                // leaves the default full-texture viewport — a no-op.
-                let scale = self.renderer.scene_render_scale;
-                if scale < 1.0 {
-                    let w = self.renderer.config.width as f32;
-                    let h = self.renderer.config.height as f32;
-                    let sw = (w * scale).floor().max(1.0);
-                    let sh = (h * scale).floor().max(1.0);
-                    render_pass.set_viewport(0.0, 0.0, sw, sh, 0.0, 1.0);
+                    // ENH-003: during LOD motion the fractal renders into the
+                    // top-left `floor(size*scale)` sub-rect of scene_texture; the
+                    // post chain upsamples (scene_uv_scale). The fullscreen-quad
+                    // vertices carry NDC uv, so shrinking the viewport scales the
+                    // raster without cropping the view. scale==1.0 (idle / LOD off)
+                    // leaves the default full-texture viewport — a no-op.
+                    let scale = self.renderer.scene_render_scale;
+                    if scale < 1.0 {
+                        let w = self.renderer.config.width as f32;
+                        let h = self.renderer.config.height as f32;
+                        let sw = (w * scale).floor().max(1.0);
+                        let sh = (h * scale).floor().max(1.0);
+                        render_pass.set_viewport(0.0, 0.0, sw, sh, 0.0, 1.0);
+                    }
+
+                    render_pass.set_bind_group(0, &self.renderer.uniform_bind_group, &[]);
+                    render_pass.set_vertex_buffer(0, self.renderer.vertex_buffer.slice(..));
+                    render_pass.draw(0..4, 0..1);
                 }
-
-                render_pass.set_bind_group(0, &self.renderer.uniform_bind_group, &[]);
-                render_pass.set_vertex_buffer(0, self.renderer.vertex_buffer.slice(..));
-                render_pass.draw(0..4, 0..1);
             }
-        }
+        } // ENH-002: close `if !skip_scene_pass`
 
         // Passes 2-6: bloom (gated), composite, FXAA/final.
         self.run_post_chain(&mut encoder, &view, use_accumulation);

@@ -197,6 +197,29 @@ impl UI {
                             });
                         }
 
+                        // ENH-002: scene pass state. "Idle" = the cached
+                        // full-quality frame was reused (fractal pass skipped on
+                        // a UI-only repaint); "Active" = the fractal was
+                        // (re)rendered this frame.
+                        ui.horizontal(|ui| {
+                            ui.label(
+                                egui::RichText::new("Scene:")
+                                    .color(egui::Color32::from_rgb(180, 180, 180))
+                                    .size(14.0),
+                            );
+                            let (scene_text, scene_color) = if self.scene_converged {
+                                ("Idle".to_string(), egui::Color32::from_rgb(0, 255, 0))
+                            } else {
+                                ("Active".to_string(), egui::Color32::from_rgb(255, 255, 0))
+                            };
+                            ui.label(
+                                egui::RichText::new(scene_text)
+                                    .color(scene_color)
+                                    .size(14.0)
+                                    .strong(),
+                            );
+                        });
+
                         ui.add_space(8.0);
 
                         // Frame time graph (similar to three.js stats)

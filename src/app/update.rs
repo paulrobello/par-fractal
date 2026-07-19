@@ -25,6 +25,9 @@ impl App {
         // Update frame time for performance overlay
         let frame_time_ms = dt * 1000.0;
         self.ui.update_frame_time(frame_time_ms);
+        // ENH-002: mirror convergence so the performance overlay can show
+        // whether the fractal pass was skipped (Idle) on this frame.
+        self.ui.scene_converged = self.scene_converged;
 
         // Check for delayed screenshot (CLI option)
         if let Some(delay) = self.screenshot_delay {
