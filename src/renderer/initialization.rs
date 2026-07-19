@@ -1028,6 +1028,11 @@ impl Renderer {
             // first frame's write always happens.
             cached_bloom_uniforms: None,
             cached_composite_uniforms: None,
+
+            // ENH-003: render at native resolution until LOD drops the active
+            // quality level (or a capture path overrides it).
+            scene_render_scale: 1.0,
+            render_scale_override: None,
         }
     }
 

@@ -277,11 +277,15 @@ impl UI {
                                                             .on_hover_text("Depth of field sample count")
                                                             .changed();
 
-                                                        // ARC-007: render_scale is a no-op today — the renderer
-                                                        // always renders at native resolution. The slider is hidden
-                                                        // (not deleted) so existing settings keep parsing; the field
-                                                        // is wired up under ENH-003 (dynamic render scale).
-                                                        let _ = preset.render_scale;
+                                                        // ENH-003: render_scale is now applied — the fractal
+                                                        // pass renders into a sub-rect of scene_texture at this
+                                                        // fraction during LOD motion and the post chain upsamples.
+                                                        // 1.0 = native; lower = cheaper interaction, imperceptible
+                                                        // while moving.
+                                                        actions.changed |= ui.add(egui::Slider::new(&mut preset.render_scale, 0.25..=1.0)
+                                                            .text("Render Scale"))
+                                                            .on_hover_text("Resolution multiplier during LOD motion (1.0 = native, 0.5 ≈ 4× faster, imperceptible while moving; full res returns when idle)")
+                                                            .changed();
                                                     });
                                                 }
                                             });
@@ -381,7 +385,7 @@ impl UI {
                                                     ui.label(format!("Shadow Step: {:.2}", quality.shadow_step_factor));
                                                     ui.label(format!("AO Step: {:.2}", quality.ao_step_size));
                                                     ui.label(format!("DOF Samples: {}", quality.dof_samples));
-                                                    ui.label(format!("Render Scale: {:.2} (not yet applied — see ENH-003)", quality.render_scale));
+                                                    ui.label(format!("Render Scale: {:.2}", quality.render_scale));
                                                 });
                                             });
                                         }

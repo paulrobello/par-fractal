@@ -40,7 +40,8 @@ var<uniform> bloom_params: BloomUniforms;
 
 @fragment
 fn fs_bloom_extract(input: VertexOutput) -> @location(0) vec4<f32> {
-    let color = textureSample(t_scene, s_scene, input.tex_coords).rgb;
+    let scene_uv = scene_sample_uv(input.tex_coords, bloom_params.scene_uv_scale);
+    let color = textureSample(t_scene, s_scene, scene_uv).rgb;
     let luminance = dot(color, vec3<f32>(0.2126, 0.7152, 0.0722));
 
     if (luminance > bloom_params.threshold) {
@@ -134,6 +135,23 @@ struct PostProcessUniforms {
 @group(1) @binding(0)
 var<uniform> postfx: PostProcessUniforms;
 
+// ENH-003: remap a pass's [0,1] tex_coords into the sub-rect of `t_scene`
+// (scene_texture) that the fractal pass actually wrote — the top-left
+// `scene_uv_scale` fraction, set when LOD renders the scene pass into a
+// smaller viewport during motion. At full resolution (`scene_uv_scale == 1.0`)
+// this is a bit-for-bit no-op (the input uv is returned unchanged) so idle /
+// LOD-off / golden frames are untouched. Below 1.0 the linear sampler
+// stretches the sub-rect to fill the pass output; the half-texel clamp avoids
+// bleeding the cleared (black) margin beyond the viewport floor.
+fn scene_sample_uv(uv: vec2<f32>, scene_uv_scale: vec2<f32>) -> vec2<f32> {
+    if (all(scene_uv_scale >= vec2<f32>(1.0))) {
+        return uv;
+    }
+    let tex_size = vec2<f32>(textureDimensions(t_scene));
+    let half_texel = vec2<f32>(0.5) / tex_size;
+    return clamp(uv * scene_uv_scale, half_texel, scene_uv_scale - half_texel);
+}
+
 // RGB to HSV conversion
 fn rgb_to_hsv(rgb: vec3<f32>) -> vec3<f32> {
     let cmax = max(max(rgb.r, rgb.g), rgb.b);
@@ -193,7 +211,8 @@ fn hsv_to_rgb(hsv: vec3<f32>) -> vec3<f32> {
 
 @fragment
 fn fs_composite(input: VertexOutput) -> @location(0) vec4<f32> {
-    var color = textureSample(t_scene, s_scene, input.tex_coords).rgb;
+    let scene_uv = scene_sample_uv(input.tex_coords, postfx.scene_uv_scale);
+    var color = textureSample(t_scene, s_scene, scene_uv).rgb;
 
     // Apply color grading FIRST (before bloom, so we don't clamp it)
     // Brightness

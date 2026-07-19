@@ -352,7 +352,13 @@ impl App {
         // Create temporary camera with correct aspect ratio
         let mut temp_camera = self.camera.clone();
         temp_camera.aspect = width as f32 / height as f32;
+        // ENH-003: force full resolution — a capture taken mid-motion (LOD at
+        // reduced render_scale) must still export at native quality. The
+        // override is read once by `update()` and cleared right after so the
+        // restore-update below (and the next normal frame) are unaffected.
+        self.renderer.set_render_scale_override(Some(1.0));
         self.renderer.update(&temp_camera, &self.fractal_params);
+        self.renderer.set_render_scale_override(None);
 
         let mut encoder =
             self.renderer

@@ -108,6 +108,22 @@ impl App {
                     &self.renderer.pipeline_2d
                 };
                 render_pass.set_pipeline(pipeline);
+
+                // ENH-003: during LOD motion the fractal renders into the
+                // top-left `floor(size*scale)` sub-rect of scene_texture; the
+                // post chain upsamples (scene_uv_scale). The fullscreen-quad
+                // vertices carry NDC uv, so shrinking the viewport scales the
+                // raster without cropping the view. scale==1.0 (idle / LOD off)
+                // leaves the default full-texture viewport — a no-op.
+                let scale = self.renderer.scene_render_scale;
+                if scale < 1.0 {
+                    let w = self.renderer.config.width as f32;
+                    let h = self.renderer.config.height as f32;
+                    let sw = (w * scale).floor().max(1.0);
+                    let sh = (h * scale).floor().max(1.0);
+                    render_pass.set_viewport(0.0, 0.0, sw, sh, 0.0, 1.0);
+                }
+
                 render_pass.set_bind_group(0, &self.renderer.uniform_bind_group, &[]);
                 render_pass.set_vertex_buffer(0, self.renderer.vertex_buffer.slice(..));
                 render_pass.draw(0..4, 0..1);

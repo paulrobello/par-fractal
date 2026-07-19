@@ -139,4 +139,16 @@ pub struct Renderer {
     /// ARC-017: cached `PostProcessUniforms` from the last upload; the buffer
     /// write is skipped when the value hasn't changed. `None` until first upload.
     cached_composite_uniforms: Option<uniforms::PostProcessUniforms>,
+
+    /// ENH-003: the render scale in effect for the most recent `update()`,
+    /// read by `App::render` to set the scene-pass viewport. 1.0 = native res;
+    /// <1.0 = the fractal pass renders into the top-left sub-rect of
+    /// `scene_texture` and the post chain upsamples. Driven by LOD's active
+    /// `QualityLevel.render_scale` (so it tracks motion automatically), forced
+    /// to 1.0 for accumulation display and high-resolution capture.
+    pub scene_render_scale: f32,
+    /// ENH-003: when `Some`, forces `scene_render_scale` regardless of LOD —
+    /// used by high-resolution capture / video paths so a capture taken mid-motion
+    /// (LOD at reduced scale) still renders at full quality. `None` in normal use.
+    render_scale_override: Option<f32>,
 }

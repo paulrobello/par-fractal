@@ -858,9 +858,8 @@ impl FractalParams {
                 shadow_step_factor: self.settings.shadow_step_factor,
                 ao_step_size: self.settings.ao_step_size,
                 dof_samples: self.settings.dof_samples,
-                // `render_scale` is unused by the renderer today (see the
-                // deleted `apply_lod_quality` comment in the prior commit);
-                // pass through 1.0 to keep the field well-formed.
+                // LOD is disabled → render at native resolution (render_scale
+                // only takes effect via the LOD-active presets above).
                 render_scale: 1.0,
                 // LOD is disabled — never scale 2D iterations.
                 iteration_scale: 1.0,

@@ -2,6 +2,7 @@ use super::{BloomUniforms, PostProcessUniforms, Renderer};
 use crate::camera::Camera;
 use crate::deep_zoom::{ReferenceOrbit, perturbation_eligible};
 use crate::fractal::FractalParams;
+use crate::renderer::uniforms::scene_uv_scale_for;
 
 /// Update and helper methods
 impl Renderer {
@@ -189,6 +190,15 @@ impl Renderer {
         }
     }
 
+    /// ENH-003: force the render scale used by the next `update()` call —
+    /// `Some(1.0)` makes high-resolution capture / video render at full quality
+    /// regardless of LOD's motion-driven scale; `None` reverts to LOD-driven.
+    /// The override is read once in `update()`; callers restore `None` right
+    /// after so subsequent normal frames are unaffected.
+    pub fn set_render_scale_override(&mut self, scale: Option<f32>) {
+        self.render_scale_override = scale;
+    }
+
     pub fn update(&mut self, camera: &Camera, params: &FractalParams) {
         let time = self.start_time.elapsed().as_secs_f32();
         self.uniforms.update(camera, params, time);
@@ -223,6 +233,28 @@ impl Renderer {
             bytemuck::cast_slice(&[self.uniforms]),
         );
 
+        // ENH-003: resolve the render scale for this frame. LOD's active
+        // QualityLevel.render_scale drives it (so it tracks motion
+        // automatically — lower presets render the scene pass into a sub-rect
+        // of scene_texture and the post chain upsamples). Forced to 1.0 when:
+        //   - a capture path set `render_scale_override` (full-quality output), or
+        //   - accumulation display is active (its display pass writes scene_texture
+        //     at full resolution, so the sub-rect sampling must be a no-op).
+        // `App::render` reads `scene_render_scale` back to set the scene viewport.
+        let scene_render_scale = self.render_scale_override.unwrap_or_else(|| {
+            let is_accumulation = params.settings.attractor_accumulation_enabled
+                && (params.settings.fractal_type.is_2d_attractor()
+                    || params.settings.fractal_type.is_buddhabrot());
+            if is_accumulation {
+                1.0
+            } else {
+                params.effective_quality().render_scale.clamp(0.25, 1.0)
+            }
+        });
+        self.scene_render_scale = scene_render_scale;
+        let scene_uv_scale =
+            scene_uv_scale_for(scene_render_scale, self.config.width, self.config.height);
+
         // ARC-017: gate the post-processing uniform uploads behind change
         // detection. With ARC-006's dirty-flag redraw skipping most frames
         // while idle, the `time`-driven main uniform still has to be rewritten
@@ -234,7 +266,7 @@ impl Renderer {
         let bloom_uniforms = BloomUniforms {
             threshold: params.settings.bloom_threshold,
             intensity: params.settings.bloom_intensity,
-            scene_uv_scale: [1.0, 1.0],
+            scene_uv_scale,
         };
         if self.cached_bloom_uniforms != Some(bloom_uniforms) {
             self.queue.write_buffer(
@@ -264,7 +296,7 @@ impl Renderer {
             bloom_enabled: if params.settings.bloom_enabled { 1 } else { 0 },
             bloom_intensity: params.settings.bloom_intensity,
             _padding2: [0.0; 2],
-            scene_uv_scale: [1.0, 1.0],
+            scene_uv_scale,
             _padding3: [0.0, 0.0],
         };
         if self.cached_composite_uniforms != Some(composite_uniforms) {

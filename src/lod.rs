@@ -72,10 +72,11 @@ pub struct QualityLevel {
     pub dof_samples: u32,
     /// Resolution multiplier (1.0 = native, 0.5 = half res)
     ///
-    /// NOTE: `render_scale` is a UI-exposed no-op today — the renderer always
-    /// renders at native resolution. The field is retained so existing
-    /// settings.yaml files keep parsing and the slider remains visible behind
-    /// a "(not yet applied)" label (see ENH-003 for the wiring plan).
+    /// ENH-003: applied by the renderer — when the LOD-active preset sets this
+    /// below 1.0, the fractal pass renders into a sub-rect of `scene_texture`
+    /// (via `set_viewport`) and the post chain (`scene_uv_scale`) upsamples.
+    /// ~4× fragment-cost reduction at 0.5, imperceptible while moving; full
+    /// resolution returns when idle (LOD restores the ultra preset = 1.0).
     pub render_scale: f32,
     /// ARC-007: 2D iteration multiplier applied to the zoom-bonus-adjusted
     /// iteration count. LOD previously had no lever for the (often dominant)

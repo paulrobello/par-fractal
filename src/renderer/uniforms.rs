@@ -73,6 +73,30 @@ pub(crate) fn perturbation_max_iterations(params: &FractalParams) -> u32 {
         params.settings.max_iterations
     }
 }
+/// ENH-003: the `scene_uv_scale` post-uniform value — the fraction of
+/// `scene_texture` the fractal pass actually wrote — for a given render scale
+/// and full-window pixel size. The fractal pass renders into the top-left
+/// `floor(size * scale)` sub-rect via `set_viewport`; consumers sample only
+/// that sub-rect and let the linear sampler stretch it to fill their output.
+///
+/// Returns `[1.0, 1.0]` at full resolution so the shader's `scene_sample_uv`
+/// is a bit-for-bit no-op (idle / LOD-off / golden frames are untouched).
+/// Below 1.0, returns the FLOORED-pixel ratio `[sw/full_w, sh/full_h]` rather
+/// than the raw float: the viewport floors to integer pixels, so the sampled
+/// region must match that floor exactly or the right/bottom edge shimmers by a
+/// texel. `full_w`/`full_h` are clamped to ≥1 so a zero-size surface (before
+/// the first resize) cannot divide by zero.
+pub(crate) fn scene_uv_scale_for(render_scale: f32, full_w: u32, full_h: u32) -> [f32; 2] {
+    if render_scale >= 1.0 {
+        return [1.0, 1.0];
+    }
+    let full_w = full_w.max(1) as f32;
+    let full_h = full_h.max(1) as f32;
+    let sw = (full_w * render_scale).floor().max(1.0);
+    let sh = (full_h * render_scale).floor().max(1.0);
+    [sw / full_w, sh / full_h]
+}
+
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct Uniforms {
@@ -888,5 +912,35 @@ mod numeric_tests {
         let max_user_iters: u32 = 100_000; // SEC-001 upper bound
         let total = max_user_iters + extreme;
         assert!(total < u32::MAX, "iteration total overflows u32: {total}",);
+    }
+
+    /// ENH-003: `scene_uv_scale_for` must (1) be exactly [1,1] at full
+    /// resolution so idle/golden frames are untouched, (2) round DOWN to the
+    /// floored pixel sub-rect (never exceed the viewport floor — that would
+    /// sample the cleared margin), and (3) survive a zero-size surface without
+    /// dividing by zero.
+    #[test]
+    fn scene_uv_scale_matches_floored_viewport() {
+        // Full resolution is a perfect no-op.
+        assert_eq!(scene_uv_scale_for(1.0, 1920, 1080), [1.0, 1.0]);
+        // Values ≥1.0 clamp to the no-op too (no super-sampling).
+        assert_eq!(scene_uv_scale_for(1.5, 1920, 1080), [1.0, 1.0]);
+
+        // Half scale on 1920×1080: floor(960)=960, floor(540)=540 → exact halves.
+        assert_eq!(scene_uv_scale_for(0.5, 1920, 1080), [0.5, 0.5]);
+
+        // 0.7 on an odd width (1921): floor(1921*0.7)=floor(1344.7)=1344.
+        // 1344/1921 ≈ 0.6996 — strictly less than 0.7 (never exceeds the floor).
+        let [sx, _] = scene_uv_scale_for(0.7, 1921, 1080);
+        assert!(
+            sx < 0.7,
+            "scene_uv_scale.x {sx} must not exceed the raw scale"
+        );
+        assert!(sx > 0.69, "scene_uv_scale.x {sx} lost too much precision");
+        assert_eq!(sx, 1344.0 / 1921.0);
+
+        // Zero-size surface (before first resize) must not panic or produce NaN.
+        let z = scene_uv_scale_for(0.5, 0, 0);
+        assert!(z[0].is_finite() && z[1].is_finite());
     }
 }
