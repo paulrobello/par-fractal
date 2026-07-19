@@ -226,6 +226,8 @@ pub struct UI {
     last_saved_settings: Option<RenderSettings>,
     // Camera bookmarks
     bookmark_name: String,
+    /// Text buffer for the 2D precise-center "Go to" entry (ENH-001 Phase C).
+    precise_center_input: String,
     bookmarks: Vec<String>,
     last_bookmark_list_update: web_time::Instant,
     bookmark_to_delete: Option<String>,
@@ -293,6 +295,7 @@ impl UI {
             max_history_size: 50,
             last_saved_settings: None,
             bookmark_name: String::new(),
+            precise_center_input: String::new(),
             bookmarks: BookmarkGallery::list_bookmarks().unwrap_or_default(),
             last_bookmark_list_update: web_time::Instant::now(),
             bookmark_to_delete: None,

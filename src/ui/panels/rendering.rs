@@ -2,7 +2,41 @@
 //! the core per-fractal/per-mode rendering knobs.
 
 use super::super::{UI, UiActions};
+use crate::deep_zoom::orbit::parse_center_decimal;
 use crate::fractal::{FractalParams, FractalType, ShadingModel};
+
+/// Parse a "Go to" location string into `(re, im, optional zoom)` for the 2D
+/// precise-center entry (ENH-001 Phase C).
+///
+/// Accepted forms: `re, im` and `re, im @ zoom`. Both coordinates are validated
+/// to parse as decimal numbers (via [`parse_center_decimal`]); the returned
+/// strings are the trimmed raw decimals (the driver re-parses them at the
+/// orbit's zoom-derived precision). Returns `None` on any malformed input.
+fn parse_location_input(s: &str) -> Option<(String, String, Option<f64>)> {
+    let s = s.trim();
+    if s.is_empty() {
+        return None;
+    }
+    // Optional " @ zoom" suffix.
+    let (coords, zoom) = match s.split_once('@') {
+        Some((c, z)) => {
+            let z = z.trim().parse::<f64>().ok()?;
+            (c, Some(z))
+        }
+        None => (s, None),
+    };
+    let (re, im) = coords.split_once(',')?;
+    let re = re.trim();
+    let im = im.trim();
+    if re.is_empty() || im.is_empty() {
+        return None;
+    }
+    // Validate both parse as decimal coordinates — any precision suffices here
+    // (the driver re-parses at the orbit's zoom-derived precision at view time).
+    parse_center_decimal(re, 64).ok()?;
+    parse_center_decimal(im, 64).ok()?;
+    Some((re.to_string(), im.to_string(), zoom))
+}
 
 impl UI {
     /// Render the "Shading" collapsing header (3D mode).
@@ -300,8 +334,27 @@ impl UI {
                                                 .changed();
                                         }
 
-                                        ui.label(format!("Center: ({:.6}, {:.6})", params.settings.center_2d[0], params.settings.center_2d[1]))
-                                            .on_hover_text("Current view center (drag to pan)");
+                                        // Center — high precision; shows the exact decimal center when a
+                                        // precise override is active (ENH-001 Phase C).
+                                        let precise_active = params.settings.center_2d_precise.is_some();
+                                        let center_text = match &params.settings.center_2d_precise {
+                                            Some(p) => format!("Center: ({}, {})", p[0], p[1]),
+                                            None => format!(
+                                                "Center: ({:?}, {:?})",
+                                                params.settings.center_2d[0], params.settings.center_2d[1]
+                                            ),
+                                        };
+                                        ui.label(center_text).on_hover_text(format!(
+                                            "Current view center (drag to pan).{}\n\
+                                             Paste a high-precision coordinate below to render zoom past ~1e15 \
+                                             (ENH-001 Phase C perturbation).",
+                                            if precise_active {
+                                                "\n🔒 Precise decimal center active — the reference orbit uses \
+                                                 this exact value; pan / zoom-at-cursor clears it."
+                                            } else {
+                                                ""
+                                            }
+                                        ));
                                         let zoom = params.settings.zoom_2d;
                                         ui.label(format!("Zoom: {}", format_zoom(zoom)))
                                             .on_hover_text(format!(
@@ -322,8 +375,91 @@ impl UI {
                                                     ""
                                                 },
                                             ));
+                                        // Precise-center "Go to" (ENH-001 Phase C): paste "re, im"
+                                        // (optionally "re, im @ zoom") to jump to a high-precision
+                                        // coordinate the f64 mirror cannot represent.
+                                        ui.horizontal(|ui| {
+                                            ui.label("Go to:");
+                                            ui.add(
+                                                egui::TextEdit::singleline(&mut self.precise_center_input)
+                                                    .hint_text("re, im   e.g. -0.743643887037151071, 0.1318259042")
+                                                    .desired_width(200.0),
+                                            );
+                                            if ui
+                                                .button("Set")
+                                                .on_hover_text(
+                                                    "Jump to the pasted coordinate (sets the high-precision center)",
+                                                )
+                                                .clicked()
+                                                && !self.precise_center_input.trim().is_empty()
+                                            {
+                                                match parse_location_input(&self.precise_center_input) {
+                                                    Some((re_s, im_s, zoom)) => {
+                                                        // Mirror into the f64 center so the rest of the app
+                                                        // (panning, display, non-perturbation rendering) sees
+                                                        // the right location; clamp to the f64 band.
+                                                        let re_f = parse_center_decimal(&re_s, 64)
+                                                            .unwrap()
+                                                            .to_f64()
+                                                            .value()
+                                                            .clamp(-1e15, 1e15);
+                                                        let im_f = parse_center_decimal(&im_s, 64)
+                                                            .unwrap()
+                                                            .to_f64()
+                                                            .value()
+                                                            .clamp(-1e15, 1e15);
+                                                        params.settings.center_2d = [re_f, im_f];
+                                                        params.settings.center_2d_precise = Some([re_s, im_s]);
+                                                        if let Some(z) = zoom {
+                                                            params.settings.zoom_2d = z.max(1e-6);
+                                                        }
+                                                        actions.changed = true;
+                                                        self.precise_center_input.clear();
+                                                    }
+                                                    None => {
+                                                        self.show_toast(
+                                                            "Could not parse center. Use: re, im  (e.g. -0.7436, 0.1318)"
+                                                                .to_string(),
+                                                        );
+                                                    }
+                                                }
+                                            }
+                                            if ui
+                                                .button("Copy")
+                                                .on_hover_text("Copy location as 're, im @ zoom'")
+                                                .clicked()
+                                            {
+                                                let (re, im) = match &params.settings.center_2d_precise {
+                                                    Some(p) => (p[0].clone(), p[1].clone()),
+                                                    None => (
+                                                        format!("{:?}", params.settings.center_2d[0]),
+                                                        format!("{:?}", params.settings.center_2d[1]),
+                                                    ),
+                                                };
+                                                ui.ctx().copy_text(format!(
+                                                    "{} {}, @ {}",
+                                                    re,
+                                                    im,
+                                                    format_zoom(params.settings.zoom_2d)
+                                                ));
+                                                self.show_toast("Location copied".to_string());
+                                            }
+                                            if precise_active
+                                                && ui
+                                                    .button("Clear")
+                                                    .on_hover_text(
+                                                        "Drop the precise center; resume f64-precision navigation",
+                                                    )
+                                                    .clicked()
+                                            {
+                                                params.settings.center_2d_precise = None;
+                                                actions.changed = true;
+                                            }
+                                        });
+
                                         if ui.button("Reset View").on_hover_text("Reset center and zoom [R]").clicked() {
                                             params.settings.center_2d = [0.0, 0.0];
+                                            params.settings.center_2d_precise = None;
                                             params.settings.zoom_2d = 1.0;
                                             actions.changed = true;
                                         }
@@ -547,5 +683,43 @@ mod tests {
             deep.len() < 20,
             "deep readout should be compact, got {deep}"
         );
+    }
+
+    // ---- ENH-001 Phase C: precise-center "Go to" input parsing ----
+
+    #[test]
+    fn parse_location_plain_pair() {
+        let (re, im, zoom) = parse_location_input("-0.743643887037151071, 0.1318259042").unwrap();
+        assert_eq!(re, "-0.743643887037151071");
+        assert_eq!(im, "0.1318259042");
+        assert!(zoom.is_none(), "no @ suffix → no zoom");
+    }
+
+    #[test]
+    fn parse_location_with_zoom_suffix() {
+        let (re, im, zoom) = parse_location_input("  -0.5 , 0.0 @ 1e20 ").unwrap();
+        assert_eq!(re, "-0.5");
+        assert_eq!(im, "0.0");
+        assert_eq!(zoom, Some(1e20));
+    }
+
+    #[test]
+    fn parse_location_scientific_coords() {
+        // Coordinates in scientific notation parse (DBig accepts `E`).
+        let (re, im, _) = parse_location_input("1.5e-3, -2e0").unwrap();
+        assert_eq!(re, "1.5e-3");
+        assert_eq!(im, "-2e0");
+    }
+
+    #[test]
+    fn parse_location_rejects_garbage() {
+        assert!(parse_location_input("not a coordinate").is_none());
+        assert!(
+            parse_location_input("-0.7").is_none(),
+            "need both re and im"
+        );
+        assert!(parse_location_input("").is_none());
+        // Bad zoom suffix.
+        assert!(parse_location_input("-0.5, 0.0 @ huge").is_none());
     }
 }

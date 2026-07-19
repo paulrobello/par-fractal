@@ -612,6 +612,9 @@ impl App {
                                     delta_x * 2.0 / self.fractal_params.settings.zoom_2d * aspect;
                                 self.fractal_params.settings.center_2d[1] +=
                                     delta_y * 2.0 / self.fractal_params.settings.zoom_2d;
+                                // Pan moves the center → drop any precise decimal override
+                                // (ENH-001 Phase C); the f64 center is now the source of truth.
+                                self.fractal_params.settings.center_2d_precise = None;
                             }
                             self.last_mouse_pos = Some(current_pos);
                             true
@@ -666,6 +669,9 @@ impl App {
                             delta_x * 2.0 / self.fractal_params.settings.zoom_2d * aspect;
                         self.fractal_params.settings.center_2d[1] +=
                             delta_y * 2.0 / self.fractal_params.settings.zoom_2d;
+                        // Pan moves the center → drop any precise decimal override
+                        // (ENH-001 Phase C); the f64 center is now the source of truth.
+                        self.fractal_params.settings.center_2d_precise = None;
                     }
                     self.last_mouse_pos = Some(current_pos);
                     true

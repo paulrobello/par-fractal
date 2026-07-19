@@ -109,6 +109,7 @@ impl FractalParams {
     /// Reference behavior: matches `src/app/update.rs`'s continuous-zoom path exactly.
     pub fn zoom_at(&mut self, cursor_ndc: (f64, f64), factor: f64, aspect: f64) {
         let old_zoom = self.settings.zoom_2d;
+        let old_center = self.settings.center_2d;
         // Fractal point under the cursor in old coordinates.
         let fx = self.settings.center_2d[0] + (cursor_ndc.0 * 2.0 / old_zoom) * aspect;
         let fy = self.settings.center_2d[1] + cursor_ndc.1 * 2.0 / old_zoom;
@@ -117,6 +118,13 @@ impl FractalParams {
         self.settings.center_2d[0] = fx - (cursor_ndc.0 * 2.0 / new_zoom) * aspect;
         self.settings.center_2d[1] = fy - cursor_ndc.1 * 2.0 / new_zoom;
         self.settings.zoom_2d = new_zoom;
+        // Zoom-at-cursor that moves the center (cursor off-screen-center) navigates
+        // to a new point → drop the precise decimal override (ENH-001 Phase C). A
+        // pure zoom (cursor at center) leaves the center unchanged and keeps it,
+        // so pasting a deep-zoom location then zooming straight in stays precise.
+        if self.settings.center_2d != old_center {
+            self.settings.center_2d_precise = None;
+        }
     }
 
     /// Serialize to the on-disk [`Settings`] representation.
