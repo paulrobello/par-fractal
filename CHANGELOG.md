@@ -47,6 +47,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   A bit-for-bit no-op at scale 1.0 (idle / LOD off / golden frames untouched);
   forced full-res for accumulation display and high-res capture. The slider is
   re-enabled.
+- **GPU frame profiler (ENH-006).** A `GpuProfiler` (`src/renderer/profiler.rs`) wraps every
+  render/compute pass (scene, bloom×3, composite, FXAA, egui, compute accumulation, Buddhabrot
+  copy) in wgpu timestamp queries, reads them back through a 3-deep staging ring (2-frame latency,
+  no pipeline stalls), and reports an EMA-smoothed per-scope ms table. `Features::TIMESTAMP_QUERY`
+  is requested only when the adapter supports it — on wasm or unsupported drivers the profiler is a
+  clean no-op and the HUD shows "timestamp queries unavailable". A new debug overlay
+  (`render_gpu_profile_overlay`) shows per-scope ms, a proportional bar, total GPU ms, and CPU
+  frame ms; toggle it with `Shift+G` or the Settings panel checkbox (the plain-`G` floor toggle is
+  unchanged), and `show_gpu_profile` persists across restarts. A `--profile-dump <path>` CLI flag
+  writes the EMA timings to YAML once after a 120-frame warmup, exposed as `make profile`; the
+  prior Linux `perf`-based `make profile` target is now `make profile-cpu`.
 
 ### Changed
 - `capture_screenshot` honors `--screenshot-path` (no timestamp / toast / auto-open

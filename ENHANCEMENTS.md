@@ -12,13 +12,14 @@
 > ideas below build on that foundation. Ordering assumes the AUDIT Phase 1–2 fixes land first
 > (especially the ARC-002 deep-zoom correctness bundle and ARC-008 LOD ownership).
 
-> **Status — verified 2026-07-18 at HEAD `615fb26`:** ENH-007 (visual regression harness)
+> **Status — verified 2026-07-19 at HEAD `afb8cbe`:** ENH-007 (visual regression harness)
 > shipped complete and was **removed from this list** — its CPU teeth (`tests/reference_math.rs`)
 > and GPU goldens (`tests/golden/`) remain the regression backbone for every remaining item.
-> Of the 7 still open: **3 effectively done (ENH-001, ENH-002, ENH-003); 1 partial
-> (ENH-004); 3 not started (ENH-005, ENH-006, ENH-008).** ENH-001's remaining work
-> (BLA series-approximation) is a deferred perf optimization that awaits the ENH-006
-> profiler, not a correctness gap. Per-item verdicts with file:line evidence appear
+> Of the 7 still open: **3 effectively done (ENH-001, ENH-002, ENH-003); ENH-006 done;
+> 1 partial (ENH-004); 2 not started (ENH-005, ENH-008).** ENH-001's remaining work
+> (BLA series-approximation) is a deferred perf optimization whose prerequisite — the
+> ENH-006 profiler — is now shipped, so BLA can be revisited once per-pixel cost is
+> measured as the bottleneck; it is not a correctness gap. Per-item verdicts with file:line evidence appear
 > under each entry below, and the priority table has a Status column.
 
 ## Priority order
@@ -28,7 +29,7 @@
 | ENH-002 | Progressive refinement + render-on-demand | High | Medium–High (~1 week) | ARC-006/008 fixes | **Done** — v1 Converged fast-path (`1c92fd2`) + v2 tile-progressive refinement (`615fb26`); plan's explicit settle-timer/LOD-bypass steps redundant with LOD's existing restore |
 | ENH-003 | Dynamic resolution scaling (wire `render_scale`) | High | Medium (~2–3 days) | ARC-007/008 fixes | **Done** (commit `6c2079b`) — viewport + `scene_uv_scale` remap; no-op at scale 1.0 |
 | ENH-001 | Perturbation-theory infinite zoom | Transformative | Very High (2–4 weeks) | ARC-001/002 bundle; harness ✓ (ENH-007 shipped) | **Phases A + B + C done** — all 4 kinds; 1e8 golden pinned & deterministic; decimal-string precise center (Phase C); BLA deferred (perf optimization, awaits ENH-006 profiler) |
-| ENH-006 | GPU frame profiler (timestamp queries + HUD) | Medium (enables tuning) | Medium (~2 days) | none | Not started |
+| ENH-006 | GPU frame profiler (timestamp queries + HUD) | Medium (enables tuning) | Medium (~2 days) | none | **Done** — `GpuProfiler` (`src/renderer/profiler.rs`) + per-pass `timestamp_writes` + EMA HUD (`Shift+G`) + `--profile-dump`/`make profile` (commits `48a4ec0`→`afb8cbe`); degrades cleanly when `TIMESTAMP_QUERY` absent |
 | ENH-005 | Half-resolution bloom pipeline | Medium | Low–Medium (~1 day) | ARC-005 (bloom gating) | Not started (bloom gating done via ARC-005) |
 | ENH-004 | Per-fractal pipeline specialization | Medium | Medium (~3 days) | ENH-006 (to measure) | **Partial** — 2D/3D entry-point split done; per-type specialization not |
 | ENH-008 | `encase`-based uniform layout automation | Medium (kills the #1 crash class) | Medium (~2 days) | ARC-010 (offset tests as safety net) | Not started (offset tests landed via ARC-010) |
@@ -140,7 +141,7 @@ Rgba16Float intermediates reclaimed). **Impact**: medium. **Effort**: ~1 day.
 
 ### ENH-006 — GPU frame profiler (timestamp queries + HUD)
 **Plan**: `docs/fable/ENH-006-gpu-profiler-hud.md`
-**Status (2026-07-17, v0.9.0):** Not started. No `TIMESTAMP_QUERY` feature, no query set, no `write_timestamp`, no profiler HUD (the overlay at `src/ui/overlays.rs:131` is FPS-only), and no CSV-dump CLI flag in `src/main.rs`.
+**Status (2026-07-19, HEAD `afb8cbe`):** **Done.** `GpuProfiler` (`src/renderer/profiler.rs`) owns a 32-capacity timestamp `QuerySet`, a 3-deep staging ring for 2-frame-latent readback (no `device.poll(Wait)` in the frame loop), and an EMA (α=0.1) per scope. `Features::TIMESTAMP_QUERY` is requested only when `adapter.features()` contains it (`src/renderer/initialization.rs`) — on wasm / unsupported drivers the profiler is a clean no-op and the HUD reports "timestamp queries unavailable". Every render/compute pass in `src/app/render.rs` and the compute dispatches in `src/renderer/compute.rs` carry pass-level `timestamp_writes` (the portable mechanism, per the plan's pitfall guidance): `compute_accum`, `scene`, `bloom_extract`, `bloom_h`, `bloom_v`, `composite`, `fxaa`, `egui`, plus `buddhabrot_copy` (Buddhabrot mode only — worst case 9 scopes × 2 = 18 queries, within the 32 cap). The HUD (`render_gpu_profile_overlay`, modeled on the LOD overlay) shows per-scope ms + a proportional bar + total GPU ms + CPU frame ms; toggle is `Shift+G` (plain-`G` floor toggle unchanged) or the Settings checkbox, and `show_gpu_profile` persists (`#[serde(default)]`). Agent dump: `--profile-dump <path>` writes the EMA map to YAML once at frame ≥ 120 (`src/app/update.rs`), exposed as `make profile` (the old Linux `perf` target is now `make profile-cpu`). Unit tests cover ring-slot rotation, EMA math, and `process_bytes` byte→scope pairing; `make checkall` green; `make profile` verified producing `target/profile.yaml` (scene pass dominates, bloom absent when off). This ships the per-pixel-cost measurement ENH-001's deferred BLA re-evaluation needs.
 
 Every performance decision above is currently guesswork — the app has an FPS counter but no
 per-pass timing. wgpu exposes `Features::TIMESTAMP_QUERY`; wrap each pass (fractal, bloom×3,
