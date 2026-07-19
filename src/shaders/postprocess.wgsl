@@ -319,7 +319,8 @@ struct AccumulationDisplayUniforms {
     log_scale: f32,
     gamma: f32,
     palette_offset: f32,
-    _padding: f32,
+    // ENH-008: 4 bytes of implicit padding aligns the `array<vec4<f32>, 8>`
+    // palette to its 16-byte element stride (formerly an explicit `_padding`).
     palette: array<vec4<f32>, 8>,
 }
 

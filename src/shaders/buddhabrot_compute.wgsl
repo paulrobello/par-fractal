@@ -33,7 +33,6 @@ struct Uniforms {
     total_iterations: u32,
     clear_accumulation: u32,
     min_iterations: u32,  // Minimum iterations for a trajectory to be plotted
-    _padding: u32,
 }
 
 // Atomic storage buffer for thread-safe accumulation

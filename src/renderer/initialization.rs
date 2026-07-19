@@ -785,10 +785,11 @@ impl Renderer {
 
         // Create uniform buffer for accumulation display
         let accumulation_display_uniforms = AccumulationDisplayUniforms::default();
+        let display_bytes = write_uniform_bytes(&accumulation_display_uniforms);
         let accumulation_display_uniform_buffer =
             device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("Accumulation Display Uniform Buffer"),
-                contents: bytemuck::cast_slice(&[accumulation_display_uniforms]),
+                contents: &display_bytes,
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             });
 

@@ -451,7 +451,6 @@ impl App {
                         as u32,
                     clear_accumulation: 0,
                     min_iterations: min_iter,
-                    _padding: 0,
                 };
                 compute.update_uniforms(&self.renderer.queue);
 
@@ -530,7 +529,6 @@ impl App {
                     total_iterations: (self.fractal_params.accum.total_iterations & 0xFFFF_FFFF)
                         as u32,
                     clear_accumulation: 0,
-                    _padding: [0; 2],
                 };
                 compute.update_uniforms(&self.renderer.queue);
 
@@ -573,16 +571,16 @@ impl App {
             log_scale: self.fractal_params.settings.attractor_log_scale,
             gamma: 0.6,
             palette_offset: self.fractal_params.settings.palette_offset,
-            _padding: 0.0,
             palette: std::array::from_fn(|i| {
                 let c = palette_colors[i];
-                [c.x, c.y, c.z, 1.0]
+                glam::Vec4::new(c.x, c.y, c.z, 1.0)
             }),
         };
+        let display_bytes = write_uniform_bytes(&display_uniforms);
         self.renderer.queue.write_buffer(
             &self.renderer.accumulation_display_uniform_buffer,
             0,
-            bytemuck::cast_slice(&[display_uniforms]),
+            &display_bytes,
         );
 
         // Render accumulation texture to scene_texture with log scaling

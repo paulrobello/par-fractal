@@ -32,7 +32,6 @@ struct Uniforms {
     // Accumulation control
     total_iterations: u32,
     clear_accumulation: u32,
-    _padding: vec2<u32>,
 }
 
 @group(0) @binding(0)

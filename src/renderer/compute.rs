@@ -23,19 +23,18 @@
 //! compute/copy shaders live in `src/shaders/` (`attractor_compute.wgsl`,
 //! `attractor_display.wgsl`, `buddhabot_compute.wgsl`, `buddhabot_copy.wgsl`).
 
-use bytemuck::{Pod, Zeroable};
+use super::uniforms::write_uniform_bytes;
+use encase::ShaderType;
 use wgpu::util::DeviceExt;
 
 /// Uniforms for the accumulation display shader
-#[repr(C)]
-#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+#[derive(Debug, Clone, Copy, encase::ShaderType)]
 pub struct AccumulationDisplayUniforms {
     pub log_scale: f32,
     pub gamma: f32,
     pub palette_offset: f32,
-    pub _padding: f32,
-    /// 8 palette colors, each as [r, g, b, a] (alpha unused but needed for alignment)
-    pub palette: [[f32; 4]; 8],
+    /// 8 palette colors; maps to the WGSL `array<vec4<f32>, 8>`.
+    pub palette: [glam::Vec4; 8],
 }
 
 impl Default for AccumulationDisplayUniforms {
@@ -44,25 +43,23 @@ impl Default for AccumulationDisplayUniforms {
             log_scale: 1.0,
             gamma: 0.6,
             palette_offset: 0.0,
-            _padding: 0.0,
             // Default fire palette (8 colors)
             palette: [
-                [0.0, 0.0, 0.0, 1.0],   // Black
-                [0.25, 0.0, 0.25, 1.0], // Deep purple
-                [0.5, 0.0, 0.5, 1.0],   // Purple
-                [0.75, 0.0, 0.25, 1.0], // Magenta
-                [1.0, 0.0, 0.0, 1.0],   // Red
-                [1.0, 0.5, 0.0, 1.0],   // Orange
-                [1.0, 0.75, 0.0, 1.0],  // Light orange
-                [1.0, 1.0, 0.0, 1.0],   // Yellow
+                glam::Vec4::new(0.0, 0.0, 0.0, 1.0),   // Black
+                glam::Vec4::new(0.25, 0.0, 0.25, 1.0), // Deep purple
+                glam::Vec4::new(0.5, 0.0, 0.5, 1.0),   // Purple
+                glam::Vec4::new(0.75, 0.0, 0.25, 1.0), // Magenta
+                glam::Vec4::new(1.0, 0.0, 0.0, 1.0),   // Red
+                glam::Vec4::new(1.0, 0.5, 0.0, 1.0),   // Orange
+                glam::Vec4::new(1.0, 0.75, 0.0, 1.0),  // Light orange
+                glam::Vec4::new(1.0, 1.0, 0.0, 1.0),   // Yellow
             ],
         }
     }
 }
 
 /// Uniforms for the attractor compute shader
-#[repr(C)]
-#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+#[derive(Debug, Clone, Copy, encase::ShaderType)]
 pub struct AttractorComputeUniforms {
     // Attractor parameters (from julia_c, power, etc.)
     pub param_a: f32,
@@ -85,12 +82,10 @@ pub struct AttractorComputeUniforms {
     // Accumulation control
     pub total_iterations: u32,
     pub clear_accumulation: u32,
-    pub _padding: [u32; 2],
 }
 
 /// Uniforms for the Buddhabrot compute shader
-#[repr(C)]
-#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+#[derive(Debug, Clone, Copy, encase::ShaderType)]
 pub struct BuddhabrotComputeUniforms {
     // View transform
     pub center_x: f32,
@@ -108,7 +103,6 @@ pub struct BuddhabrotComputeUniforms {
     pub total_iterations: u32,
     pub clear_accumulation: u32,
     pub min_iterations: u32, // Minimum iterations for trajectory to be plotted
-    pub _padding: u32,
 }
 
 impl Default for BuddhabrotComputeUniforms {
@@ -125,7 +119,6 @@ impl Default for BuddhabrotComputeUniforms {
             total_iterations: 0,
             clear_accumulation: 1,
             min_iterations: 20, // Filter out short trajectories
-            _padding: 0,
         }
     }
 }
@@ -147,7 +140,6 @@ impl Default for AttractorComputeUniforms {
             attractor_type: 0, // Hopalong
             total_iterations: 0,
             clear_accumulation: 1,
-            _padding: [0; 2],
         }
     }
 }
@@ -477,7 +469,7 @@ impl AttractorComputePipeline {
         let uniforms = AttractorComputeUniforms::default();
         let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Attractor Compute Uniform Buffer"),
-            size: std::mem::size_of::<AttractorComputeUniforms>() as u64,
+            size: AttractorComputeUniforms::min_size().get(),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -502,11 +494,8 @@ impl AttractorComputePipeline {
 
     /// Update the uniform buffer with current parameters.
     pub fn update_uniforms(&mut self, queue: &wgpu::Queue) {
-        queue.write_buffer(
-            &self.uniform_buffer,
-            0,
-            bytemuck::cast_slice(&[self.uniforms]),
-        );
+        let bytes = write_uniform_bytes(&self.uniforms);
+        queue.write_buffer(&self.uniform_buffer, 0, &bytes);
     }
 
     /// Dispatch the compute shader to accumulate attractor points.
@@ -605,7 +594,7 @@ impl BuddhabrotComputePipeline {
         let uniforms = BuddhabrotComputeUniforms::default();
         let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Buddhabrot Compute Uniform Buffer"),
-            size: std::mem::size_of::<BuddhabrotComputeUniforms>() as u64,
+            size: BuddhabrotComputeUniforms::min_size().get(),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -630,11 +619,8 @@ impl BuddhabrotComputePipeline {
 
     /// Update the uniform buffer with current parameters.
     pub fn update_uniforms(&mut self, queue: &wgpu::Queue) {
-        queue.write_buffer(
-            &self.uniform_buffer,
-            0,
-            bytemuck::cast_slice(&[self.uniforms]),
-        );
+        let bytes = write_uniform_bytes(&self.uniforms);
+        queue.write_buffer(&self.uniform_buffer, 0, &bytes);
     }
 
     /// Dispatch the compute shader to accumulate Buddhabrot points.
@@ -660,5 +646,35 @@ impl BuddhabrotComputePipeline {
         compute_pass.set_bind_group(1, &self.uniform_bind_group, &[]);
         // Each workgroup (256 threads) tests samples_per_thread samples each
         compute_pass.dispatch_workgroups(num_workgroups, 1, 1);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// ENH-008: `AccumulationDisplayUniforms` derives `encase::ShaderType`. Lock
+    /// the layout: 3 scalars, 4B implicit pad, then `array<vec4<f32>, 8>` (16B
+    /// stride) starting at @16; total 144B. Pins the palette offset + stride.
+    #[test]
+    fn accumulation_display_uniform_byte_layout() {
+        let u = AccumulationDisplayUniforms {
+            log_scale: 1.0,
+            gamma: 2.0,
+            palette_offset: 3.0,
+            palette: std::array::from_fn(|i| glam::Vec4::new(i as f32, 0.0, 0.0, 1.0)),
+        };
+        let bytes = write_uniform_bytes(&u);
+        assert_eq!(bytes.len(), 144);
+        let f = |o: usize| f32::from_le_bytes(bytes[o..o + 4].try_into().unwrap());
+        assert_eq!(f(0), 1.0); // log_scale
+        assert_eq!(f(4), 2.0); // gamma
+        assert_eq!(f(8), 3.0); // palette_offset
+        // 12..16 implicit pad aligns the array<vec4<f32>, 8> to 16B stride
+        assert_eq!(f(16), 0.0); // palette[0].x (i=0)
+        assert_eq!(f(28), 1.0); // palette[0].w
+        assert_eq!(f(32), 1.0); // palette[1].x (i=1)
+        assert_eq!(f(128), 7.0); // palette[7].x (16 + 7*16)
+        assert_eq!(f(140), 1.0); // palette[7].w
     }
 }
