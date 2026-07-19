@@ -176,3 +176,149 @@ descriptor construction and own the staging-ring lifecycle.
 - The profiler allocates one extra scope (`"buddhabrot_copy"`) beyond the
   brief's 8 named scopes, used only in Buddhabrot-accumulation mode. Max
   simultaneous queries: 9 scopes × 2 = 18, well within the 32-query capacity.
+
+## Fix round 1
+
+Applied the Task-1 reviewer's one Important + one Minor finding. No structural
+deviation from the suggested shape; field/method names match the existing code.
+
+### Fix 1 (Important) — `ring_scopes[slot]` overwrite no longer races the `slot_mapped` safety net
+
+In `end_frame`, the unconditional `self.ring_scopes[slot] = self.frame_scopes.borrow_mut().drain(..).collect();`
+ran even when the `!slot_mapped[slot]` guard had skipped the `resolve_query_set`
++ `copy_buffer_to_buffer`. When an outstanding `map_async` callback lagged past
+~3 frames, the staging buffer still held the *old* frame's bytes while the name
+list was overwritten with the *current* frame's scopes; the delayed callback
+would then pair stale bytes with fresh names → silently mislabeled timings.
+
+**Hunk applied** to `src/renderer/profiler.rs` (`end_frame`):
+
+```diff
+@@
+         if used > 0 && !self.slot_mapped[slot] {
+             if let (Some(query_set), Some(resolve_buf), Some(staging)) = (
+                 self.query_set.as_ref(),
+                 self.resolve_buf.as_ref(),
+                 self.staging[slot].as_ref(),
+             ) {
+                 encoder.resolve_query_set(query_set, 0..used, resolve_buf, 0);
+                 encoder.copy_buffer_to_buffer(/* … */);
+             }
+-        } else if used > 0 && self.slot_mapped[slot] {
+-            log::debug!(
+-                "GpuProfiler: skipping copy for slot {slot} (still mapped); no data this frame"
+-            );
++            self.ring_scopes[slot] = self.frame_scopes.borrow_mut().drain(..).collect();
++        } else {
++            // Drop this frame's scope names without overwriting the ring
++            // slot's saved names (which still match the in-flight bytes).
++            self.frame_scopes.borrow_mut().clear();
++            if used > 0 && self.slot_mapped[slot] {
++                log::debug!(
++                    "GpuProfiler: skipping copy for slot {slot} (still mapped); no data this frame"
++                );
++            }
+         }
+-
+-        // (3) Save this frame's scope names into the ring slot so a later
+-        // `poll_results` can pair query results with names. Then reset the
+-        // per-frame allocator.
+-        self.ring_scopes[slot] = self.frame_scopes.borrow_mut().drain(..).collect();
++        // (3) Reset the per-frame allocator.
+         self.next_index.set(0);
+         self.frame_idx.set(self.frame_idx.get() + 1);
+```
+
+Net effect: `ring_scopes[slot]` is overwritten *only* in the branch that
+actually performed the copy. The else branch `clear()`s `frame_scopes` so the
+per-frame Vec doesn't grow across frames, and the existing `log::debug` for the
+mapped-slot case is preserved verbatim. No renames, no other refactors.
+
+### Fix 2 (Minor) — unit tests for `process_bytes`
+
+`process_bytes` is a private free fn in the same module, so the existing
+`#[cfg(test)] mod tests` (which already does `use super::*;`) reaches it
+directly — no refactor needed. Added two tests next to the EMA/ring helpers:
+
+1. `test_process_bytes_pairs_scopes_to_durations` — the requested 2-scope
+   fixture (32 bytes of u64 timestamp pairs), `period = 1.0`. Assertions:
+
+   - `timings["scene"] == 0.001` (1_000 ticks × 1.0 ns/tick / 1_000_000)
+   - `timings["post"]  == 0.002` (2_000 ticks × 1.0 ns/tick / 1_000_000)
+   - `timings.len() == 2` (no spurious entries)
+
+2. `test_process_bytes_skips_zero_pair_and_respects_scope_count` — covers the
+   zero-pair skip and the `scope_count` bound the reviewer called out. A 48-byte
+   buffer holds 3 scope lanes; `scope_count = 2`. Lane 0 is all-zero (skipped),
+   lane 1 is the only non-zero pair, lane 2 is non-zero but past the bound.
+   Assertions:
+
+   - `!timings.contains_key("scene")` (zero-pair skipped, EMA not seeded)
+   - `timings["post"] == 0.002` (2_000 ticks = 500 → 2_500)
+   - `!timings.contains_key("extra")` (3rd lane past `scope_count` not read)
+   - `timings.len() == 1`
+
+### Verification
+
+**1. `cargo test --lib profiler`** — 10 passed, 0 failed (8 pre-existing + 2 new):
+
+```
+running 10 tests
+test renderer::profiler::tests::test_query_budget_enforced ... ok
+test renderer::profiler::tests::test_ring_read_slot_after_increment ... ok
+test renderer::profiler::tests::test_ring_slot_rotation ... ok
+test renderer::profiler::tests::test_disabled_profiler_state ... ok
+test renderer::profiler::tests::test_ema_first_sample_seeds ... ok
+test renderer::profiler::tests::test_process_bytes_pairs_scopes_to_durations ... ok
+test renderer::profiler::tests::test_process_bytes_skips_zero_pair_and_respects_scope_count ... ok
+test renderer::profiler::tests::test_ema_one_step_toward_new_sample ... ok
+test renderer::profiler::tests::test_ema_is_stable_under_steady_input ... ok
+test renderer::profiler::tests::test_ema_converges_to_steady_input ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 100 filtered out; finished in 0.00s
+```
+
+**2. `make checkall`** — green. Tail:
+
+```
+running 9 tests
+test far_point_escapes_immediately ... ok
+... (all 9 deep-zoom / decimal-float tests pass)
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+Running Rust linters and auto-fixing issues...
+cargo clippy --all-targets --all-features --fix --allow-dirty --allow-staged -- -D warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 9.46s
+cargo fmt
+
+======================================================================
+  Lint complete! (auto-fixed)
+======================================================================
+
+======================================================================
+  All code quality checks passed!
+======================================================================
+
+Summary:
+  ✓ Rust tests
+  ✓ Rust format (auto-fixed)
+  ✓ Rust lint (clippy auto-fixed)
+```
+
+**3. `cargo build --release`** — succeeded:
+
+```
+   Compiling par-fractal v0.9.0 (/Users/probello/Repos/par-fractal)
+    Finished `release` profile [optimized] target(s) in 1m 17s
+```
+
+### Notes
+
+- A first run of the zero-pair test failed on a fixture bug: I had initially
+  placed scope-1's timestamp pair at byte offsets 24..40, but `process_bytes`
+  lays each scope in a contiguous 16-byte lane (scope `i` at `[i*16 .. i*16+16]`),
+  so scope 1 actually lives at bytes 16..31. Corrected the offsets; test passes.
+  Recorded here so the miscalculation is visible, not hidden.

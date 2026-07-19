@@ -256,6 +256,12 @@ impl GpuProfiler {
         // (2) Resolve + copy. Skip when there's nothing to read or when the
         // target slot is still awaiting its `map_async` callback (rare safety
         // net — drops one data point rather than panicking wgpu).
+        //
+        // Only save `frame_scopes` into `ring_scopes[slot]` when we actually
+        // performed the copy — otherwise a still-mapped slot still holds the
+        // *old* frame's bytes, and overwriting the name list here would pair
+        // those stale bytes with fresh names when the delayed `map_async`
+        // callback eventually fires (silently mislabeled timings).
         if used > 0 && !self.slot_mapped[slot] {
             if let (Some(query_set), Some(resolve_buf), Some(staging)) = (
                 self.query_set.as_ref(),
@@ -271,16 +277,19 @@ impl GpuProfiler {
                     u64::from(used) * u64::from(wgpu::QUERY_SIZE),
                 );
             }
-        } else if used > 0 && self.slot_mapped[slot] {
-            log::debug!(
-                "GpuProfiler: skipping copy for slot {slot} (still mapped); no data this frame"
-            );
+            self.ring_scopes[slot] = self.frame_scopes.borrow_mut().drain(..).collect();
+        } else {
+            // Drop this frame's scope names without overwriting the ring
+            // slot's saved names (which still match the in-flight bytes).
+            self.frame_scopes.borrow_mut().clear();
+            if used > 0 && self.slot_mapped[slot] {
+                log::debug!(
+                    "GpuProfiler: skipping copy for slot {slot} (still mapped); no data this frame"
+                );
+            }
         }
 
-        // (3) Save this frame's scope names into the ring slot so a later
-        // `poll_results` can pair query results with names. Then reset the
-        // per-frame allocator.
-        self.ring_scopes[slot] = self.frame_scopes.borrow_mut().drain(..).collect();
+        // (3) Reset the per-frame allocator.
         self.next_index.set(0);
         self.frame_idx.set(self.frame_idx.get() + 1);
     }
@@ -553,5 +562,76 @@ mod tests {
         }
         // Should still be 5.0 to within float tolerance.
         assert!((timings["fxaa"] - 5.0).abs() < 1e-5);
+    }
+
+    /// `process_bytes` parses 2 scopes' worth of timestamp pairs (32 bytes of
+    /// `u64`s) into ms durations, pairs each with its scope name, and seeds
+    /// the EMA. `period = 1.0` ns/tick keeps the arithmetic obvious:
+    /// ms = ticks / 1_000_000.
+    #[test]
+    fn test_process_bytes_pairs_scopes_to_durations() {
+        let qsize = wgpu::QUERY_SIZE as usize;
+        assert_eq!(qsize, 8, "fixture assumes 8-byte timestamp queries");
+
+        // 2 scopes × 2 queries × 8 bytes = 32 bytes.
+        let mut buf = vec![0u8; 2 * 2 * qsize];
+        // Scope "scene": start=1_000, end=2_000 → 1_000 ticks.
+        buf[0..qsize].copy_from_slice(&1_000u64.to_le_bytes());
+        buf[qsize..2 * qsize].copy_from_slice(&2_000u64.to_le_bytes());
+        // Scope "post": start=3_000, end=5_000 → 2_000 ticks.
+        buf[2 * qsize..3 * qsize].copy_from_slice(&3_000u64.to_le_bytes());
+        buf[3 * qsize..4 * qsize].copy_from_slice(&5_000u64.to_le_bytes());
+
+        let scopes = ["scene", "post"];
+        let mut timings = HashMap::new();
+        process_bytes(&mut timings, &scopes, scopes.len(), 1.0, &buf);
+
+        // 1_000 ticks × 1.0 ns/tick / 1_000_000 = 0.001 ms.
+        assert!(
+            (timings["scene"] - 0.001).abs() < 1e-9,
+            "scene should be 0.001 ms, got {}",
+            timings["scene"]
+        );
+        // 2_000 ticks × 1.0 ns/tick / 1_000_000 = 0.002 ms.
+        assert!(
+            (timings["post"] - 0.002).abs() < 1e-9,
+            "post should be 0.002 ms, got {}",
+            timings["post"]
+        );
+        // No spurious entries — only the 2 named scopes.
+        assert_eq!(timings.len(), 2);
+    }
+
+    /// `process_bytes` skips pairs where both timestamps are 0 (an unwritten
+    /// query, e.g. a conditionally-skipped pass) so they don't drag the EMA
+    /// toward zero, and bounds the parse loop at `scope_count` even when the
+    /// buffer holds additional bytes.
+    #[test]
+    fn test_process_bytes_skips_zero_pair_and_respects_scope_count() {
+        let qsize = wgpu::QUERY_SIZE as usize;
+        // 3 scopes worth of bytes (48 bytes), but only 2 scopes declared.
+        // Each scope occupies a contiguous 16-byte lane: scope i lives at
+        // bytes `[i*16 .. i*16+16]` (start = first 8, end = second 8).
+        let mut buf = vec![0u8; 3 * 2 * qsize];
+        // Scope 0 ("scene") at bytes 0..15: both zero → skipped entirely.
+        // Scope 1 ("post") at bytes 16..31: start=500, end=2_500 → 2_000 ticks.
+        buf[2 * qsize..3 * qsize].copy_from_slice(&500u64.to_le_bytes());
+        buf[3 * qsize..4 * qsize].copy_from_slice(&2_500u64.to_le_bytes());
+        // Scope 2 ("extra") at bytes 32..47: non-zero but past scope_count →
+        // must not be read.
+        buf[4 * qsize..5 * qsize].copy_from_slice(&9_000u64.to_le_bytes());
+
+        let scopes = ["scene", "post", "extra"];
+        let mut timings = HashMap::new();
+        // scope_count = 2: the loop must not look at the 3rd pair.
+        process_bytes(&mut timings, &scopes, 2, 1.0, &buf);
+
+        // "scene" was a zero-pair → never inserted.
+        assert!(!timings.contains_key("scene"));
+        // "post" → 2_000 ticks = 0.002 ms.
+        assert!((timings["post"] - 0.002).abs() < 1e-9);
+        // "extra" past the bound → never read.
+        assert!(!timings.contains_key("extra"));
+        assert_eq!(timings.len(), 1);
     }
 }
