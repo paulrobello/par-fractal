@@ -1,7 +1,7 @@
 use super::{
     AccumulationDisplayUniforms, AccumulationTexture, AttractorComputePipeline, BloomUniforms,
     BlurUniforms, BuddhabrotAccumulationBuffer, BuddhabrotComputePipeline, GpuInfo, OrbitBuffer,
-    PostProcessUniforms, Renderer, Uniforms,
+    PostProcessUniforms, Renderer, Uniforms, write_uniform_bytes,
 };
 use wgpu::util::DeviceExt;
 
@@ -442,11 +442,12 @@ impl Renderer {
         let bloom_uniforms = BloomUniforms {
             threshold: 0.7,
             intensity: 0.5,
-            scene_uv_scale: [1.0, 1.0],
+            scene_uv_scale: glam::Vec2::new(1.0, 1.0),
         };
+        let bloom_bytes = write_uniform_bytes(&bloom_uniforms);
         let bloom_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Bloom Uniform Buffer"),
-            contents: bytemuck::cast_slice(&[bloom_uniforms]),
+            contents: &bloom_bytes,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 

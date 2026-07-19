@@ -97,6 +97,25 @@ pub(crate) fn scene_uv_scale_for(render_scale: f32, full_w: u32, full_h: u32) ->
     [sw / full_w, sh / full_h]
 }
 
+/// ENH-008: serialize a `ShaderType` value into WGSL-uniform-layout bytes via
+/// encase. Replaces `bytemuck::cast_slice(&[value])` at every uniform upload
+/// site for structs that have migrated to `#[derive(encase::ShaderType)]`.
+///
+/// One-shot `Vec<u8>` per call. The per-frame uploads (main `Uniforms`,
+/// bloom/composite post uniforms) run at most once per rendered frame and
+/// ENH-002 skips re-render while idle, so this is not on a tight inner loop;
+/// if profiling later flags it, switch the hot callers to a reused scratch
+/// `UniformBuffer`.
+pub(super) fn write_uniform_bytes<T>(value: &T) -> Vec<u8>
+where
+    T: encase::ShaderType + encase::internal::WriteInto,
+{
+    let mut buf = encase::UniformBuffer::new(Vec::<u8>::new());
+    buf.write(value)
+        .expect("encase uniform layout write failed");
+    buf.into_inner()
+}
+
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct Uniforms {
@@ -674,17 +693,24 @@ const _: () = assert!(
     "Uniforms struct must be exactly 896 bytes"
 );
 
-// Post-processing uniform structs
-#[repr(C)]
-#[derive(Copy, Clone, Debug, PartialEq, Pod, Zeroable)]
+// Post-processing uniform structs.
+//
+// ENH-008: these derive `encase::ShaderType` instead of the prior `#[repr(C)]
+// + bytemuck` hand-layout. encase computes WGSL-correct uniform layout
+// (alignment + trailing padding) from the field types, so the explicit
+// `_padding_*` fields are gone from both Rust and WGSL. vec/mat fields use glam
+// types (glam's `encase` feature provides the `ShaderType` impls), because
+// encase maps `[f32; N]` to a WGSL `array<f32, N>` (16-byte stride in uniform
+// address space), not a `vecN<f32>`. Upload sites call `write_uniform_bytes`
+// (encase `UniformBuffer::write`) instead of `bytemuck::cast_slice`.
+#[derive(Copy, Clone, Debug, PartialEq, encase::ShaderType)]
 pub(super) struct BloomUniforms {
     pub(super) threshold: f32,
     pub(super) intensity: f32,
     /// ENH-003: fraction of `scene_texture` the fractal pass actually wrote
     /// (sub-rect viewport during LOD motion). `[1.0, 1.0]` at full resolution
-    /// — the bloom-extract shader's `scene_sample_uv` is a no-op then. Repurposes
-    /// the prior `_padding` slot, so the struct stays 16 bytes.
-    pub(super) scene_uv_scale: [f32; 2],
+    /// — the bloom-extract shader's `scene_sample_uv` is a no-op then.
+    pub(super) scene_uv_scale: glam::Vec2,
 }
 
 #[repr(C)]
@@ -724,7 +750,7 @@ impl BloomUniforms {
         Self {
             threshold: params.settings.bloom_threshold,
             intensity: params.settings.bloom_intensity,
-            scene_uv_scale,
+            scene_uv_scale: scene_uv_scale.into(),
         }
     }
 }
@@ -824,13 +850,36 @@ mod layout_tests {
     /// ENH-003: lock the post-processing uniform layouts. `scene_uv_scale`
     /// repurposes pre-existing padding, so the struct sizes must NOT change
     /// (16B / 64B) and the new field lands at the documented offset.
+    /// Read an f32 at a byte offset (little-endian) from serialized uniform
+    /// bytes — used by the ENH-008 byte-pattern layout tests.
+    fn f32_at(bytes: &[u8], offset: usize) -> f32 {
+        f32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap())
+    }
+
+    /// ENH-008: `BloomUniforms` now derives `encase::ShaderType`. Lock its GPU
+    /// layout by serializing sentinel values and checking they land at the
+    /// WGSL-documented offsets (threshold@0, intensity@4, scene_uv_scale@8,
+    /// total 16B). A byte-pattern test is stronger than `offset_of!` here: it
+    /// proves the bytes the GPU receives match the WGSL struct, not just the
+    /// Rust struct's in-memory layout (which glam/encase may pad differently).
+    #[test]
+    fn bloom_uniform_byte_layout() {
+        let bloom = BloomUniforms {
+            threshold: 1.0,
+            intensity: 2.0,
+            scene_uv_scale: glam::Vec2::new(3.0, 4.0),
+        };
+        let bytes = write_uniform_bytes(&bloom);
+        assert_eq!(bytes.len(), 16);
+        assert_eq!(f32_at(&bytes, 0), 1.0);
+        assert_eq!(f32_at(&bytes, 4), 2.0);
+        assert_eq!(f32_at(&bytes, 8), 3.0);
+        assert_eq!(f32_at(&bytes, 12), 4.0);
+    }
+
     #[test]
     fn post_uniform_layout_contract() {
-        assert_eq!(std::mem::size_of::<BloomUniforms>(), 16);
-        assert_eq!(offset_of!(BloomUniforms, threshold), 0);
-        assert_eq!(offset_of!(BloomUniforms, intensity), 4);
-        assert_eq!(offset_of!(BloomUniforms, scene_uv_scale), 8);
-
+        // PostProcessUniforms is still #[repr(C)] + Pod until ENH-008 phase 3.
         assert_eq!(std::mem::size_of::<PostProcessUniforms>(), 64);
         assert_eq!(offset_of!(PostProcessUniforms, scene_uv_scale), 48);
         assert_eq!(offset_of!(PostProcessUniforms, _padding3), 56);

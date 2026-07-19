@@ -74,7 +74,10 @@ wgpu = "29.0.4"  # Requires egui-wgpu 0.34+
 winit = "0.30.13"
 
 # Math
-glam = "0.32.1"
+# `encase` feature: provides encase::ShaderType impls for glam vector/matrix
+# types so GPU uniform structs derive WGSL-correct layout automatically
+# (ENH-008). dep direction is glam→encase, not encase→glam.
+glam = { version = "0.32.1", features = ["encase"] }
 
 # UI
 egui = { version = "0.35.0", default-features = false, features = ["default_fonts"] }
@@ -83,6 +86,9 @@ egui-winit = { version = "0.35.0", default-features = false, features = ["links"
 
 # Utilities
 bytemuck = { version = "1.25.0", features = ["derive"] }
+# ENH-008: derives WGSL-correct uniform/storage layout so the Rust uniform
+# structs stop hand-mirroring WGSL alignment with manual padding fields.
+encase = "0.12"
 log = "0.4.33"
 rand = "0.10.2"
 image = { version = "0.25.10", default-features = false, features = ["png"] }

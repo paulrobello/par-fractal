@@ -1,4 +1,4 @@
-use super::{BloomUniforms, PostProcessUniforms, Renderer};
+use super::{BloomUniforms, PostProcessUniforms, Renderer, write_uniform_bytes};
 use crate::camera::Camera;
 use crate::deep_zoom::{ReferenceOrbit, perturbation_eligible};
 use crate::fractal::FractalParams;
@@ -216,11 +216,9 @@ impl Renderer {
     #[cfg(target_arch = "wasm32")]
     pub fn write_full_quality_post_uniforms(&self, params: &FractalParams) {
         let bloom = BloomUniforms::from_params(params, [1.0, 1.0]);
-        self.queue.write_buffer(
-            &self.bloom_uniform_buffer,
-            0,
-            bytemuck::cast_slice(&[bloom]),
-        );
+        let bloom_bytes = write_uniform_bytes(&bloom);
+        self.queue
+            .write_buffer(&self.bloom_uniform_buffer, 0, &bloom_bytes);
         let composite = PostProcessUniforms::from_params(params, [1.0, 1.0]);
         self.queue.write_buffer(
             &self.composite_uniform_buffer,
@@ -303,7 +301,7 @@ impl Renderer {
             self.queue.write_buffer(
                 &self.bloom_uniform_buffer,
                 0,
-                bytemuck::cast_slice(&[bloom_uniforms]),
+                &write_uniform_bytes(&bloom_uniforms),
             );
             self.cached_bloom_uniforms = Some(bloom_uniforms);
         }
