@@ -81,15 +81,31 @@ impl App {
         // scene_texture, so a deep-zoom view at high iterations no longer
         // re-renders on every mouse-move frame. Any image-affecting change,
         // continuous animation, or capture request forces a fresh full pass.
+        //
+        // ENH-002 v2 — a capture needs a complete full-quality frame, so abandon
+        // any in-flight tile refinement first.
+        let capturing = self.save_screenshot || self.save_hires_render.is_some();
+        if capturing {
+            self.refine_state = None;
+        }
         let skip_scene_pass = self.should_skip_scene_pass();
 
-        // Pass 1: fractal pass (accumulation compute chain OR the standard scene render).
-        if !skip_scene_pass {
-            if use_accumulation {
-                self.dispatch_accumulation(&mut encoder);
+        // Pass 1: fractal pass. One of: skip (converged UI repaint), accumulation
+        // dispatch, the next tile of an in-flight refinement (v2), or a full
+        // frame — which itself may start a refinement if the view is expensive.
+        if skip_scene_pass {
+            // Converged fast-path (v1): cached scene_texture reused this frame.
+        } else if use_accumulation {
+            self.dispatch_accumulation(&mut encoder);
+        } else if self.refine_state.is_some() {
+            // ENH-002 v2: rasterize the next tile of the in-flight refinement.
+            self.render_refine_tile(&mut encoder);
+        } else {
+            let started_refinement = self.maybe_start_refinement();
+            if started_refinement {
+                self.render_refine_tile(&mut encoder);
             } else {
-                // Multi-pass rendering pipeline
-                // Pass 1: Render fractal to scene_texture
+                // Pass 1: Render fractal to scene_texture (full frame).
                 {
                     let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                         label: Some("Scene Render Pass"),
@@ -138,8 +154,11 @@ impl App {
                     render_pass.set_vertex_buffer(0, self.renderer.vertex_buffer.slice(..));
                     render_pass.draw(0..4, 0..1);
                 }
+                // ENH-002 v2: a full scene pass ran — scene_texture now holds
+                // defined content, so refinement may safely use LoadOp::Load.
+                self.scene_passes_rendered += 1;
             }
-        } // ENH-002: close `if !skip_scene_pass`
+        }
 
         // Passes 2-6: bloom (gated), composite, FXAA/final.
         self.run_post_chain(&mut encoder, &view, use_accumulation);
@@ -239,6 +258,77 @@ impl App {
         // returning `is_scene_animation_active() == true` from
         // `should_render_next_frame()`.
         self.after_render_frame();
+    }
+
+    /// ENH-002 v2: render one tile of the in-flight refinement into
+    /// `scene_texture`. Rasterizes a single scissor-rect tile at full quality
+    /// with `LoadOp::Load` (so previously rendered tiles persist), then advances
+    /// `refine_state`. When the last tile finishes, clears `refine_state` and
+    /// marks the scene converged so subsequent UI-only repaints take the v1
+    /// fast-path. Full resolution is guaranteed by `Renderer::refining` forcing
+    /// `scene_render_scale = 1.0`.
+    fn render_refine_tile(&mut self, encoder: &mut wgpu::CommandEncoder) {
+        // Read the tile coordinates out of `refine_state` first so the immutable
+        // borrows of `self.renderer` below don't conflict with mutating
+        // `refine_state` after the pass.
+        let (grid_side, tile_idx, last) = match self.refine_state.as_ref() {
+            Some(r) => {
+                let tile_idx = r.order[r.next];
+                (r.grid_side, tile_idx, r.next + 1 >= r.total())
+            }
+            None => return,
+        };
+
+        let w = self.renderer.config.width;
+        let h = self.renderer.config.height;
+        // Floor-divide the surface into a `grid_side`×`grid_side` grid (pure,
+        // unit-tested in `refine::tile_rect`): the whole texture is covered
+        // with no gaps or overlap, and the rect is always a valid non-empty
+        // in-bounds scissor.
+        let [tx, ty, tw, th] = super::refine::tile_rect(tile_idx, grid_side, w, h);
+
+        {
+            let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("ENH-002 Refine Tile Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &self.renderer.scene_view,
+                    depth_slice: None,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        // Preserve the other tiles; only the scissored tile is
+                        // overwritten by this draw.
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                occlusion_query_set: None,
+                timestamp_writes: None,
+                multiview_mask: None,
+            });
+            let mut render_pass = render_pass.forget_lifetime();
+            // Full-texture viewport (refining forces scale 1.0); the scissor
+            // limits rasterization to this tile. The fullscreen-quad vertices
+            // cover NDC [-1,1], so each tile renders its own region of the view.
+            render_pass.set_scissor_rect(tx, ty, tw, th);
+            let pipeline = if self.fractal_params.settings.fractal_type.is_3d() {
+                &self.renderer.pipeline_3d
+            } else {
+                &self.renderer.pipeline_2d
+            };
+            render_pass.set_pipeline(pipeline);
+            render_pass.set_bind_group(0, &self.renderer.uniform_bind_group, &[]);
+            render_pass.set_vertex_buffer(0, self.renderer.vertex_buffer.slice(..));
+            render_pass.draw(0..4, 0..1);
+        }
+
+        // Advance; finish on the last tile.
+        if last {
+            self.refine_state = None;
+            self.scene_converged = true;
+        } else if let Some(refine) = self.refine_state.as_mut() {
+            refine.next += 1;
+        }
     }
 
     /// Dispatch the attractor/Buddhabrot accumulation compute passes and the

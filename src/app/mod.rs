@@ -1,6 +1,7 @@
 // Module declarations
 mod camera_transition;
 mod input;
+mod refine;
 mod render;
 mod update;
 
@@ -14,6 +15,7 @@ mod capture_web;
 mod persistence;
 
 use camera_transition::CameraTransition;
+use refine::{RefineState, estimate_full_quality_ms, grid_side_for_cost};
 
 use crate::camera::{Camera, CameraController};
 use crate::deep_zoom::PerturbationDriver;
@@ -105,6 +107,34 @@ pub struct App {
     /// settle-then-refine ramp itself is provided by LOD's restore + ARC-006's
     /// animation tracking — this flag is the skip-the-stable-pass half of v1.
     scene_converged: bool,
+    /// ENH-002 v2: tile-progressive refinement in flight (`None` when idle,
+    /// converged, or not started). While `Some`, the fractal pass rasterizes
+    /// one scissor-rect tile per frame at full quality with `LoadOp::Load`, so
+    /// an expensive 2D view (deep zoom, high iterations) refines center-out
+    /// across frames instead of freezing on one costly full-quality frame.
+    /// Aborted by `mark_scene_dirty` (any change discards partial tiles; the
+    /// next interactive frame redraws the whole scene).
+    refine_state: Option<RefineState>,
+    /// ENH-002 v2: wall-clock duration (ms) of the most recently rendered
+    /// frame, paired with `last_render_scale` (the LOD render scale that frame
+    /// used) to extrapolate the full-quality cost and pick the adaptive tile
+    /// count when a view settles.
+    last_frame_ms: f32,
+    last_render_scale: f32,
+    /// ENH-002 v2: timestamp of the most recent image-affecting change (any
+    /// `mark_scene_dirty`). Tile refinement only engages once the view has been
+    /// stable past `REFINE_SETTLE` so it never tiles mid-interaction.
+    last_change_time: web_time::Instant,
+    /// ENH-002 v2: count of full (non-tiled) scene passes rendered. Refinement
+    /// uses `LoadOp::Load`, which requires `scene_texture` to hold defined
+    /// content — so the first refinement can only start after at least one full
+    /// pass has initialized it. (In normal flow the settle timer already
+    /// guarantees this; the guard is defensive and also backs the diagnostic
+    /// force hook.)
+    scene_passes_rendered: u32,
+    /// ENH-002 v2 diagnostic: forced refinement grid side (see
+    /// `read_force_refine_side`). `None` in normal use.
+    force_refine_side: Option<u32>,
     /// ARC-006: set by any unprocessed input event (pointer/keyboard/touch/wheel)
     /// and OR'd into the redraw decision. Forces a redraw so egui (and the
     /// fractal) get to process the event. Without this, render-on-demand parks
@@ -151,6 +181,33 @@ fn scene_pass_can_be_skipped(
 /// re-renders the fractal.
 fn scene_converged_after_frame(scene_dirty: bool, animation_active: bool) -> bool {
     !scene_dirty && !animation_active
+}
+
+/// ENH-002 v2: how long the view must be stable (no `mark_scene_dirty`) before
+/// tile refinement engages. Prevents tiling mid-interaction; long enough that a
+/// drag/scroll stream keeps refinements aborted, short enough to feel instant
+/// on release. LOD's own restore (restore_delay + transition_duration ≈ 0.8 s)
+/// keeps the loop alive well past this, so for LOD-on deep zoom refinement
+/// engages as soon as LOD reaches ultra.
+const REFINE_SETTLE: std::time::Duration = std::time::Duration::from_millis(150);
+
+/// ENH-002 v2 diagnostic: read `PAR_REFINE_FORCE_SIDE` once at startup so the
+/// tile-refinement path can be exercised deterministically (bypassing the
+/// settle + cost checks) — e.g. `PAR_REFINE_FORCE_SIDE=4` forces a 4×4 grid as
+/// soon as `scene_texture` is initialized. `None` (no forcing) in normal use.
+/// Native only: wasm has no process env, so forcing is unavailable there.
+#[cfg(not(target_arch = "wasm32"))]
+fn read_force_refine_side() -> Option<u32> {
+    std::env::var("PAR_REFINE_FORCE_SIDE")
+        .ok()
+        .and_then(|s| s.parse::<u32>().ok())
+        .filter(|n| *n >= 1)
+        .map(|n| n.min(refine::MAX_GRID_SIDE))
+}
+
+#[cfg(target_arch = "wasm32")]
+fn read_force_refine_side() -> Option<u32> {
+    None
 }
 
 impl App {
@@ -466,6 +523,12 @@ impl App {
             bloom_texture_cleared: false,
             scene_dirty: true,
             scene_converged: false,
+            refine_state: None,
+            last_frame_ms: 16.0,
+            last_render_scale: 1.0,
+            last_change_time: web_time::Instant::now(),
+            scene_passes_rendered: 0,
+            force_refine_side: read_force_refine_side(),
             input_pending: false,
             #[cfg(not(target_arch = "wasm32"))]
             gpu_scan_receiver: None,
@@ -502,6 +565,11 @@ impl App {
         // ENH-002: an image-affecting change invalidates the cached frame —
         // the fractal pass must run again before UI-only repaints can skip it.
         self.scene_converged = false;
+        // ENH-002 v2: any change discards partial tile refinement; the next
+        // frame redraws the whole scene for the new view. Stamp the change so
+        // refinement only re-engages after the view settles.
+        self.refine_state = None;
+        self.last_change_time = web_time::Instant::now();
     }
 
     /// ARC-006: true when something is animating the scene continuously,
@@ -576,6 +644,7 @@ impl App {
             || self.ui_needs_repaint()
             || self.save_screenshot
             || self.save_hires_render.is_some()
+            || self.refine_state.is_some()
     }
 
     /// ARC-006: hook called from `App::render` after the fractal pass + UI
@@ -596,7 +665,70 @@ impl App {
         // always full quality) → mark Converged so UI-only repaints can skip
         // the fractal pass. Animation in flight means the image is still
         // changing, so stay non-converged.
-        self.scene_converged = scene_converged_after_frame(self.scene_dirty, animation_active);
+        self.scene_converged = self.refine_state.is_none()
+            && scene_converged_after_frame(self.scene_dirty, animation_active);
+        // ENH-002 v2: record the render scale this frame used, paired with the
+        // frame duration measured at the start of the next `update()` (which is
+        // this frame's wall-clock length), so the next settle can extrapolate
+        // the full-quality cost. Only consulted when a refinement decision is
+        // about to be made, at which point this holds a real render frame's
+        // scale (LOD-restore frames), not an idle skip frame's.
+        self.last_render_scale = self.fractal_params.effective_quality().render_scale;
+    }
+
+    /// ENH-002 v2: decide whether to start tile-progressive refinement for the
+    /// current view, and if so, initialize `refine_state`. Returns true iff
+    /// refinement was started (the caller then renders tile 0). Called from
+    /// `render()` at the point where a full frame would otherwise be drawn.
+    ///
+    /// Eligibility: settled (no animation, not already refining), 2D mode (3D
+    /// keeps its continuous camera behavior), not an accumulation path
+    /// (attractors accumulate rather than refine), and the extrapolated
+    /// full-quality frame cost exceeds one tile budget — otherwise the view is
+    /// cheap enough to render in a single frame (the v1 converge path).
+    fn maybe_start_refinement(&mut self) -> bool {
+        use crate::fractal::RenderMode;
+
+        if self.refine_state.is_some() || self.is_scene_animation_active() {
+            return false;
+        }
+        if self.fractal_params.settings.render_mode != RenderMode::TwoD {
+            return false;
+        }
+        let is_accumulation = self.fractal_params.settings.attractor_accumulation_enabled
+            && (self.fractal_params.settings.fractal_type.is_2d_attractor()
+                || self.fractal_params.settings.fractal_type.is_buddhabrot());
+        if is_accumulation {
+            return false;
+        }
+        // `LoadOp::Load` needs defined scene_texture — wait for one full pass.
+        if self.scene_passes_rendered == 0 {
+            return false;
+        }
+
+        // Diagnostic force hook (`PAR_REFINE_FORCE_SIDE`) bypasses the settle +
+        // cost checks so the tiling path can be exercised deterministically.
+        let forced = self.force_refine_side.is_some();
+        let grid_side = if let Some(side) = self.force_refine_side {
+            side
+        } else {
+            // Only refine once the view has settled — never tile mid-interaction.
+            if self.last_change_time.elapsed() < REFINE_SETTLE {
+                return false;
+            }
+            let est_full_ms = estimate_full_quality_ms(self.last_frame_ms, self.last_render_scale);
+            grid_side_for_cost(est_full_ms)
+        };
+        if grid_side <= 1 {
+            return false;
+        }
+        self.refine_state = Some(RefineState::new(grid_side));
+        log::trace!(
+            "ENH-002 v2: start tile refinement (grid {grid_side}×{grid_side}, forced={forced}, last {last_frame_ms:.1} ms @ scale {last_render_scale:.2})",
+            last_frame_ms = self.last_frame_ms,
+            last_render_scale = self.last_render_scale,
+        );
+        true
     }
 
     /// ENH-002 v1: whether the fractal scene pass may be skipped this frame.

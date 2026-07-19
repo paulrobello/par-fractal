@@ -269,6 +269,11 @@ impl Renderer {
         //     at full resolution, so the sub-rect sampling must be a no-op).
         // `App::render` reads `scene_render_scale` back to set the scene viewport.
         let scene_render_scale = self.render_scale_override.unwrap_or_else(|| {
+            // ENH-002 v2: tile refinement rasterizes full-resolution tiles, so
+            // force full res (and thus scene_uv_scale = [1,1]) while refining.
+            if self.refining {
+                return 1.0;
+            }
             let is_accumulation = params.settings.attractor_accumulation_enabled
                 && (params.settings.fractal_type.is_2d_attractor()
                     || params.settings.fractal_type.is_buddhabrot());

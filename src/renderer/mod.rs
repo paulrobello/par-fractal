@@ -151,4 +151,10 @@ pub struct Renderer {
     /// used by high-resolution capture / video paths so a capture taken mid-motion
     /// (LOD at reduced scale) still renders at full quality. `None` in normal use.
     render_scale_override: Option<f32>,
+    /// ENH-002 v2: set by `App` while tile-progressive refinement is in flight
+    /// so `Renderer::update` forces `scene_render_scale = 1.0` (tiles must
+    /// cover the full `scene_texture`, and the post chain must read it at full
+    /// resolution — a sub-rect viewport would conflict with the per-tile
+    /// scissor).
+    pub refining: bool,
 }

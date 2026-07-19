@@ -1033,6 +1033,7 @@ impl Renderer {
             // quality level (or a capture path overrides it).
             scene_render_scale: 1.0,
             render_scale_override: None,
+            refining: false,
         }
     }
 

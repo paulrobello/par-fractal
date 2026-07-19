@@ -25,6 +25,11 @@ impl App {
         // Update frame time for performance overlay
         let frame_time_ms = dt * 1000.0;
         self.ui.update_frame_time(frame_time_ms);
+        // ENH-002 v2: record this frame's wall-clock length for the adaptive
+        // tile-count estimate (paired with `last_render_scale` captured at the
+        // end of the previous render). `dt` is the duration of the previous
+        // frame, which is exactly the signal we want.
+        self.last_frame_ms = frame_time_ms;
         // ENH-002: mirror convergence so the performance overlay can show
         // whether the fractal pass was skipped (Idle) on this frame.
         self.ui.scene_converged = self.scene_converged;
@@ -199,6 +204,10 @@ impl App {
         self.update_perturbation();
 
         // Update renderer uniforms
+        // ENH-002 v2: tell the renderer whether tile refinement is in flight so
+        // it forces full-resolution scene rendering (tiles + the post chain
+        // must both operate on the whole scene_texture).
+        self.renderer.refining = self.refine_state.is_some();
         self.renderer.update(&self.camera, &self.fractal_params);
     }
 
