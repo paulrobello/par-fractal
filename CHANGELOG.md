@@ -11,9 +11,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Perturbation deep-zoom (ENH-001), Phase A + breadth.** Arbitrary-precision
   reference orbit (`dashu-float`, `src/deep_zoom/`) computed off-thread and uploaded
   as a storage buffer; per-pixel f32 delta recurrences for Mandelbrot, Julia, Burning
-  Ship, and Tricorn in `shaders/fractal.wgsl`. Engages past zoom ~1.6e7
-  (`PERTURBATION_LOG2_GATE = 24`) and fixes the >1e7 HP coordinate-precision collapse.
+  Ship, and Tricorn in `shaders/fractal.wgsl`. Engages past zoom ~1e4
+  (`PERTURBATION_LOG2_GATE = 13.3`, lowered from 24 / ~1.6e7 to cover the full
+  df-degraded band) and fixes the >1e7 HP coordinate-precision collapse.
   Recurrence math CPU-verified vs direct f64 in `tests/perturb_math.rs`.
+- **Perturbation deep-zoom (ENH-001), Phase C — precise center + zoom readout.**
+  The 2D panel "Zoom" label shows a compact `≈ 1.23×10⁴⁵` readout at/above 1e4
+  (commit `a05cbef`). A decimal-string precise center (`Settings.center_2d_precise`,
+  `#[serde(default)]` so old files load) frees the reference orbit from f64:
+  `parse_center_decimal` (`src/deep_zoom/orbit.rs`) parses a pasted coordinate
+  straight to `FBig`, and the perturbation worker uses
+  `compute_reference_orbit_best_precise` so zoom past ~1e15 stays correct. The 2D
+  panel exposes a "Go to" field (`re, im`, optionally `@ zoom`), a "Copy" button,
+  and a 🔒 indicator; pan / zoom-at-cursor clears the override, pure zoom-at-center
+  keeps it. Unit-tested (`parse_center_decimal` + `parse_location_input` + driver
+  invalidation).
 - **1e8 deep-zoom golden** (`mandel-seahorse-1e8`) — pins the collapse-fix in the
   visual-regression harness: structured output (39 distinct gray values vs the 3 of the
   pre-fix collapse) and pixel-identical across runs (MAE 0.0) via the deterministic
