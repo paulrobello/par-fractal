@@ -12,7 +12,7 @@
 > ideas below build on that foundation. Ordering assumes the AUDIT Phase 1–2 fixes land first
 > (especially the ARC-002 deep-zoom correctness bundle and ARC-008 LOD ownership).
 
-> **Status — verified 2026-07-18 at HEAD `6c2079b`:** ENH-007 (visual regression harness)
+> **Status — verified 2026-07-18 at HEAD `1c92fd2`:** ENH-007 (visual regression harness)
 > shipped complete and was **removed from this list** — its CPU teeth (`tests/reference_math.rs`)
 > and GPU goldens (`tests/golden/`) remain the regression backbone for every remaining item.
 > Of the 7 still open: **3 partial (ENH-001, ENH-002, ENH-004); 3 not started (ENH-005,
@@ -23,7 +23,7 @@
 
 | ID | Title | Impact | Effort | Depends on | Status (2026-07-18) |
 |----|-------|--------|--------|-----------|---------------------|
-| ENH-002 | Progressive refinement + render-on-demand | High | Medium–High (~1 week) | ARC-006/008 fixes | **Partial** — render-on-demand done (ARC-006); idle refinement not started |
+| ENH-002 | Progressive refinement + render-on-demand | High | Medium–High (~1 week) | ARC-006/008 fixes | **Partial — v1 Converged fast-path done** (commit `1c92fd2`); settle-then-refine steps + v2 tile-convergence not started |
 | ENH-003 | Dynamic resolution scaling (wire `render_scale`) | High | Medium (~2–3 days) | ARC-007/008 fixes | **Done** (commit `6c2079b`) — viewport + `scene_uv_scale` remap; no-op at scale 1.0 |
 | ENH-001 | Perturbation-theory infinite zoom | Transformative | Very High (2–4 weeks) | ARC-001/002 bundle; harness ✓ (ENH-007 shipped) | **Partial — Phase A + breadth done** (Mandelbrot/Julia/BurningShip/Tricorn); 1e8 golden pinned & deterministic; BLA deferred (orbit ~1.5 ms) |
 | ENH-006 | GPU frame profiler (timestamp queries + HUD) | Medium (enables tuning) | Medium (~2 days) | none | Not started |
@@ -48,7 +48,24 @@ actual infinite zoom. **Effort**: very high; phased plan delivers Mandelbrot-onl
 
 ### ENH-002 — Progressive refinement + render-on-demand
 **Plan**: `docs/fable/ENH-002-progressive-refinement.md`
-**Status (2026-07-18, HEAD `48f4427`):** Partial. The render-on-demand half landed via ARC-006 (`scene_dirty` flag + `ControlFlow::Wait`, `src/app/mod.rs:94`). The progressive-refinement half (idle quality ramp / tile convergence) is not — `src/app/mod.rs:93` explicitly defers it to ENH-002, and the scene pass is a single full-frame render (`src/app/render.rs:82`, "Pass 1: Render fractal to scene_texture").
+**Status (2026-07-18, HEAD `1c92fd2`):** v1 **Converged fast-path shipped** (commit `1c92fd2`). The
+non-redundant half of v1: ARC-006 parks the loop when idle, but `should_render_next_frame()`
+still triggers a render on every egui repaint, and `render()` ran the fractal scene pass
+unconditionally — so hovering over a static deep-zoom view at high iterations re-rendered the
+whole fractal every mouse-move frame. Now a `scene_converged` flag (`src/app/mod.rs`) — set at
+the end of `render()` once a frame completes clean + no continuous animation (which is always a
+full-quality frame: LOD restores to ultra when idle, LOD-off is always full quality), cleared by
+`mark_scene_dirty` — lets converged UI-only repaints **skip the fractal pass** and re-composite the
+cached `scene_texture` (`src/app/render.rs`, guarded by `should_skip_scene_pass`; capture forces a
+fresh pass). Pure decision logic is unit-tested (`app::enh_002_tests`, 3 tests, native + web); the
+performance overlay gained a `Scene: Idle/Active` row (`src/ui/overlays.rs`). GPU golden harness
+5/5 bit-identical (each row runs 8 s post-convergence before capture). **Deferred — v1 steps 2–4
+(explicit settle timer + LOD bypass) and v2 (tile-progressive refinement):** the settle→full-quality
+ramp is *already* provided by LOD's restore + ARC-006's animation tracking, so a parallel settle
+timer is redundant, and an LOD-bypass "Refining" frame would risk desyncing ENH-001's perturbation
+`max_iter` lockstep (orbit vs shader read the same LOD `iteration_scale`). v2 (scissor-rect tiling
+with `LoadOp::Load` for extreme deep-zoom views) remains the transformative follow-on — that is the
+runtime foundation ENH-001 Phase B step 9 calls out.
 
 After the dirty-flag fix (ARC-006) stops idle re-rendering, invert the remaining tradeoff: during
 interaction render cheap (low iterations / low scale), and while idle *converge* — re-render at
