@@ -16,6 +16,7 @@ use crate::fractal::FractalParams;
 use crate::platform::Capture;
 use crate::platform::web::WebCapture;
 use crate::renderer::Renderer;
+use crate::renderer::uniforms::{BlurUniforms, write_uniform_bytes};
 use std::sync::{Arc, Mutex};
 
 /// State shared between the map_async callback and the async task
@@ -405,21 +406,12 @@ pub fn render_high_resolution_web(
         pass.draw(0..4, 0..1);
     }
 
-    // Update blur direction to vertical
-    #[repr(C)]
-    #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-    struct BlurUniforms {
-        direction: [f32; 2],
-        _padding: [f32; 2],
-    }
-    renderer.queue.write_buffer(
-        &renderer.blur_uniform_buffer,
-        0,
-        bytemuck::cast_slice(&[BlurUniforms {
-            direction: [0.0, 1.0],
-            _padding: [0.0; 2],
-        }]),
-    );
+    // Update blur direction to vertical (ENH-008: reuse renderer's BlurUniforms)
+    let blur_v = BlurUniforms::new([0.0, 1.0]);
+    let blur_v_bytes = write_uniform_bytes(&blur_v);
+    renderer
+        .queue
+        .write_buffer(&renderer.blur_uniform_buffer, 0, &blur_v_bytes);
 
     // Pass 4: Vertical blur
     {
@@ -447,14 +439,11 @@ pub fn render_high_resolution_web(
     }
 
     // Restore blur direction to horizontal for normal rendering
-    renderer.queue.write_buffer(
-        &renderer.blur_uniform_buffer,
-        0,
-        bytemuck::cast_slice(&[BlurUniforms {
-            direction: [1.0, 0.0],
-            _padding: [0.0; 2],
-        }]),
-    );
+    let blur_h = BlurUniforms::new([1.0, 0.0]);
+    let blur_h_bytes = write_uniform_bytes(&blur_h);
+    renderer
+        .queue
+        .write_buffer(&renderer.blur_uniform_buffer, 0, &blur_h_bytes);
 
     // Pass 5: Composite (scene + bloom + color grading + vignette)
     {

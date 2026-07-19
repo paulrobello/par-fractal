@@ -59,8 +59,7 @@ fn fs_bloom_extract(input: VertexOutput) -> @location(0) vec4<f32> {
 // ============================================================================
 
 struct BlurUniforms {
-    direction: vec2<f32>,  // (1,0) for horizontal, (0,1) for vertical
-    _padding: vec2<f32>,
+    direction: vec2<f32>, // (1,0) for horizontal, (0,1) for vertical
 }
 
 @group(1) @binding(0)
@@ -110,26 +109,22 @@ var s_bloom: sampler;
 
 struct PostProcessUniforms {
     // Color grading
-    brightness: f32,        // offset 0
-    contrast: f32,          // offset 4
-    saturation: f32,        // offset 8
-    hue_shift: f32,         // offset 12
+    brightness: f32,
+    contrast: f32,
+    saturation: f32,
+    hue_shift: f32,
 
     // Vignette
-    vignette_enabled: u32,      // offset 16
-    vignette_intensity: f32,    // offset 20
-    vignette_radius: f32,       // offset 24
-    _padding1: f32,             // offset 28
+    vignette_enabled: u32,
+    vignette_intensity: f32,
+    vignette_radius: f32,
 
     // Bloom
-    bloom_enabled: u32,         // offset 32
-    bloom_intensity: f32,       // offset 36
-    _padding2: vec2<f32>,       // offset 40
-
-    // ENH-003: sub-rect of scene_texture the fractal pass wrote ([1,1] = full
-    // res; bloom-extract's scene_sample_uv is a no-op then).
-    scene_uv_scale: vec2<f32>,  // offset 48
-    _padding3: vec2<f32>,       // offset 56
+    bloom_enabled: u32,
+    bloom_intensity: f32,
+    // ENH-008: 4 bytes of implicit padding aligns scene_uv_scale to vec2's
+    // 8-byte boundary (formerly an explicit `_padding2` field).
+    scene_uv_scale: vec2<f32>,
 }
 
 @group(1) @binding(0)

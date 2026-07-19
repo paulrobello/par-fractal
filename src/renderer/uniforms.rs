@@ -106,7 +106,7 @@ pub(crate) fn scene_uv_scale_for(render_scale: f32, full_w: u32, full_h: u32) ->
 /// ENH-002 skips re-render while idle, so this is not on a tight inner loop;
 /// if profiling later flags it, switch the hot callers to a reused scratch
 /// `UniformBuffer`.
-pub(super) fn write_uniform_bytes<T>(value: &T) -> Vec<u8>
+pub(crate) fn write_uniform_bytes<T>(value: &T) -> Vec<u8>
 where
     T: encase::ShaderType + encase::internal::WriteInto,
 {
@@ -713,32 +713,38 @@ pub(super) struct BloomUniforms {
     pub(super) scene_uv_scale: glam::Vec2,
 }
 
-#[repr(C)]
-#[derive(Copy, Clone, Debug, Pod, Zeroable)]
-pub(super) struct BlurUniforms {
-    pub(super) direction: [f32; 2], // (1,0) for horizontal, (0,1) for vertical
-    pub(super) _padding: [f32; 2],
+#[derive(Copy, Clone, Debug, encase::ShaderType)]
+pub(crate) struct BlurUniforms {
+    /// `(1,0)` horizontal or `(0,1)` vertical.
+    pub(crate) direction: glam::Vec2,
 }
 
-#[repr(C)]
-#[derive(Copy, Clone, Debug, PartialEq, Pod, Zeroable)]
-pub(super) struct PostProcessUniforms {
-    pub(super) brightness: f32, // offset 0
-    pub(super) contrast: f32,   // offset 4
-    pub(super) saturation: f32, // offset 8
-    pub(super) hue_shift: f32,  // offset 12
+impl BlurUniforms {
+    /// `(1,0)` horizontal or `(0,1)` vertical. Single constructor so the
+    /// WGSL-mirrored layout lives in one place; reused by the interactive
+    /// renderer and the high-res capture paths (ENH-008 dedup — previously
+    /// each capture path re-declared its own local `BlurUniforms`).
+    pub(crate) fn new(direction: [f32; 2]) -> Self {
+        Self {
+            direction: direction.into(),
+        }
+    }
+}
 
-    pub(super) vignette_enabled: u32,   // offset 16
-    pub(super) vignette_intensity: f32, // offset 20
-    pub(super) vignette_radius: f32,    // offset 24
-    pub(super) _padding1: f32,          // offset 28 (align to 16 bytes)
-
-    pub(super) bloom_enabled: u32,   // offset 32
-    pub(super) bloom_intensity: f32, // offset 36
-    pub(super) _padding2: [f32; 2],  // offset 40 (pad to 48)
-
-    pub(super) scene_uv_scale: [f32; 2], // offset 48 — ENH-003: sub-rect of scene_texture the fractal pass wrote ([1,1] = full res; composite's scene_sample_uv is a no-op then). Repurposes half of the prior _padding3 vec4.
-    pub(super) _padding3: [f32; 2],      // offset 56 (pad to 64)
+#[derive(Copy, Clone, Debug, PartialEq, encase::ShaderType)]
+pub(crate) struct PostProcessUniforms {
+    pub(crate) brightness: f32,
+    pub(crate) contrast: f32,
+    pub(crate) saturation: f32,
+    pub(crate) hue_shift: f32,
+    pub(crate) vignette_enabled: u32,
+    pub(crate) vignette_intensity: f32,
+    pub(crate) vignette_radius: f32,
+    pub(crate) bloom_enabled: u32,
+    pub(crate) bloom_intensity: f32,
+    /// ENH-003: sub-rect of scene_texture the fractal pass wrote ([1,1] = full
+    /// res; composite's scene_sample_uv is a no-op then).
+    pub(crate) scene_uv_scale: glam::Vec2,
 }
 
 impl BloomUniforms {
@@ -758,7 +764,7 @@ impl BloomUniforms {
 impl PostProcessUniforms {
     /// Build from the user's settings + the frame's `scene_uv_scale`. Single
     /// constructor (see `BloomUniforms::from_params`). (ENH-003.)
-    pub(super) fn from_params(params: &FractalParams, scene_uv_scale: [f32; 2]) -> Self {
+    pub(crate) fn from_params(params: &FractalParams, scene_uv_scale: [f32; 2]) -> Self {
         Self {
             brightness: params.settings.brightness,
             contrast: params.settings.contrast,
@@ -771,12 +777,9 @@ impl PostProcessUniforms {
             },
             vignette_intensity: params.settings.vignette_intensity,
             vignette_radius: params.settings.vignette_radius,
-            _padding1: 0.0,
             bloom_enabled: if params.settings.bloom_enabled { 1 } else { 0 },
             bloom_intensity: params.settings.bloom_intensity,
-            _padding2: [0.0; 2],
-            scene_uv_scale,
-            _padding3: [0.0; 2],
+            scene_uv_scale: scene_uv_scale.into(),
         }
     }
 }
@@ -856,6 +859,11 @@ mod layout_tests {
         f32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap())
     }
 
+    /// Read a u32 at a byte offset (little-endian) from serialized uniform bytes.
+    fn u32_at(bytes: &[u8], offset: usize) -> u32 {
+        u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap())
+    }
+
     /// ENH-008: `BloomUniforms` now derives `encase::ShaderType`. Lock its GPU
     /// layout by serializing sentinel values and checking they land at the
     /// WGSL-documented offsets (threshold@0, intensity@4, scene_uv_scale@8,
@@ -877,12 +885,39 @@ mod layout_tests {
         assert_eq!(f32_at(&bytes, 12), 4.0);
     }
 
+    /// ENH-008: `PostProcessUniforms` derives `encase::ShaderType`; its three
+    /// former `_padding*` fields are gone from Rust and WGSL. encase lays the
+    /// 9 scalars out at natural alignment, so `scene_uv_scale` (vec2, 8-align)
+    /// lands at @40 after `bloom_intensity`@32 (4B implicit pad at 36) and the
+    /// struct is 48 bytes. Pin the bytes the GPU receives with sentinels.
     #[test]
-    fn post_uniform_layout_contract() {
-        // PostProcessUniforms is still #[repr(C)] + Pod until ENH-008 phase 3.
-        assert_eq!(std::mem::size_of::<PostProcessUniforms>(), 64);
-        assert_eq!(offset_of!(PostProcessUniforms, scene_uv_scale), 48);
-        assert_eq!(offset_of!(PostProcessUniforms, _padding3), 56);
+    fn postprocess_uniform_byte_layout() {
+        let p = PostProcessUniforms {
+            brightness: 1.0,
+            contrast: 2.0,
+            saturation: 3.0,
+            hue_shift: 4.0,
+            vignette_enabled: 5,
+            vignette_intensity: 6.0,
+            vignette_radius: 7.0,
+            bloom_enabled: 8,
+            bloom_intensity: 9.0,
+            scene_uv_scale: glam::Vec2::new(10.0, 11.0),
+        };
+        let bytes = write_uniform_bytes(&p);
+        assert_eq!(bytes.len(), 48);
+        assert_eq!(f32_at(&bytes, 0), 1.0);
+        assert_eq!(f32_at(&bytes, 4), 2.0);
+        assert_eq!(f32_at(&bytes, 8), 3.0);
+        assert_eq!(f32_at(&bytes, 12), 4.0);
+        assert_eq!(u32_at(&bytes, 16), 5);
+        assert_eq!(f32_at(&bytes, 20), 6.0);
+        assert_eq!(f32_at(&bytes, 24), 7.0);
+        assert_eq!(u32_at(&bytes, 28), 8);
+        assert_eq!(f32_at(&bytes, 32), 9.0);
+        // 36..40 implicit padding (vec2 aligns to its 8-byte boundary)
+        assert_eq!(f32_at(&bytes, 40), 10.0);
+        assert_eq!(f32_at(&bytes, 44), 11.0);
     }
 }
 

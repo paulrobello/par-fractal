@@ -220,11 +220,9 @@ impl Renderer {
         self.queue
             .write_buffer(&self.bloom_uniform_buffer, 0, &bloom_bytes);
         let composite = PostProcessUniforms::from_params(params, [1.0, 1.0]);
-        self.queue.write_buffer(
-            &self.composite_uniform_buffer,
-            0,
-            bytemuck::cast_slice(&[composite]),
-        );
+        let composite_bytes = write_uniform_bytes(&composite);
+        self.queue
+            .write_buffer(&self.composite_uniform_buffer, 0, &composite_bytes);
     }
 
     pub fn update(&mut self, camera: &Camera, params: &FractalParams) {
@@ -314,7 +312,7 @@ impl Renderer {
             self.queue.write_buffer(
                 &self.composite_uniform_buffer,
                 0,
-                bytemuck::cast_slice(&[composite_uniforms]),
+                &write_uniform_bytes(&composite_uniforms),
             );
             self.cached_composite_uniforms = Some(composite_uniforms);
         }

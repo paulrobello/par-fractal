@@ -451,17 +451,11 @@ impl Renderer {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        let blur_h_uniforms = BlurUniforms {
-            direction: [1.0, 0.0], // Horizontal
-            _padding: [0.0; 2],
-        };
-        let _blur_v_uniforms = BlurUniforms {
-            direction: [0.0, 1.0], // Vertical
-            _padding: [0.0; 2],
-        };
+        let blur_h_uniforms = BlurUniforms::new([1.0, 0.0]); // Horizontal
+        let blur_bytes = write_uniform_bytes(&blur_h_uniforms);
         let blur_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Blur Uniform Buffer"),
-            contents: bytemuck::cast_slice(&[blur_h_uniforms]),
+            contents: &blur_bytes,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -473,17 +467,15 @@ impl Renderer {
             vignette_enabled: 0,
             vignette_intensity: 0.5,
             vignette_radius: 0.8,
-            _padding1: 0.0,
             bloom_enabled: 0,
             bloom_intensity: 0.5,
-            _padding2: [0.0; 2],
-            scene_uv_scale: [1.0, 1.0],
-            _padding3: [0.0, 0.0],
+            scene_uv_scale: [1.0, 1.0].into(),
         };
+        let composite_bytes = write_uniform_bytes(&composite_uniforms);
         let composite_uniform_buffer =
             device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("Composite Uniform Buffer"),
-                contents: bytemuck::cast_slice(&[composite_uniforms]),
+                contents: &composite_bytes,
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             });
 
