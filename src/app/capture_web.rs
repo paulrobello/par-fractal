@@ -312,6 +312,12 @@ pub fn render_high_resolution_web(
         0,
         bytemuck::cast_slice(&[uniforms]),
     );
+    // ENH-003: this path reuses the shared bloom/composite uniform bind groups
+    // but only writes the main uniform above, so force the post uniforms to
+    // full quality (scene_uv_scale=[1,1]) — otherwise a capture triggered
+    // mid-LOD-motion would inherit the last interactive frame's sub-rect scale
+    // and the post passes would sample only part of the capture texture.
+    renderer.write_full_quality_post_uniforms(fractal_params);
 
     let mut encoder = renderer
         .device

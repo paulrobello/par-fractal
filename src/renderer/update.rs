@@ -199,6 +199,33 @@ impl Renderer {
         self.render_scale_override = scale;
     }
 
+    /// ENH-003: write the bloom + composite post-uniform buffers at full
+    /// resolution (`scene_uv_scale = [1,1]`) for a capture path that renders
+    /// its own full-size `scene_texture` but reuses the shared post-uniform
+    /// bind groups (the wasm high-res path, which does not call `update`).
+    /// Without this, a capture triggered mid-LOD-motion would inherit the last
+    /// interactive frame's `scene_uv_scale < 1` and the post passes would
+    /// sample a sub-rect of the capture texture. Does NOT touch the
+    /// change-detection cache — a capture is one-shot, and the next normal
+    /// `update()` re-writes with the correct interactive value.
+    ///
+    /// Wasm-only: its sole caller is `capture_web::render_high_resolution_web`.
+    #[cfg(target_arch = "wasm32")]
+    pub fn write_full_quality_post_uniforms(&self, params: &FractalParams) {
+        let bloom = BloomUniforms::from_params(params, [1.0, 1.0]);
+        self.queue.write_buffer(
+            &self.bloom_uniform_buffer,
+            0,
+            bytemuck::cast_slice(&[bloom]),
+        );
+        let composite = PostProcessUniforms::from_params(params, [1.0, 1.0]);
+        self.queue.write_buffer(
+            &self.composite_uniform_buffer,
+            0,
+            bytemuck::cast_slice(&[composite]),
+        );
+    }
+
     pub fn update(&mut self, camera: &Camera, params: &FractalParams) {
         let time = self.start_time.elapsed().as_secs_f32();
         self.uniforms.update(camera, params, time);
@@ -263,11 +290,7 @@ impl Renderer {
         // so skipping the `write_buffer` when the value matches the cache
         // saves two <1KB uploads per rendered frame. PartialEq on the structs
         // is field-wise (padding is consistent because both derive Pod).
-        let bloom_uniforms = BloomUniforms {
-            threshold: params.settings.bloom_threshold,
-            intensity: params.settings.bloom_intensity,
-            scene_uv_scale,
-        };
+        let bloom_uniforms = BloomUniforms::from_params(params, scene_uv_scale);
         if self.cached_bloom_uniforms != Some(bloom_uniforms) {
             self.queue.write_buffer(
                 &self.bloom_uniform_buffer,
@@ -280,25 +303,7 @@ impl Renderer {
         // Blur uniforms don't change (direction is fixed)
         // We use the same buffer for both H and V passes, just different bind groups
 
-        let composite_uniforms = PostProcessUniforms {
-            brightness: params.settings.brightness,
-            contrast: params.settings.contrast,
-            saturation: params.settings.saturation,
-            hue_shift: params.settings.hue_shift,
-            vignette_enabled: if params.settings.vignette_enabled {
-                1
-            } else {
-                0
-            },
-            vignette_intensity: params.settings.vignette_intensity,
-            vignette_radius: params.settings.vignette_radius,
-            _padding1: 0.0,
-            bloom_enabled: if params.settings.bloom_enabled { 1 } else { 0 },
-            bloom_intensity: params.settings.bloom_intensity,
-            _padding2: [0.0; 2],
-            scene_uv_scale,
-            _padding3: [0.0, 0.0],
-        };
+        let composite_uniforms = PostProcessUniforms::from_params(params, scene_uv_scale);
         if self.cached_composite_uniforms != Some(composite_uniforms) {
             self.queue.write_buffer(
                 &self.composite_uniform_buffer,

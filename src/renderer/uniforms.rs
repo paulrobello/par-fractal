@@ -715,6 +715,46 @@ pub(super) struct PostProcessUniforms {
     pub(super) _padding3: [f32; 2],      // offset 56 (pad to 64)
 }
 
+impl BloomUniforms {
+    /// Build from the user's settings + the frame's `scene_uv_scale`. The
+    /// single constructor for the struct so the WGSL-mirrored layout lives in
+    /// one place; called by `Renderer::update` (interactive scale) and the
+    /// capture paths (full-quality `[1,1]`). (ENH-003.)
+    pub(super) fn from_params(params: &FractalParams, scene_uv_scale: [f32; 2]) -> Self {
+        Self {
+            threshold: params.settings.bloom_threshold,
+            intensity: params.settings.bloom_intensity,
+            scene_uv_scale,
+        }
+    }
+}
+
+impl PostProcessUniforms {
+    /// Build from the user's settings + the frame's `scene_uv_scale`. Single
+    /// constructor (see `BloomUniforms::from_params`). (ENH-003.)
+    pub(super) fn from_params(params: &FractalParams, scene_uv_scale: [f32; 2]) -> Self {
+        Self {
+            brightness: params.settings.brightness,
+            contrast: params.settings.contrast,
+            saturation: params.settings.saturation,
+            hue_shift: params.settings.hue_shift,
+            vignette_enabled: if params.settings.vignette_enabled {
+                1
+            } else {
+                0
+            },
+            vignette_intensity: params.settings.vignette_intensity,
+            vignette_radius: params.settings.vignette_radius,
+            _padding1: 0.0,
+            bloom_enabled: if params.settings.bloom_enabled { 1 } else { 0 },
+            bloom_intensity: params.settings.bloom_intensity,
+            _padding2: [0.0; 2],
+            scene_uv_scale,
+            _padding3: [0.0; 2],
+        }
+    }
+}
+
 #[cfg(test)]
 mod layout_tests {
     use super::*;
