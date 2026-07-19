@@ -302,8 +302,26 @@ impl UI {
 
                                         ui.label(format!("Center: ({:.6}, {:.6})", params.settings.center_2d[0], params.settings.center_2d[1]))
                                             .on_hover_text("Current view center (drag to pan)");
-                                        ui.label(format!("Zoom: {:.4}", params.settings.zoom_2d))
-                                            .on_hover_text("Current zoom level (scroll to zoom)");
+                                        let zoom = params.settings.zoom_2d;
+                                        ui.label(format!("Zoom: {}", format_zoom(zoom)))
+                                            .on_hover_text(format!(
+                                                "Current zoom level (scroll / shift-drag to zoom).\n\
+                                                 log₁₀ ≈ {:.2}    log₂ ≈ {:.2}{}\n\
+                                                 Deep-zoom perturbation (ENH-001) engages past log₂ 24 \
+                                                 (~1.6e7) for Mandelbrot / Julia / Burning Ship / Tricorn \
+                                                 in 2D mode.",
+                                                zoom.log10(),
+                                                zoom.log2(),
+                                                if crate::deep_zoom::perturbation_eligible(
+                                                    zoom,
+                                                    params.settings.fractal_type,
+                                                    params.settings.render_mode,
+                                                ) {
+                                                    "\n● Perturbation active."
+                                                } else {
+                                                    ""
+                                                },
+                                            ));
                                         if ui.button("Reset View").on_hover_text("Reset center and zoom [R]").clicked() {
                                             params.settings.center_2d = [0.0, 0.0];
                                             params.settings.zoom_2d = 1.0;
@@ -458,5 +476,76 @@ impl UI {
                                         }
                                     });
         self.ui_state.params_2d_open = response.openness > 0.0;
+    }
+}
+
+/// Render an integer as Unicode superscript digits (e.g. `-45` → `⁻⁴⁵`), for the
+/// `10ⁿ` deep-zoom readout. egui's default font includes these codepoints.
+fn superscript_int(n: i32) -> String {
+    const SUP: [char; 10] = ['⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹'];
+    let mut s = String::new();
+    if n < 0 {
+        s.push('⁻');
+    }
+    for d in n.unsigned_abs().to_string().chars() {
+        s.push(SUP[d.to_digit(10).unwrap_or(0) as usize]);
+    }
+    s
+}
+
+/// Format a 2D magnification for display. Shallow zoom keeps the readable
+/// fixed-point form; deep zoom (≥ 1e4) collapses to a power-of-ten readout
+/// (`≈ 1.23×10⁴⁵`) so the level stays legible at extreme depths where the raw
+/// f64 prints dozens of digits. ENH-001 Phase C.
+fn format_zoom(zoom: f64) -> String {
+    if !zoom.is_finite() || zoom < 1e4 {
+        format!("{:.4}", zoom)
+    } else {
+        let exp = zoom.log10().floor() as i32;
+        // Guard against powi overflow / NaN at absurd values.
+        let mantissa = if (-30..=308).contains(&exp) {
+            zoom / 10f64.powi(exp)
+        } else {
+            1.0
+        };
+        format!("≈ {:.2}×10{}", mantissa, superscript_int(exp))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn superscript_digits_and_sign() {
+        assert_eq!(superscript_int(0), "⁰");
+        assert_eq!(superscript_int(7), "⁷");
+        assert_eq!(superscript_int(45), "⁴⁵");
+        assert_eq!(superscript_int(-3), "⁻³");
+    }
+
+    #[test]
+    fn zoom_readout_shallow_stays_fixed() {
+        // Below the 1e4 threshold the readable fixed-point form is preserved.
+        assert_eq!(format_zoom(1.0), "1.0000");
+        assert_eq!(format_zoom(256.0), "256.0000");
+        assert_eq!(format_zoom(9999.0), "9999.0000");
+        // Non-finite doesn't panic.
+        assert_eq!(format_zoom(f64::NAN), "NaN"); // {:.4} of NaN is "NaN"
+    }
+
+    #[test]
+    fn zoom_readout_deep_is_power_of_ten() {
+        // At and above 1e4 the readout collapses to ≈ M.MM×10ⁿ.
+        let s = format_zoom(1.6e7);
+        assert!(s.starts_with("≈ "), "got {s}");
+        assert!(s.contains("×10⁷"), "expected 10⁷ term, got {s}");
+        // 1e45 renders as ≈ 1.00×10⁴⁵ — readable, not a 46-digit string.
+        let deep = format_zoom(1e45);
+        assert!(deep.contains("×10⁴⁵"), "got {deep}");
+        assert!(
+            deep.len() < 20,
+            "deep readout should be compact, got {deep}"
+        );
     }
 }
