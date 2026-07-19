@@ -12,19 +12,19 @@
 > ideas below build on that foundation. Ordering assumes the AUDIT Phase 1–2 fixes land first
 > (especially the ARC-002 deep-zoom correctness bundle and ARC-008 LOD ownership).
 
-> **Status — verified 2026-07-18 at HEAD `48f4427`:** ENH-007 (visual regression harness)
+> **Status — verified 2026-07-18 at HEAD `6c2079b`:** ENH-007 (visual regression harness)
 > shipped complete and was **removed from this list** — its CPU teeth (`tests/reference_math.rs`)
 > and GPU goldens (`tests/golden/`) remain the regression backbone for every remaining item.
-> Of the 7 still open: **3 partial (ENH-001, ENH-002, ENH-004); 4 not started (ENH-003, ENH-005,
-> ENH-006, ENH-008); 0 fully done.** Per-item verdicts with file:line evidence appear under each
-> entry below, and the priority table has a Status column.
+> Of the 7 still open: **3 partial (ENH-001, ENH-002, ENH-004); 3 not started (ENH-005,
+> ENH-006, ENH-008); 1 fully done (ENH-003).** Per-item verdicts with file:line evidence appear
+> under each entry below, and the priority table has a Status column.
 
 ## Priority order
 
 | ID | Title | Impact | Effort | Depends on | Status (2026-07-18) |
 |----|-------|--------|--------|-----------|---------------------|
 | ENH-002 | Progressive refinement + render-on-demand | High | Medium–High (~1 week) | ARC-006/008 fixes | **Partial** — render-on-demand done (ARC-006); idle refinement not started |
-| ENH-003 | Dynamic resolution scaling (wire `render_scale`) | High | Medium (~2–3 days) | ARC-007/008 fixes | Not started (`render_scale` still inert) |
+| ENH-003 | Dynamic resolution scaling (wire `render_scale`) | High | Medium (~2–3 days) | ARC-007/008 fixes | **Done** (commit `6c2079b`) — viewport + `scene_uv_scale` remap; no-op at scale 1.0 |
 | ENH-001 | Perturbation-theory infinite zoom | Transformative | Very High (2–4 weeks) | ARC-001/002 bundle; harness ✓ (ENH-007 shipped) | **Partial — Phase A + breadth done** (Mandelbrot/Julia/BurningShip/Tricorn); 1e8 golden pinned & deterministic; BLA deferred (orbit ~1.5 ms) |
 | ENH-006 | GPU frame profiler (timestamp queries + HUD) | Medium (enables tuning) | Medium (~2 days) | none | Not started |
 | ENH-005 | Half-resolution bloom pipeline | Medium | Low–Medium (~1 day) | ARC-005 (bloom gating) | Not started (bloom gating done via ARC-005) |
@@ -60,7 +60,20 @@ is the runtime foundation ENH-001 needs (perturbation frames are expensive). **E
 
 ### ENH-003 — Dynamic resolution scaling (wire `render_scale`)
 **Plan**: `docs/fable/ENH-003-dynamic-render-scale.md`
-**Status (2026-07-17, v0.9.0):** Not started. `render_scale` is defined, serialized, and interpolated (`src/lod.rs:79`) but never applied — the scene texture is still created at full window resolution (`src/renderer/initialization.rs:358-367`). The slider label itself reads "not yet applied — see ENH-003" (`src/ui/panels/lod.rs:384`).
+**Status (2026-07-18, HEAD `6c2079b`):** **Done.** `QualityLevel.render_scale` is now
+applied end-to-end (commit `6c2079b`, on top of phase-1 plumbing `8f2db86`). During LOD
+motion `Renderer::update` resolves the active scale (`src/renderer/update.rs`) and
+`App::render` sets a sub-rect `set_viewport` on the fractal pass (`src/app/render.rs`); the
+post chain upsamples via `scene_uv_scale` in `BloomUniforms`/`PostProcessUniforms` and a
+`scene_sample_uv` helper (`src/shaders/postprocess.wgsl`) that remaps the `scene_texture`
+read in bloom-extract + composite with a half-texel clamp. **Design note:** the plan's step 2
+(`render_size` uniform + coord-mapping change) was unnecessary — `fs_main_2d` derives coords
+from NDC `uv` (viewport-independent), so the viewport scales the raster without cropping.
+`scene_sample_uv` is a bit-for-bit no-op at `scene_uv_scale == 1.0` (idle / LOD-off / goldens
+untouched); scale is forced to 1.0 for accumulation display and high-res capture
+(`render_scale_override`). Verified: scale=1.0 LOD-ultra vs LOD-off default NCC 0.998 (no-op);
+scale=0.5 shares framing with scale=1.0 (NCC 0.945, identical black-fraction — no crop/offset).
+The slider is re-enabled (`src/ui/panels/lod.rs`).
 
 `QualityLevel.render_scale` (0.25–1.0) exists, is user-visible, serialized, and interpolated — but
 was never applied (AUDIT ARC-007). Because the scene already renders to an intermediate

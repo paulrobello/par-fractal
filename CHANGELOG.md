@@ -27,6 +27,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and compares PNGs via the new `imgdiff` bin; skips cleanly on headless boxes.
 - CLI flags `--screenshot-path <path>` and `--window-size <WxH>` for deterministic,
   scriptable captures.
+- **Dynamic render-scale (ENH-003).** `QualityLevel.render_scale` is now applied:
+  during LOD motion the fractal pass renders into a sub-rect of `scene_texture`
+  (`set_viewport`) and the post chain upsamples via a `scene_uv_scale` uniform
+  (`scene_sample_uv` in `shaders/postprocess.wgsl`), cutting fragment cost ~4× at
+  half resolution — imperceptible while moving, full resolution returns at idle.
+  A bit-for-bit no-op at scale 1.0 (idle / LOD off / golden frames untouched);
+  forced full-res for accumulation display and high-res capture. The slider is
+  re-enabled.
 
 ### Changed
 - `capture_screenshot` honors `--screenshot-path` (no timestamp / toast / auto-open
