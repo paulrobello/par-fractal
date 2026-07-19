@@ -77,7 +77,17 @@ pub struct App {
     /// the visual-regression harness gets a deterministic, predictable file.
     screenshot_path: Option<std::path::PathBuf>,
     screenshot_taken: bool, // Track if delayed screenshot was taken
-    should_exit: bool,      // Track if app should exit
+    /// ENH-006 Task 3: when `Some`, write the EMA-smoothed per-scope GPU
+    /// profile timings to this path as YAML after a warmup window
+    /// (see `update.rs::PROFILE_DUMP_FRAME`). Runtime-only; never persisted.
+    profile_dump_path: Option<std::path::PathBuf>,
+    /// ENH-006 Task 3: monotonic frame counter (unlike `frame_count`, which
+    /// resets every ~0.5 s for the FPS readout). Drives the dump trigger.
+    total_frame_count: u32,
+    /// ENH-006 Task 3: idempotent guard — the dump writes exactly once even
+    /// if the app keeps rendering past the warmup frame.
+    profile_dumped: bool,
+    should_exit: bool, // Track if app should exit
     /// ARC-005: tracks whether the bloom output texture currently holds defined
     /// (cleared-to-black) contents. The composite pass samples `bloom_view`
     /// unconditionally, so when bloom is disabled we must record one cheap clear
@@ -225,6 +235,7 @@ impl App {
         preset_name: Option<String>,
         quality_level: Option<usize>,
         screenshot_path: Option<std::path::PathBuf>,
+        profile_dump_path: Option<std::path::PathBuf>,
     ) -> Self {
         Self::init_common(
             window,
@@ -233,6 +244,7 @@ impl App {
             preset_name,
             quality_level,
             screenshot_path,
+            profile_dump_path,
         )
         .await
     }
@@ -251,6 +263,7 @@ impl App {
         preset_name: Option<String>,
         quality_level: Option<usize>,
         screenshot_path: Option<std::path::PathBuf>,
+        profile_dump_path: Option<std::path::PathBuf>,
     ) -> Result<Self, String> {
         Ok(Self::init_common(
             window,
@@ -259,6 +272,7 @@ impl App {
             preset_name,
             quality_level,
             screenshot_path,
+            profile_dump_path,
         )
         .await)
     }
@@ -323,6 +337,7 @@ impl App {
         preset_name: Option<String>,
         quality_level: Option<usize>,
         screenshot_path: Option<std::path::PathBuf>,
+        profile_dump_path: Option<std::path::PathBuf>,
     ) -> Self {
         let window = Arc::new(window);
         let size = window.inner_size();
@@ -519,6 +534,9 @@ impl App {
             exit_delay,
             screenshot_path,
             screenshot_taken: false,
+            profile_dump_path,
+            total_frame_count: 0,
+            profile_dumped: false,
             should_exit: false,
             bloom_texture_cleared: false,
             scene_dirty: true,
@@ -562,8 +580,14 @@ impl App {
     /// fire — otherwise ARC-006's `ControlFlow::Wait` parks the loop and the
     /// timer never gets checked. Normal interactive use sets no CLI timer and
     /// stays parked for power savings.
+    ///
+    /// ENH-006 Task 3: an undelivered `--profile-dump` also keeps the loop
+    /// ticking (the dump fires at frame N inside `update()`), but it never
+    /// forces exit on its own — pair it with `--exit-delay` for that.
     pub fn has_pending_cli_timer(&self) -> bool {
-        self.screenshot_delay.is_some() || self.exit_delay.is_some()
+        self.screenshot_delay.is_some()
+            || self.exit_delay.is_some()
+            || (self.profile_dump_path.is_some() && !self.profile_dumped)
     }
 
     /// ARC-006: mark the scene as needing a re-render. Called from every

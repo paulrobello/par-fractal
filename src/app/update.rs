@@ -1,6 +1,13 @@
 use super::App;
 use crate::fractal::RenderMode;
 
+/// ENH-006 Task 3: warmup window before the `--profile-dump` write fires.
+/// 120 frames gives the profiler's EMA (α = 0.1) ~4 time-constants to
+/// converge and lets the 2-frame-latent staging ring populate
+/// `timings_ms`. Compare with `>=`, not `==`: an exact-equality check
+/// could be skipped past if `update` ever runs twice on one frame.
+const PROFILE_DUMP_FRAME: u32 = 120;
+
 /// Update loop methods
 impl App {
     pub fn update(&mut self) {
@@ -15,6 +22,10 @@ impl App {
 
         // Update FPS counter
         self.frame_count += 1;
+        // ENH-006 Task 3: monotonic counter that does NOT reset (unlike
+        // `frame_count`, which rolls over every ~0.5 s for the FPS readout).
+        // Drives the `--profile-dump` warmup trigger.
+        self.total_frame_count = self.total_frame_count.saturating_add(1);
         let fps_elapsed = (now - self.fps_timer).as_secs_f32();
         if fps_elapsed >= 0.5 {
             self.current_fps = self.frame_count as f32 / fps_elapsed;
@@ -50,6 +61,28 @@ impl App {
             if elapsed >= delay {
                 log::info!("Exiting after {:.1}s delay", delay);
                 self.should_exit = true;
+            }
+        }
+
+        // ENH-006 Task 3: write the EMA-smoothed per-scope GPU timings to the
+        // path requested by `--profile-dump`, once the warmup window has
+        // elapsed. Idempotent (`profile_dumped` guard) and never forces exit
+        // — pair with `--exit-delay` for that. A disabled profiler / empty
+        // `timings_ms` still writes the (empty) map, which is the scriptable
+        // "feature unavailable" signal; write errors log + continue so a
+        // profile-dump failure never crashes the render loop.
+        if let Some(path) = self.profile_dump_path.clone() {
+            if !self.profile_dumped && self.total_frame_count >= PROFILE_DUMP_FRAME {
+                self.profile_dumped = true;
+                match serde_yaml::to_string(&self.renderer.profiler.timings_ms) {
+                    Ok(yaml) => match std::fs::write(&path, yaml) {
+                        Ok(()) => log::info!("wrote GPU profile to {}", path.display()),
+                        Err(e) => {
+                            log::error!("failed to write GPU profile to {}: {}", path.display(), e)
+                        }
+                    },
+                    Err(e) => log::error!("failed to serialize GPU profile: {}", e),
+                }
             }
         }
 

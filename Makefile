@@ -9,7 +9,7 @@ VERSION := $(shell grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
 .PHONY: help build build-release run run-release test check clean clippy clippy-fix fmt fmt-check \
         install-deps doc checkall pre-commit-install pre-commit-uninstall pre-commit-run \
         pre-commit-update lint deploy release cache-clean typecheck \
-        visual-test visual-bless \
+        visual-test visual-bless profile profile-cpu \
         web-install web-build web-serve web-clean web-deploy
 
 # Default target
@@ -87,6 +87,8 @@ help:
 	@echo "  audit              - Audit dependencies for security vulnerabilities"
 	@echo "  bloat              - Analyze binary size"
 	@echo "  update             - Update dependencies"
+	@echo "  profile            - Dump GPU profile to target/profile.yaml (ENH-006)"
+	@echo "  profile-cpu        - CPU sampling profile via perf (Linux only)"
 	@echo ""
 	@echo "==================================================================="
 
@@ -475,8 +477,26 @@ bench:
 	@echo "Running benchmarks..."
 	cargo bench
 
-profile: build-release
-	@echo "Running with profiling..."
+# ============================================================================
+# Profiling
+# ============================================================================
+
+# ENH-006: agent-facing GPU profile dump. Runs the binary with `--profile-dump`
+# for 6 s (past the 120-frame warmup), then prints the YAML. The dump lands
+# in `target/` (gitignored as cargo's build dir) so it is never committed.
+# Combine with `--preset` / `--quality` to measure specific scenes.
+profile:
+	@echo "Dumping GPU profile to target/profile.yaml…"
+	cargo run --release -- --profile-dump target/profile.yaml --exit-delay 6
+	@echo ""
+	@echo "======================================================================"
+	@echo "  target/profile.yaml"
+	@echo "======================================================================"
+	@cat target/profile.yaml
+
+# CPU-side sampling profiler via Linux `perf` (graphical report). Linux-only.
+profile-cpu: build-release
+	@echo "Running with CPU profiling..."
 	@if command -v perf > /dev/null; then \
 		perf record --call-graph=dwarf ./target/release/par-fractal; \
 		perf report; \

@@ -40,6 +40,9 @@ fn print_help() {
     println!("  --screenshot-delay <s>   Take a screenshot after N seconds");
     println!("  --exit-delay <s>         Exit application after N seconds");
     println!("  --screenshot-path <path> Write the screenshot to this exact path (no timestamp)");
+    println!(
+        "  --profile-dump <path>    Write EMA-smoothed GPU profile timings (YAML) after warmup"
+    );
     println!("  --window-size <WxH>      Force the window to WxH physical pixels");
     println!("  --resize-after <s WxH>   Resize the window to WxH after N seconds (QA-027)");
     println!("  --help, -h               Show this help message");
@@ -153,6 +156,10 @@ fn main() {
     let mut preset_name: Option<String> = None;
     let mut quality_level: Option<usize> = None;
     let mut screenshot_path: Option<std::path::PathBuf> = None;
+    // ENH-006 Task 3: write the EMA-smoothed per-scope GPU timings to YAML
+    // after a warmup window so agents/ci can measure optimizations. Runtime
+    // only — never persisted (same shape as `--exit-delay` / `--screenshot-*`).
+    let mut profile_dump_path: Option<std::path::PathBuf> = None;
     let mut window_size: Option<(u32, u32)> = None;
     // QA-027: resize the window mid-run to exercise the winit 0.30 resize
     // lifecycle (surface reconfigure + redraw) without driving a human input.
@@ -171,6 +178,16 @@ fn main() {
                     i += 2;
                 } else {
                     eprintln!("--screenshot-path requires a value");
+                    print_help();
+                    return;
+                }
+            }
+            "--profile-dump" => {
+                if i + 1 < args.len() {
+                    profile_dump_path = Some(std::path::PathBuf::from(&args[i + 1]));
+                    i += 2;
+                } else {
+                    eprintln!("--profile-dump requires a value");
                     print_help();
                     return;
                 }
@@ -347,6 +364,7 @@ fn main() {
         preset_name,
         quality_level,
         screenshot_path,
+        profile_dump_path,
         initial_window_size,
         resize_after,
         start: None,
@@ -371,6 +389,7 @@ struct AppHandler {
     preset_name: Option<String>,
     quality_level: Option<usize>,
     screenshot_path: Option<std::path::PathBuf>,
+    profile_dump_path: Option<std::path::PathBuf>,
     initial_window_size: (u32, u32),
     /// QA-027: `(delay_secs, width, height)` — request a window resize after
     /// the delay to exercise the resize lifecycle without a human.
@@ -414,6 +433,7 @@ impl ApplicationHandler for AppHandler {
             self.preset_name.clone(),
             self.quality_level,
             self.screenshot_path.clone(),
+            self.profile_dump_path.clone(),
         ));
         // QA-027: the resize-delay origin is when the app is ready to render,
         // not process start (App::new blocks on GPU init).
