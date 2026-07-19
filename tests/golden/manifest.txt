@@ -19,14 +19,18 @@
 # parse it with a plain `while read` and no `yq`/`python` dependency.
 #
 # SCOPE NOTE: rows are kept at zooms the GPU renders with stable, detailed output.
-# The double-float HP path is correct through ~1e7 but collapses above ~3e7
+# The double-float HP path degrades from ~1e4 (a 2026-07-18 GPU-vs-CPU-f64
+# crosscheck showed per-pixel noise — the "pixelated" mid-zoom symptom — long
+# before the 07-17 256x256 measurement suggested) and fully collapses above ~3e7
 # (root-caused 2026-07-17: fast ~1.2 ms frame, no device-loss, but per-pixel
 # coordinate precision collapses to one shared orbit → near-uniform image; naga's
 # Metal two_prod EFT is intact, so the collapse is downstream Metal FTZ / sub-ULP
-# lo-word loss). ENH-001 perturbation (engages at zoom > ~1.6e7, log2>24) fixes
-# this: the 1e8 golden below renders ~76 distinct gray values (vs the 3 of the
-# pre-fix collapse) and is deterministic across runs (MAE 0.0, pixel-identical)
-# via the deterministic `perturbation_max_iterations` budget. The reference orbit
+# lo-word loss). ENH-001 perturbation fixes this: the gate was lowered 2026-07-18
+# from log2 24 (zoom ~1.6e7) to 13.3 (zoom ~1e4) so the CPU-BigFloat reference
+# path covers the whole degraded band. The 1e8 golden below renders ~76 distinct
+# gray values (vs the 3 of the pre-fix collapse) and is deterministic across runs
+# (MAE 0.0, pixel-identical) via the deterministic `perturbation_max_iterations`
+# budget. The reference orbit
 # itself is cheap — ~1.5 ms single / ~7.5 ms for the 9× probe at 1e8, 91 bits
 # (measured 2026-07-18); an earlier "~15-20 s" estimate was the pre-fix LOD churn
 # (the orbit recomputed every frame because LOD's iteration_scale varied), not

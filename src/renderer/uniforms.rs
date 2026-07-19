@@ -62,9 +62,9 @@ pub(crate) fn effective_2d_max_iterations(params: &FractalParams) -> u32 {
 /// (2) Coverage — the orbit must be at least as long as the shader's loop so
 ///     the delta path never reads past it. `activate_perturbation` pins the
 ///     shader's `max_iterations` to the orbit length, so a deterministic orbit
-///     length gives a deterministic shader loop. Perturbation engages only at
-///     zoom > ~1.6e7 (below that the HP path renders and this isn't called),
-///     so not matching the LOD-scaled value at shallow zoom is irrelevant.
+///     length gives a deterministic shader loop. Perturbation engages at
+///     zoom > ~1e4 (PERTURBATION_LOG2_GATE; below it f32 renders and this isn't
+///     called), so not matching the LOD-scaled value at shallow zoom is irrelevant.
 pub(crate) fn perturbation_max_iterations(params: &FractalParams) -> u32 {
     if params.settings.render_mode == crate::fractal::RenderMode::TwoD {
         let zoom_bonus = zoom_iteration_bonus(params.settings.zoom_2d);

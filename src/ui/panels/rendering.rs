@@ -307,8 +307,8 @@ impl UI {
                                             .on_hover_text(format!(
                                                 "Current zoom level (scroll / shift-drag to zoom).\n\
                                                  log₁₀ ≈ {:.2}    log₂ ≈ {:.2}{}\n\
-                                                 Deep-zoom perturbation (ENH-001) engages past log₂ 24 \
-                                                 (~1.6e7) for Mandelbrot / Julia / Burning Ship / Tricorn \
+                                                 Deep-zoom perturbation (ENH-001) engages past log₂ 13.3 \
+                                                 (~1e4) for Mandelbrot / Julia / Burning Ship / Tricorn \
                                                  in 2D mode.",
                                                 zoom.log10(),
                                                 zoom.log2(),

@@ -24,12 +24,21 @@ use crate::fractal::{FractalType, RenderMode};
 
 /// Zoom (as log2) above which perturbation activates.
 ///
-/// Set to 24 (zoom ≈ 1.68e7), just below the coordinate-precision collapse
-/// root-caused at ~3e7 (log2 ≈ 24.8) on 2026-07-17. The plan's original 34
-/// was based on the superseded "DF ceiling ~1e11" model; the failure
-/// actually arrives far earlier, so perturbation must engage BEFORE the
-/// collapse or the first deep frame renders as garbage.
-pub const PERTURBATION_LOG2_GATE: f64 = 24.0;
+/// The 2026-07-17 root-cause placed the double-float collapse at ~3e7
+/// (log2 ≈ 24.8) and set the gate at 24, claiming HP rendered correctly
+/// below it. A 2026-07-18 GPU-vs-CPU-f64 crosscheck (Pearson correlation
+/// over luma) disproved that: df corr holds ~0.6 at zoom 1e3 but falls to
+/// 0.47 by 4.48e5 (log2 18.8) with visible per-pixel noise — the
+/// "blocky/pixelated" mid-zoom symptom — and to 0.43 by 1.1e7. The loss is
+/// the same Metal FTZ / sub-ULP lo-word mechanism, just arriving far earlier
+/// than the 07-17 measurement (taken at 256x256) suggested.
+///
+/// Lowered to 13.3 (zoom ≈ 1e4) so perturbation — whose reference orbit is a
+/// CPU BigFloat, immune to the shader df loss — covers the entire degraded
+/// band; f32 (clean below ~1e4) handles the rest. For the four
+/// perturbation-eligible types this supersedes the HP path (the shader checks
+/// perturbation first); HP remains the deep-zoom path for the other 2D types.
+pub const PERTURBATION_LOG2_GATE: f64 = 13.3;
 
 /// True when perturbation should engage for this view.
 ///

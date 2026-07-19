@@ -225,7 +225,7 @@ impl App {
     /// Per-frame sequence (no-ops below the gate, cheap):
     /// 1. Record the current view (`center_2d`, `zoom_2d`, effective
     ///    `max_iter`) so the driver can mark the orbit stale on change.
-    /// 2. If stale AND eligible (Mandelbrot2D + 2D + log2(zoom) > 24) AND
+    /// 2. If stale AND eligible (Mandelbrot2D + 2D + log2(zoom) > PERTURBATION_LOG2_GATE) AND
     ///    no worker is in flight, spawn one. Show a "computing…" toast only
     ///    on the transition (the driver returns true exactly once per spawn).
     /// 3. Drain any completed orbit onto the GPU via

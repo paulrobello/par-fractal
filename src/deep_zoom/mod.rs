@@ -1,8 +1,9 @@
 //! ENH-001 — perturbation-theory deep-zoom subsystem.
 //!
-//! The GPU's double-float HP path is correct only through ~1e7 zoom; above ~3e7
-//! per-pixel coordinate precision collapses (root-caused 2026-07-17: a fast
-//! frame with no device-loss, but the whole frame computes one shared orbit).
+//! The GPU's double-float HP path loses precision on Metal across the mid-zoom
+//! band: a 2026-07-18 crosscheck (GPU vs CPU f64) showed per-pixel noise from
+//! ~1e4, worsening to a fully collapsed frame (one shared orbit) above ~3e7
+//! (root-caused 2026-07-17 as downstream Metal FTZ / sub-ULP lo-word loss).
 //! Perturbation removes the ceiling: compute ONE reference orbit per view here
 //! in arbitrary precision, upload `Z_n` as f32 pairs to a GPU storage buffer,
 //! and iterate only per-pixel *deltas* on the GPU in plain f32
