@@ -259,11 +259,11 @@ impl UI {
                                         // Hide max iterations for strange attractors (they use accumulation mode)
                                         // Buddhabrot needs higher range for max iterations
                                         if params.settings.fractal_type != FractalType::Collatz2D && !params.settings.fractal_type.is_2d_attractor() {
-                                            let max_iter_range = if params.settings.fractal_type.is_buddhabrot() {
-                                                1..=10000 // Buddhabrot needs higher iterations for detail
-                                            } else {
-                                                1..=1024
-                                            };
+                                            // Cap stays below the SEC-001 safety clamp
+                                            // (max_iterations.clamp(1, 100_000) in fractal/mod.rs) so the slider
+                                            // and the preset/import clamp agree. Logarithmic scale keeps the
+                                            // default reachable; deep zoom adds more via the zoom-bonus.
+                                            let max_iter_range = 1..=10_000;
                                             actions.changed |= ui.add(egui::Slider::new(&mut params.settings.max_iterations, max_iter_range)
                                                 .text("Max Iterations")
                                                 .logarithmic(true))
