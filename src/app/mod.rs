@@ -546,6 +546,16 @@ impl App {
         self.should_exit
     }
 
+    /// True when running headlessly for automation (`--screenshot-delay`
+    /// and/or `--exit-delay` set, e.g. the visual-regression harness). Such
+    /// runs must never persist settings: they typically load a preset, and the
+    /// auto-save would overwrite the user's saved preferences with the preset's
+    /// state. (Root-caused 2026-07-18: harness `--preset` runs clobbered the
+    /// user's `color_mode`.)
+    pub fn is_headless(&self) -> bool {
+        self.screenshot_delay.is_some() || self.exit_delay.is_some()
+    }
+
     /// Whether a CLI timer (`--screenshot-delay` / `--exit-delay`) is still
     /// pending. These timers are evaluated inside `update()`, which only runs
     /// on `RedrawRequested`, so the event loop must keep ticking until they

@@ -132,18 +132,27 @@ impl App {
             }
         }
 
-        // Auto-save camera position after 1 second of inactivity (native only)
+        // Auto-save camera position after 1 second of inactivity (native only).
+        // Skipped in headless mode: scripted runs (`--screenshot-delay` /
+        // `--exit-delay`, e.g. the visual-regression harness) typically load a
+        // preset, and `save_camera_settings` persists the WHOLE settings struct
+        // — so it would overwrite the user's saved preferences with the
+        // preset's state (root-caused 2026-07-18: harness `--preset` runs
+        // clobbered the user's `color_mode`).
         #[cfg(not(target_arch = "wasm32"))]
-        if self.camera_needs_save
+        if !self.is_headless()
+            && self.camera_needs_save
             && self.camera_last_moved.elapsed() >= std::time::Duration::from_secs(1)
         {
             self.save_camera_settings();
             self.camera_needs_save = false;
         }
 
-        // Auto-save settings after 1 second of inactivity (native only)
+        // Auto-save settings after 1 second of inactivity (native only).
+        // Same headless guard — never persist from an automated run.
         #[cfg(not(target_arch = "wasm32"))]
-        if self.settings_need_save
+        if !self.is_headless()
+            && self.settings_need_save
             && self.settings_last_changed.elapsed() >= std::time::Duration::from_secs(1)
         {
             self.save_all_settings();
