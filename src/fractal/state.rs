@@ -68,6 +68,11 @@ pub struct RenderSettings {
 
     // 2D specific
     pub center_2d: [f64; 2],
+    /// Optional high-precision 2D center as decimal strings (ENH-001 Phase C).
+    /// When `Some`, the perturbation reference orbit parses these to `FBig`
+    /// instead of using `center_2d`, so zoom past ~1e15 stays correct. Cleared
+    /// by pan/zoom navigation; set by the precise-center UI / preset entry.
+    pub center_2d_precise: Option<[String; 2]>,
     /// 2D zoom factor. Stored as f64 (ARC-001) so per-frame `* factor` accumulation
     /// in `zoom_at` does not round at f32 precision across long zoom sequences.
     /// The GPU uniform receives this as f32 (cast at the boundary in `Uniforms::update`),
@@ -193,6 +198,7 @@ impl Default for RenderSettings {
             procedural_phase: [0.0, 0.333, 0.667],
 
             center_2d: [0.0f64, 0.0f64],
+            center_2d_precise: None,
             zoom_2d: 1.0,
             julia_c: [-0.7, 0.27015],
             max_iterations: 80,

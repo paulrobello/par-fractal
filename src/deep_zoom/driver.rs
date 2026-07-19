@@ -18,7 +18,8 @@
 //! path handles deep zoom with its known ceiling and the driver is a no-op.
 
 use crate::deep_zoom::orbit::{
-    FractalKind, ReferenceOrbit, compute_reference_orbit_best, precision_bits_for_zoom,
+    FractalKind, ReferenceOrbit, compute_reference_orbit_best,
+    compute_reference_orbit_best_precise, parse_center_decimal, precision_bits_for_zoom,
 };
 use crate::fractal::{FractalType, RenderMode};
 
@@ -68,9 +69,12 @@ pub fn perturbation_eligible(
 /// `fractal_type` and `julia_c` are part of the signature (Phase B step 7):
 /// switching fractal type (Mandelbrot ↔ Julia ↔ …) or editing `julia_c`
 /// changes the reference orbit and must invalidate.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 struct ViewSignature {
     center: [f64; 2],
+    /// High-precision decimal-string override (ENH-001 Phase C). `None` uses
+    /// the f64 `center`; `Some` re-routes the orbit through `parse_center_decimal`.
+    center_precise: Option<[String; 2]>,
     zoom: f64,
     aspect: f32,
     max_iter: u32,
@@ -136,9 +140,11 @@ impl PerturbationDriver {
     ///
     /// `fractal_type` and `julia_c` are part of the signature (Phase B step
     /// 7): switching type or editing `julia_c` invalidates the orbit.
+    #[allow(clippy::too_many_arguments)] // +center_precise (ENH-001 Phase C); each field is independently meaningful.
     pub fn note_view(
         &mut self,
         center: [f64; 2],
+        center_precise: Option<[String; 2]>,
         zoom: f64,
         aspect: f32,
         max_iter: u32,
@@ -147,16 +153,20 @@ impl PerturbationDriver {
     ) {
         let sig = ViewSignature {
             center,
+            center_precise,
             zoom,
             aspect,
             max_iter,
             fractal_type,
             julia_c,
         };
-        if self.last_view != Some(sig) {
+        // Compare by reference so `sig` can still move into `last_view`
+        // (ViewSignature owns Strings → not Copy).
+        let changed = self.last_view.as_ref() != Some(&sig);
+        if changed {
             self.dirty = true;
-            self.last_view = Some(sig);
         }
+        self.last_view = Some(sig);
     }
 
     /// If stale AND eligible AND idle, spawn a worker thread that computes
@@ -172,9 +182,11 @@ impl PerturbationDriver {
     ///
     /// `fractal_type` selects the recurrence via [`FractalKind`]; `julia_c`
     /// is the fixed c for Julia (ignored for the other kinds).
+    #[allow(clippy::too_many_arguments)] // +center_precise (ENH-001 Phase C); mirrors note_view's signature.
     pub fn maybe_spawn(
         &mut self,
         center: [f64; 2],
+        center_precise: Option<[String; 2]>,
         zoom: f64,
         aspect: f32,
         max_iter: u32,
@@ -213,21 +225,53 @@ impl PerturbationDriver {
             self.pending = Some(rx);
             self.computing = true;
             self.dirty = false;
-            // Move only Copy data into the worker — `center`, the half-extents,
-            // `max_iter`, `precision_bits`, `kind`, `julia_c_f64` — plus the
-            // Sender. No GPU handles cross the thread boundary (the upload
-            // happens on the main thread in `Renderer::set_reference_orbit`).
+            // Move the view data into the worker — `center`, the half-extents,
+            // `max_iter`, `precision_bits`, `kind`, `julia_c_f64`, and the
+            // owned `center_precise` strings — plus the Sender. No GPU handles
+            // cross the thread boundary (the upload happens on the main thread
+            // in `Renderer::set_reference_orbit`).
             std::thread::spawn(move || {
-                let orbit = compute_reference_orbit_best(
-                    kind,
-                    center[0],
-                    center[1],
-                    view_half_extent_x,
-                    view_half_extent_y,
-                    julia_c_f64,
-                    max_iter,
-                    precision_bits,
-                );
+                // ENH-001 Phase C: when a precise decimal-string center is set,
+                // parse it to FBig and use the precise selector so the orbit's
+                // center isn't bounded by f64. A malformed string falls back to
+                // the f64 path (the UI validates on entry, so this is defense).
+                let orbit = match center_precise {
+                    Some(p) => match (
+                        parse_center_decimal(&p[0], precision_bits),
+                        parse_center_decimal(&p[1], precision_bits),
+                    ) {
+                        (Ok(cr), Ok(ci)) => compute_reference_orbit_best_precise(
+                            kind,
+                            cr,
+                            ci,
+                            view_half_extent_x,
+                            view_half_extent_y,
+                            julia_c_f64,
+                            max_iter,
+                            precision_bits,
+                        ),
+                        _ => compute_reference_orbit_best(
+                            kind,
+                            center[0],
+                            center[1],
+                            view_half_extent_x,
+                            view_half_extent_y,
+                            julia_c_f64,
+                            max_iter,
+                            precision_bits,
+                        ),
+                    },
+                    None => compute_reference_orbit_best(
+                        kind,
+                        center[0],
+                        center[1],
+                        view_half_extent_x,
+                        view_half_extent_y,
+                        julia_c_f64,
+                        max_iter,
+                        precision_bits,
+                    ),
+                };
                 // Ignore send error: if the App was dropped, the result is
                 // just unused (the worker still completes its CPU work).
                 let _ = tx.send(orbit);
@@ -239,7 +283,15 @@ impl PerturbationDriver {
             // wasm has no `std::thread`; perturbation is native-only.
             // Clear `dirty` so eligible views don't keep churning the
             // (no-op) spawn path every frame; the HP path renders.
-            let _ = (center, zoom, aspect, max_iter, fractal_type, julia_c);
+            let _ = (
+                center,
+                center_precise,
+                zoom,
+                aspect,
+                max_iter,
+                fractal_type,
+                julia_c,
+            );
             self.dirty = false;
             false
         }
@@ -357,6 +409,7 @@ mod tests {
 
         d.note_view(
             [-0.5, 0.0],
+            None,
             1e8,
             16.0 / 9.0,
             1000,
@@ -369,6 +422,7 @@ mod tests {
         d.dirty = false;
         d.note_view(
             [-0.5, 0.0],
+            None,
             1e8,
             16.0 / 9.0,
             1000,
@@ -380,6 +434,7 @@ mod tests {
         // Each field change marks dirty.
         d.note_view(
             [-0.5, 0.0001],
+            None,
             1e8,
             16.0 / 9.0,
             1000,
@@ -390,6 +445,7 @@ mod tests {
         d.dirty = false;
         d.note_view(
             [-0.5, 0.0001],
+            None,
             2e8,
             16.0 / 9.0,
             1000,
@@ -400,6 +456,7 @@ mod tests {
         d.dirty = false;
         d.note_view(
             [-0.5, 0.0001],
+            None,
             2e8,
             4.0 / 3.0,
             1000,
@@ -410,6 +467,7 @@ mod tests {
         d.dirty = false;
         d.note_view(
             [-0.5, 0.0001],
+            None,
             2e8,
             4.0 / 3.0,
             1001,
@@ -420,6 +478,7 @@ mod tests {
         d.dirty = false;
         d.note_view(
             [-0.5, 0.0001],
+            None,
             2e8,
             4.0 / 3.0,
             1001,
@@ -430,6 +489,7 @@ mod tests {
         d.dirty = false;
         d.note_view(
             [-0.5, 0.0001],
+            None,
             2e8,
             4.0 / 3.0,
             1001,
@@ -448,6 +508,7 @@ mod tests {
         // dirty, but zoom = 1 (below gate)
         d.note_view(
             [-0.5, 0.0],
+            None,
             1.0,
             16.0 / 9.0,
             1000,
@@ -457,6 +518,7 @@ mod tests {
 
         let spawned = d.maybe_spawn(
             [-0.5, 0.0],
+            None,
             1.0,
             16.0 / 9.0,
             1000,
@@ -470,5 +532,97 @@ mod tests {
             !d.computing,
             "below-gate spawn attempt must not flip computing"
         );
+    }
+
+    // ---- ENH-001 Phase C: precise (decimal-string) center invalidation ----
+
+    /// A precise center override is part of the view signature: setting or
+    /// changing it must mark the orbit stale so the driver recomputes against
+    /// the high-precision center (not the truncated f64 mirror). This is the
+    /// contract that makes a pasted deep-zoom coordinate actually take effect.
+    #[test]
+    fn note_view_dirty_on_precise_center_change() {
+        let mut d = PerturbationDriver::new();
+        let zoom = 1e8_f64;
+        let aspect = 16.0 / 9.0;
+        let max_iter = 1000u32;
+        let jc = [0.0f32, 0.0];
+
+        // Establish a baseline view (no precise center).
+        d.note_view(
+            [-0.5, 0.0],
+            None,
+            zoom,
+            aspect,
+            max_iter,
+            FractalType::Mandelbrot2D,
+            jc,
+        );
+        d.dirty = false;
+
+        // Same f64 center, but a precise override now present → must invalidate.
+        d.note_view(
+            [-0.5, 0.0],
+            Some([
+                "-0.743643887037151071".to_string(),
+                "0.1318259042".to_string(),
+            ]),
+            zoom,
+            aspect,
+            max_iter,
+            FractalType::Mandelbrot2D,
+            jc,
+        );
+        assert!(
+            d.dirty,
+            "setting a precise center must invalidate the orbit"
+        );
+
+        // Re-recording the identical precise view must NOT re-invalidate.
+        d.dirty = false;
+        d.note_view(
+            [-0.5, 0.0],
+            Some([
+                "-0.743643887037151071".to_string(),
+                "0.1318259042".to_string(),
+            ]),
+            zoom,
+            aspect,
+            max_iter,
+            FractalType::Mandelbrot2D,
+            jc,
+        );
+        assert!(!d.dirty, "identical precise view must not re-invalidate");
+
+        // Changing the precise string's digits (sub-f64) must invalidate.
+        d.note_view(
+            [-0.5, 0.0],
+            Some([
+                "-0.743643887037151087".to_string(),
+                "0.1318259042".to_string(),
+            ]),
+            zoom,
+            aspect,
+            max_iter,
+            FractalType::Mandelbrot2D,
+            jc,
+        );
+        assert!(
+            d.dirty,
+            "sub-f64 change to the precise string must invalidate"
+        );
+
+        // Clearing the precise override must invalidate (revert to f64 path).
+        d.dirty = false;
+        d.note_view(
+            [-0.5, 0.0],
+            None,
+            zoom,
+            aspect,
+            max_iter,
+            FractalType::Mandelbrot2D,
+            jc,
+        );
+        assert!(d.dirty, "clearing the precise center must invalidate");
     }
 }

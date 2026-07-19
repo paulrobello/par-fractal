@@ -142,6 +142,7 @@ impl FractalParams {
             ui_state: UIState::default(), // Will be overridden by App if UI state exists
             auto_open_captures: false,    // Will be overridden by App with UI state
             center_2d: self.settings.center_2d,
+            center_2d_precise: self.settings.center_2d_precise.clone(),
             zoom_2d: self.settings.zoom_2d,
             julia_c: self.settings.julia_c,
             max_iterations: self.settings.max_iterations,
@@ -320,6 +321,10 @@ impl FractalParams {
             clamp_finite_f64(settings.center_2d[0], -1e15, 1e15, 0.0),
             clamp_finite_f64(settings.center_2d[1], -1e15, 1e15, 0.0),
         ];
+        // ENH-001 Phase C: precise center passes through verbatim (the driver
+        // parses + validates at orbit time; an unparseable string falls back to
+        // the f64 path). No clamp — the whole point is arbitrary precision.
+        let center_2d_precise = settings.center_2d_precise;
         let procedural_brightness = [
             clamp_finite_f32(settings.procedural_brightness[0], -1e6, 1e6, 0.5),
             clamp_finite_f32(settings.procedural_brightness[1], -1e6, 1e6, 0.5),
@@ -380,6 +385,7 @@ impl FractalParams {
                 procedural_frequency,
                 procedural_phase,
                 center_2d,
+                center_2d_precise,
                 zoom_2d,
                 julia_c,
                 max_iterations,

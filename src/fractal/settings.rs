@@ -55,6 +55,14 @@ pub struct Settings {
 
     // 2D specific
     pub center_2d: [f64; 2],
+    /// Optional high-precision 2D center as decimal strings (ENH-001 Phase C).
+    /// When `Some`, the perturbation reference orbit parses these to `FBig`
+    /// instead of using the f64 `center_2d` mirror, so zoom past ~1e15 stays
+    /// correct. `#[serde(default)]` keeps old save files loading (treated as
+    /// `None` → f64 path). Pan/zoom navigation clears it; the precise-center UI
+    /// / preset / decimal-string entry sets it.
+    #[serde(default)]
+    pub center_2d_precise: Option<[String; 2]>,
     pub zoom_2d: f64,
     pub julia_c: [f32; 2],
     pub max_iterations: u32,

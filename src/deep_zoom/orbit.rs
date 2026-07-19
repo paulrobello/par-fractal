@@ -151,7 +151,6 @@ pub struct ReferenceOrbit {
 ///
 /// Returns `Err(message)` on malformed input (the caller — UI / settings loader
 /// — surfaces the message); never panics.
-#[allow(dead_code)] // ENH-001 Phase C: consumed once the driver wires the precise center (Phase 2).
 pub fn parse_center_decimal(s: &str, precision_bits: usize) -> Result<FBig, String> {
     let p = precision_bits.max(53);
     let decimal = DBig::from_str(s).map_err(|e| format!("{e}"))?;
@@ -219,7 +218,6 @@ pub fn compute_reference_orbit(
 /// center is not bounded by f64. `julia_c` remains f64 here — it is the fixed c
 /// for Julia (stored as f32 in settings); only the *center* carries the precise
 /// path in this phase.
-#[allow(dead_code)] // ENH-001 Phase C: consumed once the driver wires the precise center (Phase 2).
 pub fn compute_reference_orbit_precise(
     kind: FractalKind,
     center_re: FBig,
@@ -393,7 +391,6 @@ pub fn compute_reference_orbit_best(
 /// (exact to add — they sit far above the delta noise floor). The driver uses
 /// this when a `center_2d_precise` override is set; otherwise the f64
 /// [`compute_reference_orbit_best`] applies.
-#[allow(dead_code)] // ENH-001 Phase C: consumed once the driver wires the precise center (Phase 2).
 #[allow(clippy::too_many_arguments)] // mirrors the f64 selector's signature
 pub fn compute_reference_orbit_best_precise(
     kind: FractalKind,

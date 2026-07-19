@@ -245,6 +245,7 @@ impl App {
         use crate::renderer::uniforms::perturbation_max_iterations;
 
         let center = self.fractal_params.settings.center_2d;
+        let center_precise = self.fractal_params.settings.center_2d_precise.clone();
         let zoom = self.fractal_params.settings.zoom_2d;
         let aspect = self.camera.aspect;
         let fractal_type = self.fractal_params.settings.fractal_type;
@@ -258,6 +259,7 @@ impl App {
         // (1) Record view → mark stale on change.
         self.perturbation_driver.note_view(
             center,
+            center_precise.clone(),
             zoom,
             aspect,
             effective_max_iter,
@@ -268,6 +270,7 @@ impl App {
         // (2) Spawn worker if eligible + stale + idle.
         if self.perturbation_driver.maybe_spawn(
             center,
+            center_precise,
             zoom,
             aspect,
             effective_max_iter,
