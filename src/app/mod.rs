@@ -689,6 +689,14 @@ impl App {
     fn maybe_start_refinement(&mut self) -> bool {
         use crate::fractal::RenderMode;
 
+        // Never start refinement on a capture frame: a screenshot / hi-res
+        // render needs a complete full-quality frame, not tile 0 over a stale
+        // background. (When parked/converged the inter-frame gap makes
+        // `last_frame_ms` huge, which would otherwise pass the cost check and
+        // make the capture render a single tile.)
+        if self.save_screenshot || self.save_hires_render.is_some() {
+            return false;
+        }
         if self.refine_state.is_some() || self.is_scene_animation_active() {
             return false;
         }
