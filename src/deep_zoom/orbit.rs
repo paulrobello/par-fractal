@@ -13,6 +13,8 @@
 //! BigFloat walk is caught without a GPU.
 
 use crate::fractal::FractalType;
+use core::str::FromStr;
+use dashu_float::DBig;
 use dashu_float::FBig;
 use dashu_float::ops::Abs;
 
@@ -137,7 +139,30 @@ pub struct ReferenceOrbit {
     pub reference_offset: [f32; 2],
 }
 
-/// Compute the reference orbit at center `(center_re, center_im)`.
+/// Parse a decimal-string center coordinate to a base-2 `FBig` at the given
+/// mantissa precision (ENH-001 Phase C — precise center).
+///
+/// Accepts the decimal forms `DBig::from_str` supports: plain (`-0.7436…`),
+/// with explicit exponent (`1.5e-10`), and signed. The result is a base-2
+/// `FBig` (the orbit's working type) at exactly `max(precision_bits, 53)`
+/// mantissa bits, so it composes directly with the f64-derived operands in the
+/// orbit walk. This is the entry point that frees the reference orbit's center
+/// from f64 precision, keeping it valid past the ~1e11 f64 ceiling.
+///
+/// Returns `Err(message)` on malformed input (the caller — UI / settings loader
+/// — surfaces the message); never panics.
+#[allow(dead_code)] // ENH-001 Phase C: consumed once the driver wires the precise center (Phase 2).
+pub fn parse_center_decimal(s: &str, precision_bits: usize) -> Result<FBig, String> {
+    let p = precision_bits.max(53);
+    let decimal = DBig::from_str(s).map_err(|e| format!("{e}"))?;
+    // Base-10 → base-2 with Zero rounding (the orbit `FBig`'s mode); the
+    // `.with_precision` then pins the exact target mantissa width.
+    let binary = decimal.to_binary().value();
+    Ok(binary.with_precision(p).value())
+}
+
+/// Compute the reference orbit at center `(center_re, center_im)` from f64
+/// coordinates (Phase A entry point).
 ///
 /// Iterates the map selected by `kind` (Mandelbrot / Julia / Burning Ship /
 /// Tricorn), stopping at `|Z|² > 4` (escape) or `max_iter`. Each `Z_n` is
@@ -151,11 +176,10 @@ pub struct ReferenceOrbit {
 /// the whole view — passed as the `julia_c` parameter, ignored for the
 /// other kinds).
 ///
-/// `center_re`/`center_im` are f64 here (Phase A enters from the existing f64
-/// center). A later phase stores the center as a decimal string and parses it
-/// straight to `FBig` so precision is not bounded by f64 — but even from f64,
-/// raising the `FBig` precision lets the *iteration* carry guard bits f64
-/// cannot, which is what keeps the orbit valid past the ~1e11 f64 ceiling.
+/// For a center beyond f64 precision use [`compute_reference_orbit_precise`]
+/// with a value from [`parse_center_decimal`]; raising the `FBig` precision
+/// here still lets the *iteration* carry guard bits f64 cannot, which keeps
+/// the orbit valid partway past the ~1e11 f64 ceiling.
 pub fn compute_reference_orbit(
     kind: FractalKind,
     center_re: f64,
@@ -164,45 +188,87 @@ pub fn compute_reference_orbit(
     max_iter: u32,
     precision_bits: usize,
 ) -> ReferenceOrbit {
-    let p = precision_bits.max(53);
-    // f64→FBig is fallible (NaN/Inf have no finite representation), hence
-    // `try_from`. The center is finite upstream; a NaN here is a real bug worth
-    // surfacing rather than silently rendering garbage.
-    let with_p = |v: f64| -> FBig {
-        FBig::try_from(v)
-            .expect("reference orbit center must be finite")
-            .with_precision(p)
-            .value()
-    };
+    // f64→FBig is fallible (NaN/Inf have no finite representation); the center
+    // is finite upstream, a NaN here is a real bug worth surfacing.
+    let to_fbig = |v: f64| FBig::try_from(v).expect("reference orbit center must be finite");
     // Per-kind (c, Z_0). Julia inverts the role: c is the fixed `julia_c`
     // and Z_0 is the view center; the other kinds put c at the view center
     // and start Z_0 at zero.
     let (cr, ci, z0r, z0i) = match kind {
         FractalKind::Julia => (
-            with_p(julia_c[0]),
-            with_p(julia_c[1]),
-            with_p(center_re),
-            with_p(center_im),
+            to_fbig(julia_c[0]),
+            to_fbig(julia_c[1]),
+            to_fbig(center_re),
+            to_fbig(center_im),
         ),
         _ => (
-            with_p(center_re),
-            with_p(center_im),
-            with_p(0.0),
-            with_p(0.0),
+            to_fbig(center_re),
+            to_fbig(center_im),
+            to_fbig(0.0),
+            to_fbig(0.0),
         ),
     };
-    let two = with_p(2.0);
-    let four = with_p(4.0);
+    orbit_from_fbig(kind, cr, ci, z0r, z0i, max_iter, precision_bits)
+}
 
-    let mut zr = z0r;
-    let mut zi = z0i;
+/// Compute the reference orbit at a precise (decimal-string-derived) center
+/// (ENH-001 Phase C).
+///
+/// Identical to [`compute_reference_orbit`] but enters from `FBig` center
+/// coordinates parsed by [`parse_center_decimal`], so the reference orbit's
+/// center is not bounded by f64. `julia_c` remains f64 here — it is the fixed c
+/// for Julia (stored as f32 in settings); only the *center* carries the precise
+/// path in this phase.
+#[allow(dead_code)] // ENH-001 Phase C: consumed once the driver wires the precise center (Phase 2).
+pub fn compute_reference_orbit_precise(
+    kind: FractalKind,
+    center_re: FBig,
+    center_im: FBig,
+    julia_c: [f64; 2],
+    max_iter: u32,
+    precision_bits: usize,
+) -> ReferenceOrbit {
+    let to_fbig = |v: f64| FBig::try_from(v).expect("julia_c must be finite");
+    let (cr, ci, z0r, z0i) = match kind {
+        FractalKind::Julia => (
+            to_fbig(julia_c[0]),
+            to_fbig(julia_c[1]),
+            center_re,
+            center_im,
+        ),
+        _ => (center_re, center_im, to_fbig(0.0), to_fbig(0.0)),
+    };
+    orbit_from_fbig(kind, cr, ci, z0r, z0i, max_iter, precision_bits)
+}
+
+/// Iterate the reference orbit from already-`FBig` starting values (shared core
+/// for the f64 and precise-center entry points). All inputs are normalized to
+/// `max(precision_bits, 53)` mantissa bits — widening is exact, so mixing an
+/// f64-derived value with a 100-bit precise center loses nothing.
+fn orbit_from_fbig(
+    kind: FractalKind,
+    cr: FBig,
+    ci: FBig,
+    z0r: FBig,
+    z0i: FBig,
+    max_iter: u32,
+    precision_bits: usize,
+) -> ReferenceOrbit {
+    let p = precision_bits.max(53);
+    let norm = |v: FBig| v.with_precision(p).value();
+    let cr = norm(cr);
+    let ci = norm(ci);
+    let mut zr = norm(z0r);
+    let mut zi = norm(z0i);
+    let two = norm(FBig::try_from(2.0).expect("2.0 is finite"));
+    let four = norm(FBig::try_from(4.0).expect("4.0 is finite"));
 
     let mut z: Vec<[f32; 2]> = Vec::with_capacity(max_iter as usize);
     let mut escaped_at: Option<u32> = None;
 
     for i in 0..max_iter {
-        // Emit Z_i (z[0] = Z_0). Done before the escape test so the
-        // shader has the value whose magnitude is being tested.
+        // Emit Z_i (z[0] = Z_0). Done before the escape test so the shader
+        // has the value whose magnitude is being tested.
         z.push([zr.to_f64().value() as f32, zi.to_f64().value() as f32]);
 
         // Escape test on the emitted Z_i.
@@ -221,10 +287,10 @@ pub fn compute_reference_orbit(
         z,
         escaped_at,
         precision_bits: p,
-        // Callers of `compute_reference_orbit` pass the reference c directly;
-        // assume c IS the center, so the shader's delta_c_origin is zero. The
-        // selector (`compute_reference_orbit_best`) overrides this when it
-        // picks a non-center reference.
+        // Callers of `compute_reference_orbit[_precise]` pass the reference c
+        // directly; assume c IS the center, so the shader's delta_c_origin is
+        // zero. The selector (`compute_reference_orbit_best[_precise]`)
+        // overrides this when it picks a non-center reference.
         reference_offset: [0.0, 0.0],
     }
 }
@@ -309,6 +375,67 @@ pub fn compute_reference_orbit_best(
                 // variable for Julia is z_0, so the same offset semantics
                 // carry: `delta_c_origin = z_0_center − z_0_ref`.
                 let offset: [f32; 2] = [(center_re - cand_re) as f32, (center_im - cand_im) as f32];
+                let mut chosen = orbit;
+                chosen.reference_offset = offset;
+                best = Some(chosen);
+            }
+        }
+    }
+
+    best.expect("the 3×3 grid always runs at least the center candidate")
+}
+
+/// Precise-center variant of [`compute_reference_orbit_best`] (ENH-001 Phase C).
+///
+/// Identical 3×3 probe and latest-escape selection, but the center is an
+/// `FBig` parsed by [`parse_center_decimal`], so the probe candidates inherit
+/// the center's full precision. The per-axis offsets are view-sized f64 values
+/// (exact to add — they sit far above the delta noise floor). The driver uses
+/// this when a `center_2d_precise` override is set; otherwise the f64
+/// [`compute_reference_orbit_best`] applies.
+#[allow(dead_code)] // ENH-001 Phase C: consumed once the driver wires the precise center (Phase 2).
+#[allow(clippy::too_many_arguments)] // mirrors the f64 selector's signature
+pub fn compute_reference_orbit_best_precise(
+    kind: FractalKind,
+    center_re: FBig,
+    center_im: FBig,
+    view_half_extent_x: f64,
+    view_half_extent_y: f64,
+    julia_c: [f64; 2],
+    max_iter: u32,
+    precision_bits: usize,
+) -> ReferenceOrbit {
+    let step_x = 0.5 * view_half_extent_x;
+    let step_y = 0.5 * view_half_extent_y;
+
+    let mut best: Option<ReferenceOrbit> = None;
+    for dy in [-1.0_f64, 0.0, 1.0] {
+        for dx in [-1.0_f64, 0.0, 1.0] {
+            // Offsets are view-sized (f64-precise is plenty — they sit far
+            // above the delta noise floor); convert to FBig and add to the
+            // precise center so candidate coordinates inherit full precision.
+            let off_x = FBig::try_from(dx * step_x).expect("half-extent offset is finite");
+            let off_y = FBig::try_from(dy * step_y).expect("half-extent offset is finite");
+            let cand_re = center_re.clone() + off_x;
+            let cand_im = center_im.clone() + off_y;
+            let orbit = compute_reference_orbit_precise(
+                kind,
+                cand_re,
+                cand_im,
+                julia_c,
+                max_iter,
+                precision_bits,
+            );
+
+            let picks_this = match &best {
+                None => true,
+                Some(b) => later_escape(&orbit.escaped_at, &b.escaped_at),
+            };
+            if picks_this {
+                // reference_offset = c_center − c_ref, cast to f32 — identical
+                // to the f64 selector's offset (the offset is the view-sized
+                // probe step, which f32 represents fine).
+                let offset: [f32; 2] = [(-(dx * step_x)) as f32, (-(dy * step_y)) as f32];
                 let mut chosen = orbit;
                 chosen.reference_offset = offset;
                 best = Some(chosen);
@@ -695,5 +822,136 @@ mod tests {
                 o.escaped_at,
             );
         }
+    }
+
+    // ---- ENH-001 Phase C: decimal-string center parsing (precise center) ----
+
+    /// A decimal center string parses to a base-2 `FBig` that preserves digits
+    /// beyond f64 precision. Two strings that f64 conflates (they agree in the
+    /// first ~16 significant digits) must parse to *distinct* `FBig` values at
+    /// 80 bits of mantissa — this is the whole point of the precise-center
+    /// path: the reference orbit's center is not bounded by f64.
+    #[test]
+    fn parse_center_decimal_preserves_sub_f64_precision() {
+        // Differ only in the 17th significant digit → f64 collapses them.
+        let a = "-0.743643887037151071";
+        let b = "-0.743643887037151087";
+        let fa: f64 = a.parse().unwrap();
+        let fb: f64 = b.parse().unwrap();
+        assert_eq!(
+            fa.to_bits(),
+            fb.to_bits(),
+            "test premise: f64 must conflate these two strings"
+        );
+
+        let pa = parse_center_decimal(a, 80).unwrap();
+        let pb = parse_center_decimal(b, 80).unwrap();
+        assert_ne!(pa, pb, "80-bit parse must distinguish sub-f64 centers");
+    }
+
+    /// A center within f64 range round-trips: parsing the decimal string and
+    /// converting back to f64 lands on the same value (to f64 ULP tolerance;
+    /// `FBig`'s Zero rounding mode differs from f64's round-to-nearest, so an
+    /// exact bit-equality assertion would be brittle).
+    #[test]
+    fn parse_center_decimal_round_trips_f64_values() {
+        let s = "-0.743643887037151";
+        let f: f64 = s.parse().unwrap();
+        let parsed = parse_center_decimal(s, 80).unwrap();
+        assert!(
+            (parsed.to_f64().value() - f).abs() < 1e-14,
+            "f64 round-trip drifted: {} vs {}",
+            parsed.to_f64().value(),
+            f
+        );
+    }
+
+    /// `DBig::from_str` accepts scientific notation (`E`), so the parser must
+    /// too — deep-zoom coordinates are often written compactly (e.g.
+    /// `-7.43…e-1`). Verifies `E` is accepted and the value is correct (a
+    /// full-precision mantissa keeps the f64 comparison tight).
+    #[test]
+    fn parse_center_decimal_accepts_scientific_notation() {
+        let parsed = parse_center_decimal("1.2345678901234567e-2", 80).unwrap();
+        let expected: f64 = 1.2345678901234567e-2;
+        let got = parsed.to_f64().value();
+        assert!(
+            (got - expected).abs() / expected < 1e-15,
+            "scientific notation mis-parsed: {} vs {}",
+            got,
+            expected
+        );
+    }
+
+    /// Garbage input is an error, not a panic — the UI hands user-typed strings
+    /// to this function.
+    #[test]
+    fn parse_center_decimal_rejects_garbage() {
+        assert!(parse_center_decimal("not_a_number", 80).is_err());
+        assert!(parse_center_decimal("", 80).is_err());
+        assert!(parse_center_decimal("nan", 80).is_err());
+    }
+
+    /// An f64-representable center parsed as a decimal string must produce the
+    /// same orbit as the f64 entry path — the precise path is a superset, not a
+    /// divergence. `-0.5` is exactly representable in both f64 and decimal, so
+    /// the two orbits must agree to f32 mirror tolerance.
+    #[test]
+    fn precise_center_orbit_matches_f64_path() {
+        let kind = FractalKind::Mandelbrot;
+        let max_iter = 200u32;
+        let precision = 128usize;
+
+        let f64_orbit = compute_reference_orbit(kind, -0.5, 0.0, [0.0, 0.0], max_iter, precision);
+        let cr = parse_center_decimal("-0.5", precision).unwrap();
+        let ci = parse_center_decimal("0.0", precision).unwrap();
+        let precise_orbit =
+            compute_reference_orbit_precise(kind, cr, ci, [0.0, 0.0], max_iter, precision);
+
+        assert_eq!(f64_orbit.escaped_at, precise_orbit.escaped_at);
+        assert_eq!(f64_orbit.z.len(), precise_orbit.z.len());
+        for (a, b) in f64_orbit.z.iter().zip(precise_orbit.z.iter()) {
+            assert!((a[0] - b[0]).abs() < 1e-6, "re drift: {} vs {}", a[0], b[0]);
+            assert!((a[1] - b[1]).abs() < 1e-6, "im drift: {} vs {}", a[1], b[1]);
+        }
+    }
+
+    /// The precise selector picks the same reference (same `escaped_at` and same
+    /// `reference_offset`) as the f64 selector for an f64-representable center —
+    /// the precise path is a strict superset, not a behavioral fork. This is the
+    /// contract Phase 2's driver relies on when it swaps in the precise selector.
+    #[test]
+    fn best_precise_matches_f64_best_for_representable_center() {
+        let kind = FractalKind::Mandelbrot;
+        let (cr, ci) = (-0.7436438870_f64, 0.1318259042_f64);
+        let zoom = 1e8_f64;
+        let hx = (2.0 / zoom) * (16.0 / 9.0);
+        let hy = 2.0 / zoom;
+        let max_iter = 500u32;
+        let precision = precision_bits_for_zoom(zoom);
+
+        let f64_best =
+            compute_reference_orbit_best(kind, cr, ci, hx, hy, [0.0, 0.0], max_iter, precision);
+        let cr_b = parse_center_decimal(&format!("{cr}"), precision).unwrap();
+        let ci_b = parse_center_decimal(&format!("{ci}"), precision).unwrap();
+        let prec_best = compute_reference_orbit_best_precise(
+            kind,
+            cr_b,
+            ci_b,
+            hx,
+            hy,
+            [0.0, 0.0],
+            max_iter,
+            precision,
+        );
+
+        assert_eq!(
+            f64_best.escaped_at, prec_best.escaped_at,
+            "same reference selected"
+        );
+        assert_eq!(
+            f64_best.reference_offset, prec_best.reference_offset,
+            "same delta_c_origin offset"
+        );
     }
 }
