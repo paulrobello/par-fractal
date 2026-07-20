@@ -2235,12 +2235,53 @@ fn sierpinski_gasket_de(pos: vec3<f32>) -> f32 {
 
 // Pickover attractor: Creates a 3D orbit that we can ray march
 // x' = sin(a*y) - z*cos(b*x), y' = z*sin(c*x) - cos(d*y), z' = sin(x)
-fn pickover_attractor_de(pos: vec3<f32>) -> f32 {
+// Signed distance to an axis-aligned box centred at the origin with
+// half-extents `half`. Negative inside.
+fn sd_box(p: vec3<f32>, half: vec3<f32>) -> f32 {
+    let q = abs(p) - half;
+    return length(max(q, vec3<f32>(0.0))) + min(max(q.x, max(q.y, q.z)), 0.0);
+}
+
+// True when the active fractal's estimator can return a cheap lower bound
+// instead of its exact (very expensive) value — see `pickover_attractor_de`.
+// Callers use this to decide whether a two-tier evaluation is worth it; for
+// every other type the bound *is* the exact value, so the second tier would
+// only duplicate work.
+fn has_conservative_bound() -> bool {
+    let ty = select(uniforms.fractal_type, SPECIALIZED_TYPE, SPECIALIZED_TYPE != 0xFFFFu);
+    return ty == 35u;
+}
+
+fn pickover_attractor_de(pos: vec3<f32>, conservative: bool) -> f32 {
     let scale = uniforms.fractal_scale;
     let a = uniforms.julia_c.x;
     let b = uniforms.julia_c.y;
     let c = uniforms.power;
     let d = uniforms.fractal_fold;
+
+    // The trajectory below does not depend on `pos`, yet it is re-run in full
+    // for every ray-marching step of every pixel — the dominant cost of this
+    // fractal by far. Almost all of those steps are in empty space, so when the
+    // caller only needs a safe lower bound, reject them against the attractor's
+    // bounding box instead of simulating.
+    //
+    // The bound is exact and parameter-independent: z = sin(x) gives |z| <= 1,
+    // hence |x| <= |sin(a*y)| + |z * cos(b*x)| <= 2, and likewise |y| <= 2.
+    // Distance to a box enclosing the point cloud is a lower bound on the
+    // distance to the cloud, so sphere tracing stays correct.
+    //
+    // `conservative` is false for soft shadows and ambient occlusion: those
+    // read the estimate's *magnitude* as a proximity signal, so a lower bound
+    // makes them shade the bounding box rather than the attractor.
+    let radius = 0.02 * scale;
+    let bounds = vec3<f32>(2.0, 2.0, 1.0) * scale + vec3<f32>(radius);
+    let outside = sd_box(pos, bounds);
+    // Hand back to the exact estimator inside a thin shell around the box: the
+    // marcher counts any estimate below `min_distance` as a surface hit, so an
+    // early-out that reached zero would render the bounding box itself.
+    if (conservative && outside > uniforms.min_distance * 4.0) {
+        return outside;
+    }
 
     // Build attractor point cloud and find minimum distance
     var min_dist = 1000.0;
@@ -2400,7 +2441,7 @@ struct SceneResult {
 // bit-identical). 0xFFFF is the "unset" sentinel (no 3D type uses it).
 override SPECIALIZED_TYPE: u32 = 0xFFFFu;
 
-fn scene_de_with_material(pos: vec3<f32>) -> SceneResult {
+fn scene_de_with_material(pos: vec3<f32>, conservative: bool) -> SceneResult {
     var result: SceneResult;
     var fractal_dist = 1000.0;
 
@@ -2425,7 +2466,7 @@ fn scene_de_with_material(pos: vec3<f32>) -> SceneResult {
         case 23u: { fractal_dist = quaternion_cubic_de(pos); }
         case 24u: { fractal_dist = sierpinski_gasket_de(pos); }
         // 3D Strange Attractors (types 35-37)
-        case 35u: { fractal_dist = pickover_attractor_de(pos); }
+        case 35u: { fractal_dist = pickover_attractor_de(pos, conservative); }
         case 36u: { fractal_dist = lorenz_attractor_de(pos); }
         case 37u: { fractal_dist = rossler_attractor_de(pos); }
         default: { fractal_dist = 1000.0; }
@@ -2447,8 +2488,11 @@ fn scene_de_with_material(pos: vec3<f32>) -> SceneResult {
     return result;
 }
 
+// Exact estimate. Callers that read the magnitude as a proximity signal
+// (normals, ambient occlusion, soft shadows) must use this, not the
+// conservative bound the ray marcher is allowed to take.
 fn scene_de(pos: vec3<f32>) -> f32 {
-    return scene_de_with_material(pos).distance;
+    return scene_de_with_material(pos, false).distance;
 }
 
 // ============================================================================
@@ -2569,7 +2613,7 @@ fn ray_march(origin: vec3<f32>, direction: vec3<f32>) -> RayMarchResult {
     for (var i = 0u; i < uniforms.max_steps; i = i + 1u) {
         result.steps = i;
         let pos = origin + direction * total_distance;
-        let scene_result = scene_de_with_material(pos);
+        let scene_result = scene_de_with_material(pos, true);
         let dist = scene_result.distance;
 
         // Determine step size based on mode
@@ -2694,24 +2738,50 @@ fn calculate_soft_shadow(origin: vec3<f32>, direction: vec3<f32>, mint: f32) -> 
             return result;
         }
 
-        let h = scene_de(pos);
-        if (h < shadow_threshold) {
-            // Hard shadows: binary occlusion
-            if (uniforms.soft_shadows == 1u) {
-                return 0.0;
+        // Types with a cheap bounding volume (the 3D attractors, whose exact
+        // estimate re-simulates the whole trajectory per call) get a two-tier
+        // evaluation: take the bound first, and only pay for the exact estimate
+        // when the bound cannot settle this sample.
+        //
+        // This is exact, not an approximation. The exact estimate is always
+        // >= the bound, so a bound that clears `shadow_threshold` proves the
+        // exact value clears it too, and a bound whose penumbra term already
+        // exceeds `result` proves the exact value cannot lower `result`
+        // either. Stepping by the bound is likewise conservative.
+        var step_dist: f32;
+        var settled = false;
+        if (has_conservative_bound()) {
+            let bound = scene_de_with_material(pos, true).distance;
+            let clears_occlusion = bound >= shadow_threshold;
+            let cannot_darken = uniforms.soft_shadows != 2u
+                || uniforms.shadow_softness * bound / t >= result;
+            if (clears_occlusion && cannot_darken) {
+                step_dist = bound;
+                settled = true;
             }
-            // Soft shadows: accumulate penumbra factor
-            result = 0.0;
-            break;
         }
-        if (uniforms.soft_shadows == 2u) {
-            result = min(result, uniforms.shadow_softness * h / t);
+
+        if (!settled) {
+            let h = scene_de(pos);
+            if (h < shadow_threshold) {
+                // Hard shadows: binary occlusion
+                if (uniforms.soft_shadows == 1u) {
+                    return 0.0;
+                }
+                // Soft shadows: accumulate penumbra factor
+                result = 0.0;
+                break;
+            }
+            if (uniforms.soft_shadows == 2u) {
+                result = min(result, uniforms.shadow_softness * h / t);
+            }
+            step_dist = h;
         }
 
         // Conservative stepping to prevent missing thin features:
         // Use configurable step factor (default 0.6 = 60% of DE for safety margin)
         // Also cap at smaller maximum to prevent over-stepping
-        let conservative_step = h * uniforms.shadow_step_factor;
+        let conservative_step = step_dist * uniforms.shadow_step_factor;
         let max_step = 0.05 * uniforms.fractal_scale;
         let step = min(conservative_step, max_step);
         t = t + step;
