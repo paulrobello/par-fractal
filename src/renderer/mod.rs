@@ -17,6 +17,8 @@ pub mod profiler;
 pub mod uniforms;
 mod update;
 
+use std::collections::HashMap;
+
 use compute::{
     AccumulationDisplayUniforms, AccumulationTexture, AttractorComputePipeline,
     BuddhabrotAccumulationBuffer, BuddhabrotComputePipeline,
@@ -62,6 +64,16 @@ pub struct Renderer {
     // entry point by naga/the backend.
     pub pipeline_2d: wgpu::RenderPipeline,
     pub pipeline_3d: wgpu::RenderPipeline,
+    /// ENH-004 Stage 2: the shader module and pipeline layout retained past
+    /// init so specialized 3D pipelines can be compiled lazily at runtime
+    /// (one per fractal type, overriding the WGSL `SPECIALIZED_TYPE` constant).
+    pub shader_module: wgpu::ShaderModule,
+    pub render_pipeline_layout: wgpu::PipelineLayout,
+    /// ENH-004 Stage 2: lazily-compiled specialized 3D pipelines keyed by the
+    /// fractal type's GPU index (`FractalType as u32`). A miss returns the
+    /// generic `pipeline_3d` for that frame while the specialized variant
+    /// compiles. Populated by `ensure_specialized_3d_pipeline`.
+    pub pipeline_3d_cache: HashMap<u32, wgpu::RenderPipeline>,
     pub vertex_buffer: wgpu::Buffer,
     pub uniform_buffer: wgpu::Buffer,
     pub uniform_bind_group: wgpu::BindGroup,

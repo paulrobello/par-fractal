@@ -108,6 +108,11 @@ impl App {
             } else {
                 // Pass 1: Render fractal to scene_texture (full frame).
                 {
+                    // ENH-004 Stage 2: compile (cache) a per-type specialized 3D
+                    // pipeline before the pass opens, so the in-pass lookup
+                    // below is a plain `&self` read.
+                    let fractal_type = self.fractal_params.settings.fractal_type;
+                    self.renderer.ensure_specialized_3d_pipeline(fractal_type);
                     let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                         label: Some("Scene Render Pass"),
                         color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -127,10 +132,14 @@ impl App {
 
                     let mut render_pass = render_pass.forget_lifetime();
 
-                    // ARC-009: select 2D vs 3D pipeline by fractal type. Both
-                    // pipelines share one layout and uniform bind group.
-                    let pipeline = if self.fractal_params.settings.fractal_type.is_3d() {
-                        &self.renderer.pipeline_3d
+                    // ARC-009/ENH-004: select 2D vs 3D pipeline by fractal type.
+                    // The 3D path uses the per-type specialized pipeline (a
+                    // variant with the DE dispatch switch constant-folded and
+                    // the other ~14 estimators dead-stripped); until it is
+                    // compiled it falls back to the generic `pipeline_3d`,
+                    // which retains the runtime switch.
+                    let pipeline = if fractal_type.is_3d() {
+                        self.renderer.specialized_3d_pipeline_ref(fractal_type)
                     } else {
                         &self.renderer.pipeline_2d
                     };
@@ -305,6 +314,10 @@ impl App {
         let [tx, ty, tw, th] = super::refine::tile_rect(tile_idx, grid_side, w, h);
 
         {
+            // ENH-004 Stage 2: same specialization as the main scene pass —
+            // ensure the per-type 3D pipeline is compiled before the pass opens.
+            let fractal_type = self.fractal_params.settings.fractal_type;
+            self.renderer.ensure_specialized_3d_pipeline(fractal_type);
             let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("ENH-002 Refine Tile Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -330,8 +343,8 @@ impl App {
             // limits rasterization to this tile. The fullscreen-quad vertices
             // cover NDC [-1,1], so each tile renders its own region of the view.
             render_pass.set_scissor_rect(tx, ty, tw, th);
-            let pipeline = if self.fractal_params.settings.fractal_type.is_3d() {
-                &self.renderer.pipeline_3d
+            let pipeline = if fractal_type.is_3d() {
+                self.renderer.specialized_3d_pipeline_ref(fractal_type)
             } else {
                 &self.renderer.pipeline_2d
             };

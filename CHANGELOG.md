@@ -72,6 +72,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   goldens are byte-identical. A/B on an actively-blooming 3D preset (Mandelbox
   Cubic) is pixel-identical (corr 1.0, MAE 0.0); the bloom-OFF path is
   structurally untouched (ARC-005 gating). No threshold tweak needed.
+- **Per-fractal pipeline specialization (ENH-004), Stage 2.** Completes the
+  2D/3D pipeline split with per-type specialization of the 3D path: a WGSL
+  pipeline-overridable constant `override SPECIALIZED_TYPE: u32 = 0xFFFFu;`
+  drives the `scene_de_with_material` distance-estimator dispatch via
+  `select(uniforms.fractal_type, SPECIALIZED_TYPE, SPECIALIZED_TYPE != 0xFFFFu)`
+  (`shaders/fractal.wgsl`). `Renderer::ensure_specialized_3d_pipeline`
+  (`src/renderer/initialization.rs`) lazily compiles one pipeline per 3D fractal
+  type with `PipelineCompilationOptions.constants = [("SPECIALIZED_TYPE", ty)]`,
+  cached in `Renderer::pipeline_3d_cache`; the generic `pipeline_3d` (0xFFFF
+  default) stays as the runtime-switch fallback. Each specialized pipeline
+  constant-folds the DE switch and dead-strips the other ~14 distance estimators
+  from its compiled form. Both scene-pass sites in `src/app/render.rs` (main +
+  tile-refine) select the specialized pipeline for 3D types. **Verification:** A/B
+  specialized-vs-generic Mandelbulb is pixel-identical (MAE 0.0, corr 1.0,
+  100% exact match) — specialization is a provable semantic no-op; 5/5 2D goldens
+  unchanged; Mandelbulb (type 13) and Mandelbox (type 17) specialized smokes
+  render cleanly. Perf measured via ENH-006: a ~6% best-case scene-pass delta
+  within the machine-load noise floor on Apple Silicon (large register files make
+  it the worst case for an occupancy win); the DCE is compiler-guaranteed and is
+  expected to pay more on occupancy-bound integrated/mobile GPUs.
 
 ### Changed
 - **Uniform layout automation via `encase` (ENH-008).** All seven GPU uniform

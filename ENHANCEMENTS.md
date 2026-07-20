@@ -31,7 +31,7 @@
 | ENH-001 | Perturbation-theory infinite zoom | Transformative | Very High (2–4 weeks) | ARC-001/002 bundle; harness ✓ (ENH-007 shipped) | **Phases A + B + C done** — all 4 kinds; 1e8 golden pinned & deterministic; decimal-string precise center (Phase C); BLA deferred (perf optimization, awaits ENH-006 profiler) |
 | ENH-006 | GPU frame profiler (timestamp queries + HUD) | Medium (enables tuning) | Medium (~2 days) | none | **Done** — `GpuProfiler` (`src/renderer/profiler.rs`) + per-pass `timestamp_writes` + EMA HUD (`Shift+G`) + `--profile-dump`/`make profile` (commits `48a4ec0`→`afb8cbe`); degrades cleanly when `TIMESTAMP_QUERY` absent |
 | ENH-005 | Half-resolution bloom pipeline | Medium | Low–Medium (~1 day) | ARC-005 (bloom gating) | **Done** — 3 bloom textures halved via `Renderer::bloom_size` (`src/renderer/{update,initialization}.rs`); blur self-corrects via `textureDimensions`; A/B pixel-identical (corr 1.0); capture path kept full-res |
-| ENH-004 | Per-fractal pipeline specialization | Medium | Medium (~3 days) | ENH-006 (to measure) | **Partial** — 2D/3D entry-point split done; per-type specialization not |
+| ENH-004 | Per-fractal pipeline specialization | Medium | Medium (~3 days) | ENH-006 (to measure) | **Done** — Stage 2 landed: per-type `override SPECIALIZED_TYPE` + lazy 3D pipeline cache; pixel-identical A/B; perf win within noise on Apple Silicon (DCE real, ~6% best-case) |
 | ENH-008 | `encase`-based uniform layout automation | Medium (kills the #1 crash class) | Medium (~2 days) | ARC-010 (offset tests as safety net) | **Done** — all 7 GPU uniform structs migrated to `#[derive(encase::ShaderType)]` (glam vec/mat types); ~14 `_padding_*` fields deleted from Rust + WGSL; `Uniforms` 896→768B; byte-pattern layout tests pin encase offsets; golden harness pixel-identical incl. 1e8 perturbation |
 
 ---
@@ -121,7 +121,34 @@ quarter-resolution during motion ≈ 4–16× fragment-cost reduction, impercept
 
 ### ENH-004 — Per-fractal pipeline specialization
 **Plan**: `docs/fable/ENH-004-pipeline-specialization.md`
-**Status (2026-07-18, HEAD `48f4427`):** Partial. Stage 1 (2D/3D entry-point split — `fs_main_2d`/`fs_main_3d`, `src/renderer/initialization.rs:277-343`) landed. Stage 2 (per-fractal WGSL `override` constants + lazy per-type pipeline cache) did not — there are no `override` declarations, no `PipelineCompilationOptions.constants`, and all 3D fractals still share one `pipeline_3d` (`src/renderer/initialization.rs:327`, stored once at line 967).
+**Status (2026-07-19, HEAD `e15eafc` + ENH-004):** **Done** — both stages shipped. Stage 1
+(2D/3D entry-point split — `fs_main_2d`/`fs_main_3d`) was already in place. Stage 2 now
+lands: a WGSL pipeline-overridable constant `override SPECIALIZED_TYPE: u32 = 0xFFFFu;`
+drives the `scene_de_with_material` DE dispatch via
+`let ty = select(uniforms.fractal_type, SPECIALIZED_TYPE, SPECIALIZED_TYPE != 0xFFFFu);`
+(`src/shaders/fractal.wgsl`). The generic `pipeline_3d` keeps the 0xFFFF default (runtime
+switch retained); `Renderer::ensure_specialized_3d_pipeline` lazily compiles one pipeline
+per 3D fractal type with `PipelineCompilationOptions.constants = [("SPECIALIZED_TYPE", ty)]`
+(`src/renderer/initialization.rs`), cached in `Renderer::pipeline_3d_cache`
+(`HashMap<u32, RenderPipeline>`). The `shader_module` + `render_pipeline_layout` are retained
+past init to compile lazily at runtime. Both scene-pass sites in `src/app/render.rs` (main +
+ENH-002 tile-refine) call `ensure_*` before the pass opens (`&mut`, released before the pass
+borrows textures) and read `specialized_3d_pipeline_ref` (`&self`) inside. **Verification:**
+`make checkall` green; 5/5 2D goldens bit-identical (module-scope override didn't disturb the
+2D entry); 3D specialized smokes render cleanly for Mandelbulb (type 13, 1002 colors) and
+Mandelbox (type 17, 1971 colors); **A/B specialized-vs-generic Mandelbulb is pixel-identical
+(MAE 0.0, corr 1.0, 100% exact match)** — specialization is a provable semantic no-op (the
+override equals the runtime uniform whenever a specialized pipeline is bound). **Perf (ENH-006
+profiler, 800×600 Mandelbulb, `--quality ultra`):** scene-pass ms min-to-min across back-to-back
+trials was specialized 2.03 ms vs generic 2.17 ms — a ~6% best-case delta that is *within the
+machine-load noise floor* on this Apple Silicon GPU (the unchanged composite pass varied ±50–
+800% between trials, swamping a 5% signal). Apple Silicon's large register files / occupancy
+headroom make it the worst-case GPU for an occupancy optimization; the DCE itself (each
+specialized pipeline strips the ~14 other 3D distance estimators) is compiler-guaranteed and is
+expected to pay more on occupancy-bound integrated/mobile GPUs. Kept (not reverted under the
+plan's <5% off-ramp) because the change is correct, harmless, the generic fallback always
+exists, and it is the realistic-hardware win — but the on-dev-GPU win is noise-level, recorded
+honestly here.
 
 One 3,119-line ubershader compiles all 28+ fractals, DF variants, and the full 3D lighting stack
 into a single fragment pipeline; the simple Mandelbrot path pays worst-case register/occupancy

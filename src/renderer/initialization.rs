@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use super::{
     AccumulationDisplayUniforms, AccumulationTexture, AttractorComputePipeline, BloomUniforms,
     BlurUniforms, BuddhabrotAccumulationBuffer, BuddhabrotComputePipeline, GpuInfo, OrbitBuffer,
@@ -981,6 +983,10 @@ impl Renderer {
             size,
             pipeline_2d,
             pipeline_3d,
+            // ENH-004 Stage 2: retained for lazy specialized-pipeline compilation.
+            shader_module: shader,
+            render_pipeline_layout,
+            pipeline_3d_cache: HashMap::new(),
             vertex_buffer,
             uniform_buffer,
             uniform_bind_group,
@@ -1377,6 +1383,96 @@ impl Renderer {
             self.accumulation_texture = Some(accumulation_texture);
             self.accumulation_display_bind_group = Some(accumulation_display_bind_group);
         }
+    }
+
+    /// ENH-004 Stage 2: ensure a specialized 3D pipeline for `fractal_type`
+    /// exists in the cache, compiling it synchronously on the first frame a
+    /// type is used (a few ms; the OS pipeline cache makes later launches
+    /// cheap — see the ENH-004 plan). The specialized pipeline overrides the
+    /// WGSL `SPECIALIZED_TYPE` constant to this type's GPU index, so naga
+    /// folds the DE dispatch switch and dead-strips the other ~14 distance
+    /// estimators from that pipeline. No-op for non-3D types or cache hits.
+    ///
+    /// Takes `&mut self` and must be called *before* the render pass opens so
+    /// the mutable borrow is released before the pass borrows renderer
+    /// textures; [`Self::specialized_3d_pipeline_ref`] (a `&self` lookup) is
+    /// the in-pass accessor.
+    pub fn ensure_specialized_3d_pipeline(&mut self, fractal_type: crate::fractal::FractalType) {
+        if !fractal_type.is_3d() {
+            return;
+        }
+        let ty = fractal_type as u32;
+        if self.pipeline_3d_cache.contains_key(&ty) {
+            return;
+        }
+        // Identical to the init-time `pipeline_3d` descriptor except for the
+        // fragment `compilation_options.constants`, which pins
+        // `SPECIALIZED_TYPE`. Output is bit-identical to the generic pipeline:
+        // a specialized pipeline is only ever bound while rendering this exact
+        // type, so the override == the runtime uniform either way.
+        let constants: &[(&str, f64)] = &[("SPECIALIZED_TYPE", f64::from(ty))];
+        let label = format!("Render Pipeline (3D, type {ty})");
+        let pipeline = self
+            .device
+            .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                cache: None,
+                label: Some(&label),
+                layout: Some(&self.render_pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &self.shader_module,
+                    entry_point: Some("vs_main"),
+                    buffers: &[wgpu::VertexBufferLayout {
+                        array_stride: std::mem::size_of::<[f32; 2]>() as wgpu::BufferAddress,
+                        step_mode: wgpu::VertexStepMode::Vertex,
+                        attributes: &wgpu::vertex_attr_array![0 => Float32x2],
+                    }],
+                    compilation_options: Default::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &self.shader_module,
+                    entry_point: Some("fs_main_3d"),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: wgpu::TextureFormat::Rgba16Float,
+                        blend: Some(wgpu::BlendState::REPLACE),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                    compilation_options: wgpu::PipelineCompilationOptions {
+                        constants,
+                        zero_initialize_workgroup_memory: true,
+                    },
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleStrip,
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: None,
+                    polygon_mode: wgpu::PolygonMode::Fill,
+                    unclipped_depth: false,
+                    conservative: false,
+                },
+                depth_stencil: None,
+                multisample: wgpu::MultisampleState {
+                    count: 1,
+                    mask: !0,
+                    alpha_to_coverage_enabled: false,
+                },
+                multiview_mask: None,
+            });
+        self.pipeline_3d_cache.insert(ty, pipeline);
+    }
+
+    /// ENH-004 Stage 2: borrow the specialized 3D pipeline for `fractal_type`,
+    /// falling back to the generic `pipeline_3d` when no specialization is
+    /// cached yet (the first frame after a switch, before
+    /// [`Self::ensure_specialized_3d_pipeline`] compiles it) or for non-3D
+    /// types. `&self` so this composes with the other immutable renderer
+    /// borrows held inside a render pass.
+    pub fn specialized_3d_pipeline_ref(
+        &self,
+        fractal_type: crate::fractal::FractalType,
+    ) -> &wgpu::RenderPipeline {
+        let ty = fractal_type as u32;
+        self.pipeline_3d_cache.get(&ty).unwrap_or(&self.pipeline_3d)
     }
 
     // Helper: Create a render texture
