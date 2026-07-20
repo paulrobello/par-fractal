@@ -3,7 +3,7 @@
 
 use super::super::{UI, UiActions};
 use crate::deep_zoom::orbit::parse_center_decimal;
-use crate::fractal::{FractalParams, FractalType, ShadingModel};
+use crate::fractal::{FRACTAL_SCALE_RANGE, FractalParams, FractalType, ShadingModel};
 
 /// Parse a "Go to" location string into `(re, im, optional zoom)` for the 2D
 /// precise-center entry (ENH-001 Phase C).
@@ -173,7 +173,11 @@ impl UI {
                     .on_hover_text("Control the size and proportions of the fractal");
                 actions.changed |= ui
                     .add(
-                        egui::Slider::new(&mut params.settings.fractal_scale, 0.5..=5.0)
+                        egui::Slider::new(&mut params.settings.fractal_scale, FRACTAL_SCALE_RANGE)
+                            // Spans two decades now that the 3D attractors (0.05 to
+                            // 0.3) are representable; linear would bunch all of them
+                            // into the leftmost pixels.
+                            .logarithmic(true)
                             .text("Scale"),
                     )
                     .on_hover_text("Overall size of the fractal structure")

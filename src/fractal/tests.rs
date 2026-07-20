@@ -613,3 +613,43 @@ fn test_every_3d_fractal_declares_a_positive_camera_distance() {
         );
     }
 }
+
+/// An egui slider clamps whatever value it is bound to as a side effect of
+/// being drawn. The "Scale" slider is ungated, so it renders for every 3D type
+/// — and its old 0.5 lower bound silently rewrote the three 3D attractors'
+/// defaults (Lorenz 0.05 -> 0.5) the first frame the 3D Parameters panel was
+/// open. Lorenz then rendered ten times oversized, with the camera inside it
+/// and nothing in the saved settings to explain why.
+///
+/// Any per-type default outside the slider's range reintroduces that, so pin
+/// every one of them against the range the slider actually uses.
+#[test]
+fn fractal_scale_defaults_survive_the_ui_slider() {
+    for fractal_type in [
+        FractalType::Mandelbulb3D,
+        FractalType::MengerSponge3D,
+        FractalType::SierpinskiPyramid3D,
+        FractalType::SierpinskiGasket3D,
+        FractalType::JuliaSet3D,
+        FractalType::Mandelbox3D,
+        FractalType::OctahedralIFS3D,
+        FractalType::IcosahedralIFS3D,
+        FractalType::ApollonianGasket3D,
+        FractalType::Kleinian3D,
+        FractalType::HybridMandelbulbJulia3D,
+        FractalType::QuaternionCubic3D,
+        FractalType::Pickover3D,
+        FractalType::Lorenz3D,
+        FractalType::Rossler3D,
+    ] {
+        let mut params = FractalParams::default();
+        params.switch_fractal(fractal_type);
+        let scale = params.settings.fractal_scale;
+        assert!(
+            FRACTAL_SCALE_RANGE.contains(&scale),
+            "{fractal_type:?} defaults to fractal_scale {scale}, outside the \
+             slider range {:?} — drawing the panel would clamp it",
+            FRACTAL_SCALE_RANGE,
+        );
+    }
+}

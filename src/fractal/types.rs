@@ -131,6 +131,10 @@ impl FractalType {
             FractalType::OctahedralIFS3D => 9.0,
             FractalType::IcosahedralIFS3D => 9.0,
             FractalType::ApollonianGasket3D => 8.0,
+            // The 3D attractors are small in world space (Pickover spans a
+            // radius of ~0.7 at its default scale), so the shared distance
+            // leaves them as a speck.
+            FractalType::Pickover3D => 3.0,
             _ => 5.0,
         }
     }

@@ -37,6 +37,16 @@ use super::{
 /// `fractal_type` respectively) at load time and are not directly serialized
 /// by `Settings`; they live here, alongside the values they mirror, because
 /// they are stable authored state restored on undo.
+/// Range the "Scale" slider exposes for [`RenderSettings::fractal_scale`].
+///
+/// An egui slider clamps the value it is bound to as a side effect of being
+/// drawn, so a per-type default outside this range is silently rewritten the
+/// first time the 3D Parameters panel renders — the fractal then renders at the
+/// wrong size with nothing in the settings to explain it. Every value
+/// `FractalParams::switch_fractal` assigns must therefore lie inside this
+/// range; `fractal_scale_defaults_survive_the_ui_slider` pins that.
+pub const FRACTAL_SCALE_RANGE: std::ops::RangeInclusive<f32> = 0.05..=5.0;
+
 #[derive(Clone)]
 pub struct RenderSettings {
     /// Which fractal is rendered; determines whether 2D or 3D shaders run.
