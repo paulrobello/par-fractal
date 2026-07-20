@@ -144,6 +144,24 @@ impl Default for AttractorComputeUniforms {
     }
 }
 
+/// Which bind-group layout an [`AccumulationTexture`]'s `compute_bind_group`
+/// was built against. The Buddhabrot and attractor compute paths bind
+/// different resource types at binding 0 (a storage *buffer* vs a storage
+/// *texture*), so they use incompatible layouts. This tag lets the attractor
+/// path detect a Buddhabrot-created placeholder and rebuild the texture before
+/// dispatching — the Buddhabrot → attractor switch used to dispatch the
+/// Attractor pipeline with the Buddhabrot buffer-layout bind group, failing
+/// GPU validation every frame (the reported "lockup").
+pub enum AccumulationBindGroupKind {
+    /// Real StorageTexture bind group against the attractor compute layout.
+    AttractorTexture,
+    /// Placeholder built against the Buddhabrot *buffer* layout. Buddhabrot
+    /// computes against its atomic buffer and never uses this bind group for
+    /// dispatch — but it is incompatible with the Attractor pipeline, so a
+    /// texture carrying it must be rebuilt before an attractor dispatch.
+    BuddhabrotPlaceholder,
+}
+
 /// Manages an accumulation texture for iterative rendering effects.
 ///
 /// This abstraction handles:
@@ -158,6 +176,10 @@ pub struct AccumulationTexture {
     pub view: wgpu::TextureView,
     /// Bind group for compute shader access (read-write)
     pub compute_bind_group: wgpu::BindGroup,
+    /// Which layout `compute_bind_group` was built against. See
+    /// [`AccumulationBindGroupKind`]: a Buddhabrot placeholder must be rebuilt
+    /// before the attractor pipeline can dispatch against this texture.
+    pub bind_group_kind: AccumulationBindGroupKind,
     /// Texture dimensions
     pub width: u32,
     pub height: u32,
@@ -221,6 +243,7 @@ impl AccumulationTexture {
             texture,
             view,
             compute_bind_group,
+            bind_group_kind: AccumulationBindGroupKind::AttractorTexture,
             width,
             height,
             zero_buffer: None,

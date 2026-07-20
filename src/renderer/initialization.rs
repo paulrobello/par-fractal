@@ -3,7 +3,8 @@ use std::collections::HashMap;
 use super::{
     AccumulationDisplayUniforms, AccumulationTexture, AttractorComputePipeline, BloomUniforms,
     BlurUniforms, BuddhabrotAccumulationBuffer, BuddhabrotComputePipeline, GpuInfo, OrbitBuffer,
-    PostProcessUniforms, Renderer, Uniforms, write_uniform_bytes,
+    PostProcessUniforms, Renderer, Uniforms, compute::AccumulationBindGroupKind,
+    write_uniform_bytes,
 };
 use encase::ShaderType;
 use wgpu::util::DeviceExt;
@@ -1307,6 +1308,7 @@ impl Renderer {
                     texture,
                     view,
                     compute_bind_group,
+                    bind_group_kind: AccumulationBindGroupKind::BuddhabrotPlaceholder,
                     width: self.size.width,
                     height: self.size.height,
                     zero_buffer: None,
@@ -1320,10 +1322,23 @@ impl Renderer {
     /// Ensure the accumulation texture exists and has the correct size.
     /// Used by both attractor and Buddhabrot compute pipelines.
     fn ensure_accumulation_texture(&mut self) {
-        // Check if accumulation texture needs (re)creation due to missing or wrong size
+        // Check if accumulation texture needs (re)creation: missing, wrong size,
+        // or a Buddhabrot-created placeholder. The Buddhabrot path stores a
+        // placeholder texture whose `compute_bind_group` is built against the
+        // *buffer* layout (BuddhabrotPlaceholder) — incompatible with this
+        // Attractor pipeline's StorageTexture binding — so rebuild it when
+        // switching Buddhabrot → an attractor. Otherwise the attractor dispatch
+        // binds the placeholder and fails GPU validation every frame.
         let needs_texture = match &self.accumulation_texture {
             None => true,
-            Some(tex) => tex.width != self.size.width || tex.height != self.size.height,
+            Some(tex) => {
+                tex.width != self.size.width
+                    || tex.height != self.size.height
+                    || matches!(
+                        tex.bind_group_kind,
+                        AccumulationBindGroupKind::BuddhabrotPlaceholder
+                    )
+            }
         };
 
         if needs_texture {

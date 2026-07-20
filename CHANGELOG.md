@@ -7,7 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Nothing yet._
+### Fixed
+- **Buddhabrot → attractor switch lockup.** Switching from Buddhabrot2D to a
+  strange-attractor type (e.g. Hopalong2D) dispatched the Attractor compute
+  pipeline with a stale Buddhabrot buffer-layout bind group, failing GPU
+  validation every frame (the app appeared to hang). The Buddhabrot path stores
+  a placeholder `AccumulationTexture` whose `compute_bind_group` is built
+  against the buffer layout; switching to an attractor never rebuilt it. Added
+  an `AccumulationBindGroupKind` tag so the attractor path detects the
+  placeholder and rebuilds the texture with the correct StorageTexture layout.
 
 ## [0.10.0] - 2026-07-20
 
