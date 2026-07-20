@@ -646,15 +646,20 @@ impl FractalParams {
                 self.settings.max_iterations = 1000;
             }
             FractalType::Chip2D => {
-                self.settings.center_2d = [0.0, 0.0];
-                self.settings.zoom_2d = 0.002;
+                // Framed to the attractor's actual bounds (~760 units wide,
+                // centred near (-8, -7)); the old zoom showed 2000 units, so
+                // it rendered as a speck.
+                self.settings.center_2d = [-7.9, -7.1];
+                self.settings.zoom_2d = 0.005;
                 self.settings.max_iterations = 1000;
                 self.settings.julia_c = [-15.0, -19.0];
                 self.settings.power = 1.0;
             }
             FractalType::Quadruptwo2D => {
-                self.settings.center_2d = [15.0, 17.0];
-                self.settings.zoom_2d = 0.01;
+                // Framed to the attractor's actual bounds (~111 units wide,
+                // centred near (16.5, 17.5)); the old zoom showed 400 units.
+                self.settings.center_2d = [16.5, 17.5];
+                self.settings.zoom_2d = 0.032;
                 self.settings.max_iterations = 1000;
                 self.settings.julia_c = [34.0, 1.0];
                 self.settings.power = 5.0;

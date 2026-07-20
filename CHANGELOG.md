@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Chip, Quadruptwo, and Rossler rendered as specks.** Chip and Quadruptwo
+  framed a view ~3x wider than their attractors actually span, so each showed a
+  handful of pixels in an otherwise black frame; both now use a centre and zoom
+  derived from the attractors' simulated bounds. Rossler's distance estimator
+  integrated too briefly to ever reach its attractor — after the 500-step
+  transient at `dt = 0.01` the trajectory was still at ~(0.1, -0.2, 0.0),
+  sampling a 1.4-unit window of a 26-unit attractor — so it drew a tiny spiral.
+  It now integrates at `dt = 0.02` for 2000 transient steps, which reaches the
+  true extent; the scene pass costs ~0.24 ms more (0.88 ms to 1.12 ms).
 - **Sierpinski Gasket rendered as empty space.** It had no arm in
   `switch_fractal` at all, so it inherited `max_iterations` — and it is an IFS
   whose every step multiplies the point by ~2.5, so the escape-time default of 80

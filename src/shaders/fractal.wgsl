@@ -2327,10 +2327,13 @@ fn rossler_attractor_de(pos: vec3<f32>) -> f32 {
     var x = 0.1;
     var y = 0.0;
     var z = 0.0;
-    let dt = 0.01;
+    // 0.01 with a 500-step transient never leaves the origin: the trajectory
+    // is still at ~(0.1, -0.2, 0.0) when sampling starts, so the attractor
+    // rendered as a tiny spiral. 0.02 x 2000 reaches the true extent (~26).
+    let dt = 0.02;
 
     // Skip transient
-    for (var i = 0u; i < 500u; i = i + 1u) {
+    for (var i = 0u; i < 2000u; i = i + 1u) {
         let dx = -y - z;
         let dy = x + a * y;
         let dz = b + z * (x - c);
