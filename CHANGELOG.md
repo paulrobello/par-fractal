@@ -8,6 +8,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **The 3D attractors rendered many times oversized, with the camera buried
+  inside them.** Lorenz was the worst — ~10x — and its saved settings offered no
+  explanation, because nothing in the settings was wrong. An egui slider clamps
+  the value it is bound to as a side effect of being drawn, and the "Scale"
+  slider is ungated, so it renders for every 3D type; its `0.5` lower bound
+  silently rewrote every per-type default below it the first frame the 3D
+  Parameters panel was open (`switch_fractal` set Lorenz to `0.05`, the panel
+  drew, and `0.5` reached the GPU). The range is now `0.05..=5.0` — every
+  shipped default is representable — and the slider is logarithmic now that it
+  spans two decades. The bound lives in `FRACTAL_SCALE_RANGE` beside
+  `RenderSettings` instead of as a literal inside a widget, and a regression
+  test pins every per-type default against it.
+- **The default camera sat inside the larger 3D fractals.** Framing was a fixed
+  `(0, 0, 5)` for every 3D type, but their world-space extents differ by more
+  than 5x, so Octahedron IFS, Icosahedron IFS, and Apollonian Gasket rendered as
+  a wall of clipped geometry rather than a fractal. Framing distance is now a
+  property of the type (`FractalType::default_camera_distance`), measured per
+  type: 9.0 for both IFS types, 8.0 for Apollonian Gasket, 3.0 for Pickover, and
+  the previous 5.0 for everything else. Re-framing is checked centrally once per
+  frame, so it applies to every route that changes type (panel, command palette,
+  function keys, `--switch-after`), and is gated on the framing *distance*
+  changing so navigating between similarly scaled fractals keeps the view.
+  Presets and `--camera-pos` mark the camera as deliberately framed and are not
+  overwritten.
 - **Chip, Quadruptwo, and Rossler rendered as specks.** Chip and Quadruptwo
   framed a view ~3x wider than their attractors actually span, so each showed a
   handful of pixels in an otherwise black frame; both now use a centre and zoom
@@ -57,6 +81,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `[-55.0, -1.0]`, which the Julia slider clamps to `[-2.0, -1.0]`). Every point
   escaped immediately, rendering an empty set: only the floor and its shadow
   were visible. Each type now re-seeds `julia_c` to its preset value on switch.
+
+### Performance
+- **Pickover 3D cost 76 ms/frame against 2.7 ms for Mandelbulb** — 28x the next
+  worst 3D type, and the reason the 3D attractors are kept out of the fractal
+  panel. Its estimator re-simulates the entire 1500-iteration trajectory, five
+  transcendentals per iteration, on every ray-marching step of every pixel, yet
+  the trajectory does not depend on the sample position at all. Empty-space
+  steps are now rejected against a bounding box that is exact and
+  parameter-independent (`z = sin(x)` forces `|z| <= 1`, hence `|x|, |y| <= 2`).
+  The bound is handed only to callers that use the estimate for visibility: soft
+  shadows and ambient occlusion read its magnitude as a proximity signal and
+  would otherwise shade the bounding box instead of the attractor. The shadow
+  loop takes the bound first and pays for the exact estimate only when the bound
+  cannot settle the sample, which is exact rather than an approximation.
+  **76.2 ms to 19.1 ms (4x)** at 600x430 with the image unchanged (RMSE 0.00098,
+  from ray-march step sequencing). Other fractals are untouched.
+
+### Added
+- `--camera-pos <x,y,z>` places the 3D camera looking at the origin. It is the
+  agent-operability hook the per-type framing distances above were measured
+  with, and what a future re-measure would use.
 
 ## [0.10.0] - 2026-07-20
 
