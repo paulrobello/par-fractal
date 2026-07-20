@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Mandelbox rendered as a featureless blob.** `mandelbox_de` derives its
+  internal fold scale as `-(power / 4.0)`, so the classic -2.0 needs
+  `power == 8.0` — but nothing set it. `switch_fractal`'s Mandelbox arm left
+  `power` untouched and the "Power" slider is shown for Mandelbulb only, so the
+  value silently carried over from the previously selected fractal. From the
+  2.0 default the internal scale was -0.5, and |scale| < 1 contracts the
+  iteration into a smooth blob with no Mandelbox structure. Mandelbox only ever
+  looked right if you happened to arrive from Mandelbulb. The `Mandelbox Cubic`
+  preset was affected too — it loads via `from_settings`, bypassing
+  `switch_fractal`, and inherited `power` from the shared preset defaults — so
+  it now carries `power` explicitly.
 - **`--clear-settings` / `make run-reset` cleared nothing.** Settings are saved
   through the platform storage abstraction to `<config>/settings/settings.yaml`
   (ARC-014), but `clear_settings()` deleted the pre-ARC-014 legacy path

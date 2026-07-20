@@ -425,3 +425,38 @@ fn test_switch_to_3d_julia_family_reseeds_julia_c() {
         );
     }
 }
+
+/// `mandelbox_de` derives its internal fold scale as `-(power / 4.0)`, so the
+/// classic scale of -2.0 needs `power == 8.0`. Nothing else sets `power` for
+/// Mandelbox — the UI slider is Mandelbulb-only — so without a reset here it
+/// carries over from the previous fractal. The 2.0 default leaves an internal
+/// scale of -0.5, and |scale| < 1 contracts the iteration into a smooth blob
+/// with no Mandelbox structure at all.
+#[test]
+fn test_switch_to_mandelbox_sets_power_for_classic_internal_scale() {
+    let mut params = FractalParams::default();
+    assert_eq!(params.settings.power, 2.0, "default is Mandelbrot's z^2");
+
+    params.switch_fractal(FractalType::Mandelbox3D);
+
+    let internal_scale = -(params.settings.power / 4.0);
+    assert!(
+        internal_scale.abs() > 1.0,
+        "|internal scale| = {} collapses the Mandelbox to a blob",
+        internal_scale.abs()
+    );
+    assert_eq!(internal_scale, -2.0, "classic Mandelbox scale");
+}
+
+/// The shipped preset bypasses `switch_fractal` entirely
+/// (`FractalParams::from_settings`), so it has to carry `power` itself.
+#[test]
+fn test_mandelbox_preset_carries_its_own_power() {
+    let preset = PresetGallery::get_builtin_preset("Mandelbox Cubic")
+        .expect("Mandelbox Cubic preset exists");
+    let internal_scale = -(preset.settings.power / 4.0);
+    assert_eq!(
+        internal_scale, -2.0,
+        "preset renders a blob without an explicit power"
+    );
+}

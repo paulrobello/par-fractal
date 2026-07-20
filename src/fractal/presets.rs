@@ -387,6 +387,7 @@ impl PresetGallery {
                     fractal_scale: 2.0,
                     fractal_fold: 1.0,
                     fractal_min_radius: 0.4,
+                    power: 8.0, // mandelbox_de maps this to internal scale -2.0
                     max_steps: 200,
                     camera_position: [4.5, 3.0, 4.5],
                     camera_target: [0.0, 0.0, 0.0],

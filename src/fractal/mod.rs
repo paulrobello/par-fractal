@@ -584,6 +584,7 @@ impl FractalParams {
                 self.settings.fractal_scale = 1.0; // Double the apparent size
                 self.settings.fractal_fold = 1.0;
                 self.settings.fractal_min_radius = 0.5;
+                self.settings.power = 8.0; // mandelbox_de maps this to internal scale -2.0
                 self.settings.roughness = 0.21;
                 self.settings.metallic = 0.32;
             }
