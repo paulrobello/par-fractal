@@ -248,7 +248,7 @@ fn real_orbit_data_perturbs_correctly() {
 // direct f64 (±1 iteration, like Mandelbrot) is the correctness gate — it
 // catches a wrong recurrence BEFORE the GPU shader touches it.
 //
-// Math (derived in docs/fable/ENH-001-perturbation-deep-zoom.md, step 7):
+// Math:
 //
 // * Tricorn  z ← conj(z)² + c
 //   Reference iterates the tricorn map. Per-pixel Δc is the c-offset from

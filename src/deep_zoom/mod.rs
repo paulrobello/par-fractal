@@ -18,8 +18,7 @@
 //!
 //! GPU plumbing (storage buffer + uniforms) lives in
 //! [`crate::renderer::orbit_buffer`] and [`crate::renderer::uniforms`]; the
-//! delta shader is `mandelbrot_perturb` in `shaders/fractal.wgsl`. See
-//! `docs/fable/ENH-001-perturbation-deep-zoom.md`.
+//! delta shader is `mandelbrot_perturb` in `shaders/fractal.wgsl`.
 
 pub mod driver;
 pub mod orbit;
