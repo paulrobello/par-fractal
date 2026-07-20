@@ -1,8 +1,12 @@
+// ENH-008: the ~14 `_padding_*` fields are gone — encase (Rust) and WGSL
+// layout rules independently derive the same offsets from this field order, so
+// both sides agree without hand-maintained padding. Keep this declaration's
+// field ORDER identical to the Rust `Uniforms` struct (`renderer/uniforms.rs`);
+// add new fields at the end here and in Rust, no padding math required.
 struct Uniforms {
     view_proj: mat4x4<f32>,
     inv_view_proj: mat4x4<f32>,
     camera_pos: vec3<f32>,
-    _padding1: f32,
 
     center: vec2<f32>,
     zoom: f32,
@@ -18,7 +22,6 @@ struct Uniforms {
     fractal_scale: f32,
     fractal_fold: f32,
     fractal_min_radius: f32,
-    _padding2: vec2<f32>,
 
     palette: array<vec4<f32>, 8>,
 
@@ -32,15 +35,10 @@ struct Uniforms {
     channel_r: u32,
     channel_g: u32,
     channel_b: u32,
-    _padding_color_0: u32,
 
     roughness: f32,
     metallic: f32,
-    // WGSL adds 12 bytes implicit padding here to align vec3 to offset 352
-    _padding_before_albedo: vec3<f32>, // vec3 field aligned to 16-byte boundary
-    // WGSL adds 4 bytes implicit padding here to align vec3 to offset 368
     albedo: vec3<f32>,
-    _padding3: f32,
 
     dof_focal_length: f32,
     dof_aperture: f32,
@@ -58,22 +56,13 @@ struct Uniforms {
     // Light direction
     light_azimuth: f32,     // Horizontal angle in degrees (0-360)
     light_elevation: f32,   // Vertical angle in degrees (5-90)
-    _padding_light: vec2<f32>, // Maintain 16-byte alignment
 
     show_floor: u32,
     floor_height: f32,
-    _padding_floor: vec2<f32>,
     floor_color1: vec3<f32>,
-    _padding_floor1: f32,
     floor_color2: vec3<f32>,
     floor_reflections: u32,
     floor_reflection_strength: f32,
-    _padding_floor3_align_0: f32,
-    _padding_floor3_align_1: f32,
-    _padding_floor3_align_2: f32,
-    _padding_floor3_0: f32,
-    _padding_floor3_1: f32,
-    _padding_floor3_2: f32,
 
     use_adaptive_step: u32,
     fixed_step_size: f32,
@@ -83,10 +72,7 @@ struct Uniforms {
     fog_enabled: u32,
     fog_mode: u32,  // 0: Linear, 1: Exponential, 2: Quadratic
     fog_density: f32,
-    _padding_fog: f32,
-    _padding_fog_vec3_align: f32,  // Align fog_color to 16-byte boundary
     fog_color: vec3<f32>,
-    _padding_fog_color: f32,
 
     // Post-processing
     brightness: f32,
@@ -107,7 +93,6 @@ struct Uniforms {
     center_hi: vec2<f32>,   // High part of center (x, y)
     center_lo: vec2<f32>,   // Low part of center (x, y)
     high_precision: u32,    // Flag: 1 = use high precision
-    _hp_padding: vec3<f32>, // Padding to maintain alignment
 
     // LOD debug visualization
     lod_debug_enabled: u32,  // Flag: 1 = show LOD zones as colors
@@ -120,25 +105,18 @@ struct Uniforms {
 
     // Procedural palette parameters
     procedural_palette_type: u32, // 0=None (use static), 1=Firestrm, 2=Rainbow, etc.
-    _padding_proc_pal_0: u32,
-    _padding_proc_pal_1: u32,
-    _padding_proc_pal_2: u32,
     // Custom procedural palette: color(t) = brightness + contrast * cos(2π * (frequency * t + phase))
     procedural_brightness: vec4<f32>, // [r, g, b, _]
     procedural_contrast: vec4<f32>,   // [r, g, b, _]
     procedural_frequency: vec4<f32>,  // [r, g, b, _]
     procedural_phase: vec4<f32>,      // [r, g, b, _]
 
-    // Padding to align struct to 864 bytes (54 × 16)
-    _padding_end: array<vec4<f32>, 2>,  // 32 bytes
-
     // Perturbation uniforms (ENH-001 Phase A step 3 — plumbing only;
     // perturbation stays OFF here, step 5 populates these and uploads a
-    // real orbit). Mirrored byte-for-byte by the Rust `Uniforms` struct.
+    // real orbit). Mirrored by the Rust `Uniforms` struct.
     perturbation_enabled: u32, // 0 = OFF (default), 1 = use perturbation delta path
     orbit_len: u32,            // entries of ref_orbit actually populated
     ref_escaped_at: u32,       // index where the reference escaped (0 if bounded)
-    _padding_perturb: u32,     // align delta_c_scale to vec2<f32>'s 8-byte boundary
     delta_c_scale: vec2<f32>,  // pixel → Δc mapping (per-pixel delta magnitude)
     delta_c_origin: vec2<f32>, // screen-center Δc (normally 0)
 }

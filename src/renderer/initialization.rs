@@ -3,6 +3,7 @@ use super::{
     BlurUniforms, BuddhabrotAccumulationBuffer, BuddhabrotComputePipeline, GpuInfo, OrbitBuffer,
     PostProcessUniforms, Renderer, Uniforms, write_uniform_bytes,
 };
+use encase::ShaderType;
 use wgpu::util::DeviceExt;
 
 /// GPU initialization and setup methods
@@ -211,9 +212,10 @@ impl Renderer {
 
         // Create uniform buffer
         let uniforms = Uniforms::new();
+        let uniforms_bytes = write_uniform_bytes(&uniforms);
         let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Uniform Buffer"),
-            contents: bytemuck::cast_slice(&[uniforms]),
+            contents: &uniforms_bytes,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -227,8 +229,7 @@ impl Renderer {
                             ty: wgpu::BufferBindingType::Uniform,
                             has_dynamic_offset: false,
                             min_binding_size: Some(
-                                std::num::NonZeroU64::new(std::mem::size_of::<Uniforms>() as u64)
-                                    .unwrap(),
+                                std::num::NonZeroU64::new(Uniforms::min_size().get()).unwrap(),
                             ),
                         },
                         count: None,

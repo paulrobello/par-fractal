@@ -253,11 +253,9 @@ impl Renderer {
             );
         }
 
-        self.queue.write_buffer(
-            &self.uniform_buffer,
-            0,
-            bytemuck::cast_slice(&[self.uniforms]),
-        );
+        let uniforms_bytes = write_uniform_bytes(&self.uniforms);
+        self.queue
+            .write_buffer(&self.uniform_buffer, 0, &uniforms_bytes);
 
         // ENH-003: resolve the render scale for this frame. LOD's active
         // QualityLevel.render_scale drives it (so it tracks motion

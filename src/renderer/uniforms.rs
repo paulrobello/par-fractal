@@ -1,6 +1,5 @@
 use crate::camera::Camera;
 use crate::fractal::FractalParams;
-use bytemuck::{Pod, Zeroable};
 use glam::Mat4;
 
 /// Split an f64 into a (hi, lo) f32 pair for double-float arithmetic on the
@@ -116,22 +115,28 @@ where
     buf.into_inner()
 }
 
-#[repr(C)]
-#[derive(Copy, Clone, Debug, Pod, Zeroable)]
+/// ENH-008: derives `encase::ShaderType` — WGSL-correct uniform layout is
+/// computed by encase from the field types + declaration order, so the ~14
+/// hand-maintained `_padding_*` fields are gone (from both this struct and the
+/// `Uniforms` declaration in `shaders/fractal.wgsl`). vec/mat fields use glam
+/// types (glam's `encase` feature provides the `ShaderType` impls). Field
+/// ORDER must stay identical to the WGSL struct: encase and WGSL derive the
+/// same offsets from the same order, so both sides agree. Add new fields at
+/// the end (paired with a matching WGSL edit); no manual padding math needed.
+#[derive(Copy, Clone, Debug, encase::ShaderType)]
 pub struct Uniforms {
     // Camera (3D mode)
-    view_proj: [[f32; 4]; 4],
-    inv_view_proj: [[f32; 4]; 4],
-    camera_pos: [f32; 3],
-    _padding1: f32,
+    view_proj: glam::Mat4,
+    inv_view_proj: glam::Mat4,
+    camera_pos: glam::Vec3,
 
     // 2D fractal parameters
-    center: [f32; 2],
+    center: glam::Vec2,
     zoom: f32,
     max_iterations: u32,
 
     // Julia set parameters
-    julia_c: [f32; 2],
+    julia_c: glam::Vec2,
     fractal_type: u32, // 0: Mandelbrot, 1: Julia, 2: Mandelbulb, 3: Menger
     render_mode: u32,  // 0: 2D, 1: 3D
 
@@ -142,10 +147,9 @@ pub struct Uniforms {
     fractal_scale: f32,
     fractal_fold: f32,
     fractal_min_radius: f32,
-    _padding2: [f32; 2], // Adjusted for alignment
 
     // Color palette
-    palette: [[f32; 4]; 8], // 8 colors with padding
+    palette: [glam::Vec4; 8], // 8 colors
 
     // Rendering flags
     ambient_occlusion: u32,
@@ -155,19 +159,14 @@ pub struct Uniforms {
     color_mode: u32,    // Color visualization mode
     orbit_trap_scale: f32,
     palette_offset: f32,
-    channel_r: u32,      // Red channel source
-    channel_g: u32,      // Green channel source
-    channel_b: u32,      // Blue channel source
-    _padding_color: u32, // Padding for 16-byte alignment
+    channel_r: u32, // Red channel source
+    channel_g: u32, // Green channel source
+    channel_b: u32, // Blue channel source
 
     // Material properties
     roughness: f32,
     metallic: f32,
-    _padding_vec3_align1: [f32; 3], // WGSL adds 12 bytes to align next vec3 to 16-byte boundary
-    _padding_before_albedo: [f32; 3], // Actual vec3 field in WGSL
-    _padding_vec3_align2: f32,      // WGSL adds 4 bytes to align next vec3 to 16-byte boundary
-    albedo: [f32; 3],
-    _padding3: f32,
+    albedo: glam::Vec3,
 
     // DoF parameters
     dof_focal_length: f32,
@@ -184,21 +183,16 @@ pub struct Uniforms {
     shadow_step_factor: f32,
 
     // Light direction
-    light_azimuth: f32,       // Horizontal angle in degrees (0-360)
-    light_elevation: f32,     // Vertical angle in degrees (5-90)
-    _padding_light: [f32; 2], // Maintain 16-byte alignment
+    light_azimuth: f32,   // Horizontal angle in degrees (0-360)
+    light_elevation: f32, // Vertical angle in degrees (5-90)
 
     // Floor
     show_floor: u32,
     floor_height: f32,
-    _padding_floor: [f32; 2], // Padding for vec3 alignment
-    floor_color1: [f32; 3],
-    _padding_floor1: f32,
-    floor_color2: [f32; 3],
+    floor_color1: glam::Vec3,
+    floor_color2: glam::Vec3,
     floor_reflections: u32,
     floor_reflection_strength: f32,
-    _padding_floor3_align: [f32; 3], // Explicit padding to match WGSL implicit vec3 alignment to 16-byte boundary
-    _padding_floor3: [f32; 3],
 
     // Ray marching
     use_adaptive_step: u32,
@@ -210,10 +204,7 @@ pub struct Uniforms {
     fog_enabled: u32,
     fog_mode: u32, // 0: Linear, 1: Exponential, 2: Quadratic
     fog_density: f32,
-    _padding_fog: f32,            // Align to 8-byte boundary
-    _padding_fog_vec3_align: f32, // Align fog_color to 16-byte boundary (WGSL requirement)
-    fog_color: [f32; 3],
-    _padding_fog_color: f32,
+    fog_color: glam::Vec3,
 
     // Post-processing
     brightness: f32,
@@ -229,12 +220,11 @@ pub struct Uniforms {
     bloom_radius: f32,
     fxaa_enabled: u32,
 
-    // High-precision center for deep zoom (double-float emulation)
-    center_hi: [f32; 2],         // High part of center (x, y)
-    center_lo: [f32; 2],         // Low part of center (x, y)
-    high_precision: u32,         // Flag: 1 = use high precision
-    _hp_padding_align: [f32; 3], // WGSL adds 12 bytes implicit padding before vec3 to align to 16-byte boundary
-    _hp_padding: [f32; 4],       // vec3 in WGSL (16 bytes with padding)
+    // High-precision center for deep zoom (double-float emulation).
+    // Each coordinate stored as a (hi, lo) pair where value = hi + lo.
+    center_hi: glam::Vec2, // High part of center (x, y)
+    center_lo: glam::Vec2, // Low part of center (x, y)
+    high_precision: u32,   // Flag: 1 = use high precision
 
     // LOD debug visualization
     lod_debug_enabled: u32, // Flag: 1 = show LOD zones as colors
@@ -243,30 +233,25 @@ pub struct Uniforms {
     lod_zone3: f32,         // Distance threshold: Medium -> Low
 
     // Aspect ratio stored in a vec4 slot to guarantee 16-byte alignment
-    aspect_ratio: [f32; 4], // .x = width/height, others unused
+    aspect_ratio: glam::Vec4, // .x = width/height, others unused
 
     // Procedural palette parameters
     procedural_palette_type: u32, // 0=None (use static), 1=Firestrm, 2=Rainbow, etc.
-    _padding_proc_pal: [u32; 3],  // Align to 16 bytes
     /// Custom procedural palette: brightness (a), contrast (b), frequency (c), phase (d)
     /// color(t) = a + b * cos(2π * (c * t + d))
-    procedural_brightness: [f32; 4], // [r, g, b, _]
-    procedural_contrast: [f32; 4], // [r, g, b, _]
-    procedural_frequency: [f32; 4], // [r, g, b, _]
-    procedural_phase: [f32; 4],   // [r, g, b, _]
-
-    // Padding for 16-byte alignment (reduced to accommodate procedural palette)
-    _padding_end: [f32; 8], // 32 bytes
+    procedural_brightness: glam::Vec4, // [r, g, b, _]
+    procedural_contrast: glam::Vec4, // [r, g, b, _]
+    procedural_frequency: glam::Vec4, // [r, g, b, _]
+    procedural_phase: glam::Vec4, // [r, g, b, _]
 
     // Perturbation uniforms (ENH-001 Phase A step 3 — plumbing only;
     // perturbation stays OFF, step 5 populates these and uploads a real
-    // orbit). Mirrored byte-for-byte by the WGSL `Uniforms` declaration.
+    // orbit). Mirrored by the WGSL `Uniforms` declaration.
     perturbation_enabled: u32, // 0 = OFF (default), 1 = use perturbation delta path
     orbit_len: u32,            // entries of ref_orbit actually populated
     ref_escaped_at: u32,       // index where the reference escaped (0 if bounded)
-    _padding_perturb: u32,     // align delta_c_scale to vec2<f32>'s 8-byte boundary
-    delta_c_scale: [f32; 2],   // pixel → Δc mapping (per-pixel delta magnitude)
-    delta_c_origin: [f32; 2],  // screen-center Δc (normally 0)
+    delta_c_scale: glam::Vec2, // pixel → Δc mapping (per-pixel delta magnitude)
+    delta_c_origin: glam::Vec2, // screen-center Δc (normally 0)
 }
 
 impl Default for Uniforms {
@@ -278,14 +263,13 @@ impl Default for Uniforms {
 impl Uniforms {
     pub fn new() -> Self {
         Self {
-            view_proj: Mat4::IDENTITY.to_cols_array_2d(),
-            inv_view_proj: Mat4::IDENTITY.to_cols_array_2d(),
-            camera_pos: [0.0, 0.0, 3.0],
-            _padding1: 0.0,
-            center: [0.0, 0.0],
+            view_proj: Mat4::IDENTITY,
+            inv_view_proj: Mat4::IDENTITY,
+            camera_pos: glam::Vec3::new(0.0, 0.0, 3.0),
+            center: glam::Vec2::new(0.0, 0.0),
             zoom: 1.0,
             max_iterations: 80,
-            julia_c: [-0.7, 0.27015],
+            julia_c: glam::Vec2::new(-0.7, 0.27015),
             fractal_type: 0,
             render_mode: 0,
             power: 8.0,
@@ -294,8 +278,7 @@ impl Uniforms {
             fractal_scale: 2.0,
             fractal_fold: 1.0,
             fractal_min_radius: 0.5,
-            _padding2: [0.0; 2],
-            palette: [[0.0; 4]; 8],
+            palette: [glam::Vec4::ZERO; 8],
             ambient_occlusion: 1,
             soft_shadows: 1,
             depth_of_field: 0,
@@ -306,14 +289,9 @@ impl Uniforms {
             channel_r: 0, // Iterations
             channel_g: 1, // Distance
             channel_b: 4, // PositionZ
-            _padding_color: 0,
             roughness: 0.3,
             metallic: 0.15,
-            _padding_vec3_align1: [0.0, 0.0, 0.0],
-            _padding_before_albedo: [0.0, 0.0, 0.0],
-            _padding_vec3_align2: 0.0,
-            albedo: [0.8, 0.8, 0.8],
-            _padding3: 0.0,
+            albedo: glam::Vec3::new(0.8, 0.8, 0.8),
             dof_focal_length: 5.0,
             dof_aperture: 0.1,
             dof_samples: 2,
@@ -329,18 +307,13 @@ impl Uniforms {
 
             light_azimuth: 45.0,
             light_elevation: 60.0,
-            _padding_light: [0.0; 2],
 
             show_floor: 1,
             floor_height: -2.0,
-            _padding_floor: [0.0; 2],
-            floor_color1: [1.0, 1.0, 1.0], // White
-            _padding_floor1: 0.0,
-            floor_color2: [0.0, 0.0, 0.0], // Black
+            floor_color1: glam::Vec3::new(1.0, 1.0, 1.0), // White
+            floor_color2: glam::Vec3::new(0.0, 0.0, 0.0), // Black
             floor_reflections: 0,
             floor_reflection_strength: 0.7,
-            _padding_floor3_align: [0.0; 3],
-            _padding_floor3: [0.0; 3],
 
             use_adaptive_step: 1,
             fixed_step_size: 0.1,
@@ -350,10 +323,7 @@ impl Uniforms {
             fog_enabled: 0,
             fog_mode: 1, // Exponential
             fog_density: 0.001,
-            _padding_fog: 0.0,
-            _padding_fog_vec3_align: 0.0,
-            fog_color: [0.2, 0.2, 0.2], // Dark grey
-            _padding_fog_color: 0.0,
+            fog_color: glam::Vec3::new(0.2, 0.2, 0.2), // Dark grey
 
             brightness: 1.0,
             contrast: 1.0,
@@ -368,11 +338,9 @@ impl Uniforms {
             bloom_radius: 0.005,
             fxaa_enabled: 0,
 
-            center_hi: [0.0, 0.0],
-            center_lo: [0.0, 0.0],
+            center_hi: glam::Vec2::ZERO,
+            center_lo: glam::Vec2::ZERO,
             high_precision: 0,
-            _hp_padding_align: [0.0; 3],
-            _hp_padding: [0.0; 4],
 
             lod_debug_enabled: 0,
             // QA-025: shared with `LODConfig::default()` via `DEFAULT_LOD_ZONES`
@@ -382,39 +350,35 @@ impl Uniforms {
             lod_zone2: crate::lod::DEFAULT_LOD_ZONES[1],
             lod_zone3: crate::lod::DEFAULT_LOD_ZONES[2],
 
-            aspect_ratio: [16.0 / 9.0, 0.0, 0.0, 0.0], // Default aspect ratio
+            aspect_ratio: glam::Vec4::new(16.0 / 9.0, 0.0, 0.0, 0.0), // Default aspect ratio
 
             // Procedural palette defaults
             procedural_palette_type: 0, // None (use static palette)
-            _padding_proc_pal: [0; 3],
-            procedural_brightness: [0.5, 0.5, 0.5, 0.0],
-            procedural_contrast: [0.5, 0.5, 0.5, 0.0],
-            procedural_frequency: [1.0, 1.0, 1.0, 0.0],
-            procedural_phase: [0.0, 0.333, 0.667, 0.0],
-
-            _padding_end: [0.0; 8],
+            procedural_brightness: glam::Vec4::new(0.5, 0.5, 0.5, 0.0),
+            procedural_contrast: glam::Vec4::new(0.5, 0.5, 0.5, 0.0),
+            procedural_frequency: glam::Vec4::new(1.0, 1.0, 1.0, 0.0),
+            procedural_phase: glam::Vec4::new(0.0, 0.333, 0.667, 0.0),
 
             // ENH-001 Phase A step 3: perturbation OFF by default. Step 5
             // will populate these from a computed reference orbit.
             perturbation_enabled: 0,
             orbit_len: 0,
             ref_escaped_at: 0,
-            _padding_perturb: 0,
-            delta_c_scale: [0.0, 0.0],
-            delta_c_origin: [0.0, 0.0],
+            delta_c_scale: glam::Vec2::ZERO,
+            delta_c_origin: glam::Vec2::ZERO,
         }
     }
 
     pub fn update(&mut self, camera: &Camera, params: &FractalParams, time: f32) {
         let view_proj = camera.build_view_projection_matrix();
-        self.view_proj = view_proj.to_cols_array_2d();
-        self.inv_view_proj = view_proj.inverse().to_cols_array_2d();
-        self.camera_pos = camera.position.into();
+        self.view_proj = view_proj;
+        self.inv_view_proj = view_proj.inverse();
+        self.camera_pos = camera.position;
 
-        self.center = [
+        self.center = glam::Vec2::new(
             params.settings.center_2d[0] as f32,
             params.settings.center_2d[1] as f32,
-        ];
+        );
         // ARC-001: zoom_2d is f64 CPU-side; the GPU uniform stays f32 (casting here at
         // the boundary). The f32 GPU zoom is the remaining precision limiter; the
         // double-float center (hi/lo) is what actually extends the on-GPU ceiling.
@@ -445,8 +409,8 @@ impl Uniforms {
         let center_y = params.settings.center_2d[1];
         let (hi_x, lo_x) = split_f64(center_x);
         let (hi_y, lo_y) = split_f64(center_y);
-        self.center_hi = [hi_x, hi_y];
-        self.center_lo = [lo_x, lo_y];
+        self.center_hi = glam::Vec2::new(hi_x, hi_y);
+        self.center_lo = glam::Vec2::new(lo_x, lo_y);
 
         // Auto-scale iterations with zoom for 2D fractals, combined with user
         // slider. ARC-007: also fold in the LOD `iteration_scale`, applied
@@ -461,7 +425,7 @@ impl Uniforms {
         // inline math here would let the two paths drift.
         let q = params.effective_quality();
         self.max_iterations = effective_2d_max_iterations(params);
-        self.julia_c = params.settings.julia_c;
+        self.julia_c = params.settings.julia_c.into();
 
         // QA-017: enum→u32 via `#[repr(u32)]` discriminants (see
         // `fractal/types.rs` and the `gpu_discriminant_roundtrip` test, which
@@ -491,35 +455,35 @@ impl Uniforms {
 
         // Update palette
         for (i, color) in params.settings.palette.colors.iter().enumerate() {
-            self.palette[i] = [color.x, color.y, color.z, 1.0];
+            self.palette[i] = glam::Vec4::new(color.x, color.y, color.z, 1.0);
         }
 
         // Update procedural palette
         self.procedural_palette_type = params.settings.procedural_palette.shader_index();
-        self.procedural_brightness = [
+        self.procedural_brightness = glam::Vec4::new(
             params.settings.procedural_brightness[0],
             params.settings.procedural_brightness[1],
             params.settings.procedural_brightness[2],
             0.0,
-        ];
-        self.procedural_contrast = [
+        );
+        self.procedural_contrast = glam::Vec4::new(
             params.settings.procedural_contrast[0],
             params.settings.procedural_contrast[1],
             params.settings.procedural_contrast[2],
             0.0,
-        ];
-        self.procedural_frequency = [
+        );
+        self.procedural_frequency = glam::Vec4::new(
             params.settings.procedural_frequency[0],
             params.settings.procedural_frequency[1],
             params.settings.procedural_frequency[2],
             0.0,
-        ];
-        self.procedural_phase = [
+        );
+        self.procedural_phase = glam::Vec4::new(
             params.settings.procedural_phase[0],
             params.settings.procedural_phase[1],
             params.settings.procedural_phase[2],
             0.0,
-        ];
+        );
 
         self.ambient_occlusion = if params.settings.ambient_occlusion {
             1
@@ -544,7 +508,7 @@ impl Uniforms {
 
         self.roughness = params.settings.roughness;
         self.metallic = params.settings.metallic;
-        self.albedo = params.settings.albedo.into();
+        self.albedo = params.settings.albedo;
 
         self.dof_focal_length = params.settings.dof_focal_length;
         self.dof_aperture = params.settings.dof_aperture;
@@ -564,8 +528,8 @@ impl Uniforms {
 
         self.show_floor = if params.settings.show_floor { 1 } else { 0 };
         self.floor_height = params.settings.floor_height;
-        self.floor_color1 = params.settings.floor_color1.into();
-        self.floor_color2 = params.settings.floor_color2.into();
+        self.floor_color1 = params.settings.floor_color1;
+        self.floor_color2 = params.settings.floor_color2;
         self.floor_reflections = if params.settings.floor_reflections {
             1
         } else {
@@ -585,7 +549,7 @@ impl Uniforms {
         self.fog_enabled = if params.settings.fog_enabled { 1 } else { 0 };
         self.fog_mode = params.settings.fog_mode as u32;
         self.fog_density = params.settings.fog_density;
-        self.fog_color = params.settings.fog_color.into();
+        self.fog_color = params.settings.fog_color;
 
         // Post-processing
         self.brightness = params.settings.brightness;
@@ -624,8 +588,8 @@ impl Uniforms {
         self.perturbation_enabled = 0;
         self.orbit_len = 0;
         self.ref_escaped_at = 0;
-        self.delta_c_scale = [0.0, 0.0];
-        self.delta_c_origin = [0.0, 0.0];
+        self.delta_c_scale = glam::Vec2::ZERO;
+        self.delta_c_origin = glam::Vec2::ZERO;
     }
 
     /// Creates a new Uniforms struct populated from camera and fractal parameters.
@@ -682,16 +646,16 @@ impl Uniforms {
         // LOD state either side sees.
         self.max_iterations = orbit_len;
         self.ref_escaped_at = ref_escaped_at;
-        self.delta_c_scale = [(inv_zoom_f64 * aspect_f64) as f32, inv_zoom_f64 as f32];
-        self.delta_c_origin = reference_offset;
+        self.delta_c_scale =
+            glam::Vec2::new((inv_zoom_f64 * aspect_f64) as f32, inv_zoom_f64 as f32);
+        self.delta_c_origin = reference_offset.into();
     }
 }
 
-// Compile-time assertion to ensure struct size matches WGSL expectations
-const _: () = assert!(
-    std::mem::size_of::<Uniforms>() == 896,
-    "Uniforms struct must be exactly 896 bytes"
-);
+// ENH-008: the old compile-time `size_of::<Uniforms>() == 896` assert is gone —
+// the struct no longer carries manual padding, so its WGSL-correct size comes
+// from encase (`Uniforms::min_size()`), checked at runtime by the
+// `uniforms_byte_layout` test alongside the field-offset sentinels.
 
 // Post-processing uniform structs.
 //
@@ -787,67 +751,62 @@ impl PostProcessUniforms {
 #[cfg(test)]
 mod layout_tests {
     use super::*;
-    use std::mem::offset_of;
 
-    /// Locks the `Uniforms` Rust struct to the WGSL `Uniforms` declaration in
-    /// `src/shaders/fractal.wgsl` (lines 1-148). Any field reorder, add, or
-    /// remove breaks this test, forcing the change to be deliberate and paired
-    /// with a matching WGSL edit.
-    ///
-    /// The compile-time `size_of == 896` assert above catches total-size
-    /// drift but misses equal-size field swaps; offset asserts catch those.
-    ///
-    /// Expected offsets were cross-checked against the WGSL declaration by
-    /// summing WGSL host-shareable layout rules:
+    /// ENH-008: `Uniforms` derives `encase::ShaderType` with no manual padding,
+    /// so its WGSL-correct layout (768 bytes) is computed by encase. Lock a
+    /// spread of field offsets (early → trailing) by serializing sentinels and
+    /// reading them back at the offsets derived from WGSL host-shareable rules:
     ///   - mat4x4<f32>: 64B, align 16
     ///   - vec4<f32>:   16B, align 16
-    ///   - vec3<f32>:   16B effective in uniform structs (12B data + 4B pad)
+    ///   - vec3<f32>:   12B data + align 16 (a trailing scalar lands at +12, NOT +16)
     ///   - vec2<f32>:   8B,  align 8
     ///   - f32/u32:     4B,  align 4
     ///   - array<vec4<f32>, N>: stride 16, align 16
     ///
-    /// Sentinels are spread across the struct (early, middle, late, trailing)
-    /// so an insertion anywhere shifts at least one of them.
+    /// A byte-pattern test is stronger than `offset_of!` here: it proves the
+    /// bytes the GPU receives match the WGSL struct, not the Rust struct's
+    /// in-memory layout (encase decouples the two — e.g. glam::Vec3 is 4-byte
+    /// aligned in Rust but gets a 12-byte/16-align slot in the uniform buffer).
+    /// Any field reorder/add/remove or a WGSL↔Rust type mismatch breaks a sentinel.
     #[test]
-    fn wgsl_layout_contract() {
-        assert_eq!(std::mem::size_of::<Uniforms>(), 896);
+    fn uniforms_byte_layout() {
+        let mut u = Uniforms::new();
+        u.max_iterations = 0x1234_5678; // u32 @156
+        u.palette[2] = glam::Vec4::new(1.5, 2.5, 3.5, 4.5); // palette @208, [2] @240
+        u.albedo = glam::Vec3::new(5.5, 6.5, 7.5); // vec3 @384
+        u.center_hi = glam::Vec2::new(8.5, 9.5); // @604
+        u.aspect_ratio = glam::Vec4::new(10.5, 11.5, 12.5, 13.5); // @640
+        u.procedural_phase = glam::Vec4::new(14.5, 15.5, 16.5, 17.5); // @720
+        u.delta_c_origin = glam::Vec2::new(18.5, 19.5); // @760 (trailing field)
 
-        // 2D-params row: center vec2 (8) + zoom f32 (4) + max_iterations u32 (4),
-        // preceded by camera_pos vec3 + _padding1 = offset 144.
-        assert_eq!(offset_of!(Uniforms, max_iterations), 156);
+        let bytes = write_uniform_bytes(&u);
+        assert_eq!(bytes.len(), 768);
 
-        // 3D-params row: power f32 + max_steps u32 + min_distance f32 + fractal_scale f32.
-        assert_eq!(offset_of!(Uniforms, max_steps), 180);
+        assert_eq!(u32_at(&bytes, 156), 0x1234_5678); // max_iterations
 
-        // palette: array<vec4<f32>, 8> — must start on 16B boundary; comes right
-        // after the power/max_steps/min_distance/fractal_scale/fractal_fold/
-        // fractal_min_radius/_padding2 block ending at offset 208.
-        assert_eq!(offset_of!(Uniforms, palette), 208);
+        // palette[2] @208 + 2*16
+        assert_eq!(f32_at(&bytes, 240), 1.5);
+        assert_eq!(f32_at(&bytes, 244), 2.5);
+        assert_eq!(f32_at(&bytes, 248), 3.5);
+        assert_eq!(f32_at(&bytes, 252), 4.5);
 
-        // High-precision center block, immediately after the post-processing
-        // scalars (which end at fxaa_enabled @ 668 + 4 = 672).
-        assert_eq!(offset_of!(Uniforms, center_hi), 672);
+        // albedo @384: vec3 is 12B of data, so .xyz land at 384/388/392.
+        assert_eq!(f32_at(&bytes, 384), 5.5);
+        assert_eq!(f32_at(&bytes, 388), 6.5);
+        assert_eq!(f32_at(&bytes, 392), 7.5);
 
-        // aspect_ratio: vec4<f32> stored in an explicit 16B slot, after the
-        // four LOD-debug scalars (lod_debug_enabled + 3× lod_zoneN = 16B).
-        assert_eq!(offset_of!(Uniforms, aspect_ratio), 736);
+        assert_eq!(f32_at(&bytes, 592), 8.5); // center_hi.x
+        assert_eq!(f32_at(&bytes, 596), 9.5); // center_hi.y
 
-        // procedural_phase: last vec4 in the procedural-palette block, just
-        // before the trailing 32B _padding_end.
-        assert_eq!(offset_of!(Uniforms, procedural_phase), 816);
+        assert_eq!(f32_at(&bytes, 640), 10.5); // aspect_ratio.x
+        assert_eq!(f32_at(&bytes, 644), 11.5); // aspect_ratio.y
 
-        // ENH-001 Phase A step 3: perturbation block, appended after
-        // _padding_end (which ends at offset 832 + 32 = 864). The three
-        // u32 flags pack into the first 16B row; `_padding_perturb` is the
-        // explicit 4B pad that lifts `delta_c_scale` to vec2<f32>'s 8-byte
-        // alignment boundary (Rust's `#[repr(C)]` aligns `[f32; 2]` to 4,
-        // so without this pad the Rust and WGSL layouts would diverge).
-        assert_eq!(offset_of!(Uniforms, perturbation_enabled), 864);
-        assert_eq!(offset_of!(Uniforms, orbit_len), 868);
-        assert_eq!(offset_of!(Uniforms, ref_escaped_at), 872);
-        assert_eq!(offset_of!(Uniforms, _padding_perturb), 876);
-        assert_eq!(offset_of!(Uniforms, delta_c_scale), 880);
-        assert_eq!(offset_of!(Uniforms, delta_c_origin), 888);
+        assert_eq!(f32_at(&bytes, 720), 14.5); // procedural_phase.x
+        assert_eq!(f32_at(&bytes, 724), 15.5); // procedural_phase.y
+
+        // delta_c_origin is the trailing field; its 8 bytes end exactly at 768.
+        assert_eq!(f32_at(&bytes, 760), 18.5);
+        assert_eq!(f32_at(&bytes, 764), 19.5);
     }
 
     /// ENH-003: lock the post-processing uniform layouts. `scene_uv_scale`

@@ -308,11 +308,10 @@ pub fn render_high_resolution_web(
         fractal_params,
         renderer.start_time.elapsed().as_secs_f32(),
     );
-    renderer.queue.write_buffer(
-        &renderer.uniform_buffer,
-        0,
-        bytemuck::cast_slice(&[uniforms]),
-    );
+    let uniforms_bytes = write_uniform_bytes(&uniforms);
+    renderer
+        .queue
+        .write_buffer(&renderer.uniform_buffer, 0, &uniforms_bytes);
     // ENH-003: this path reuses the shared bloom/composite uniform bind groups
     // but only writes the main uniform above, so force the post uniforms to
     // full quality (scene_uv_scale=[1,1]) — otherwise a capture triggered
