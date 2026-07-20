@@ -5,7 +5,7 @@
 ![Runs on Linux | MacOS | Windows | Web](https://img.shields.io/badge/runs%20on-Linux%20%7C%20MacOS%20%7C%20Windows%20%7C%20Web-blue)
 ![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)
 
-A high-performance, cross-platform GPU-accelerated fractal renderer built with Rust and WebGPU. Features stunning 2D and immersive 3D fractal visualization with advanced rendering techniques.
+A high-performance, cross-platform GPU-accelerated fractal renderer built with Rust and WebGPU. Features stunning 2D and immersive 3D fractal visualization, perturbation-based deep zoom, and advanced rendering techniques.
 
 ![User Interface](https://raw.githubusercontent.com/paulrobello/par-fractal/main/screenshots/ui.png)
 
@@ -33,6 +33,7 @@ See the [Quick Start Guide](docs/QUICKSTART.md) for detailed instructions.
 
 - **GPU-Accelerated** - Efficient WebGPU rendering for 2D and 3D fractals
 - **35 Fractal Types** - 20 2D and 15 3D fractals including Mandelbrot, Julia, Buddhabrot, Mandelbulb, Menger Sponge, strange attractors, and more
+- **Deep Zoom (Perturbation)** - Arbitrary-precision reference orbit plus per-pixel delta recurrence enables effectively infinite zoom (tested past 1e8) on the Mandelbrot family without precision collapse
 - **Variable Power** - Adjustable exponent (z^n + c) for 6 escape-time fractals: Multibrot, Multicorn, Multi-ship, and more
 - **Advanced Rendering** - PBR shading, ambient occlusion, soft shadows, depth of field
 - **Real-time Interaction** - Smooth pan/zoom, camera controls, parameter adjustment
@@ -41,7 +42,7 @@ See the [Quick Start Guide](docs/QUICKSTART.md) for detailed instructions.
 - **Productivity Tools** - Command palette, presets, bookmarks, undo/redo
 - **Custom Palettes** - 48 static palettes, 12 procedural palettes (including Fractint-style), plus custom color schemes
 - **Web Browser Support** - Run directly in browser via WebGPU/WASM
-- **Performance Tuning** - LOD system, quality profiles, GPU selection
+- **Performance Tuning** - LOD system, adaptive render scaling, quality profiles, GPU selection, and a built-in GPU frame profiler
 
 See [Features](docs/FEATURES.md) for complete feature documentation.
 

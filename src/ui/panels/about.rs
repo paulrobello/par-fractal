@@ -56,6 +56,14 @@ impl UI {
                 ui.separator();
                 ui.add_space(4.0);
 
+                ui.collapsing("What's New in v0.10.0", |ui| {
+                    ui.label("• Perturbation deep-zoom: effectively infinite zoom (1e8+) on the Mandelbrot family");
+                    ui.label("• Precise decimal center + 10ⁿ zoom readout in the 2D panel");
+                    ui.label("• Dynamic render scaling + half-resolution bloom for smoother interaction");
+                    ui.label("• Built-in GPU frame profiler (Shift+G)");
+                    ui.label("• Per-fractal pipeline specialization and encase-driven uniform layout");
+                });
+
                 ui.collapsing("What's New in v0.9.0", |ui| {
                     ui.label("• Upgraded egui 0.34 → 0.35");
                     ui.label("• Migrated to Rust edition 2024");

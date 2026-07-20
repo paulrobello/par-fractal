@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.10.0] - 2026-07-20
+
 ### Added
 - **Perturbation deep-zoom (ENH-001), Phase A + breadth.** Arbitrary-precision
   reference orbit (`dashu-float`, `src/deep_zoom/`) computed off-thread and uploaded
@@ -497,6 +501,7 @@ Full remediation of the 2026-07-16 audit (81 issues across security, architectur
 - Cross-platform support: Windows (DX12/Vulkan), macOS (Metal), Linux (Vulkan)
 
 <!-- v0.8.2 has no git tag; compare anchors use v0.8.1 as the base. -->
+[0.10.0]: https://github.com/paulrobello/par-fractal/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/paulrobello/par-fractal/compare/v0.8.3...v0.9.0
 [0.8.3]: https://github.com/paulrobello/par-fractal/compare/v0.8.1...v0.8.3
 [0.8.2]: https://github.com/paulrobello/par-fractal/compare/v0.8.1...v0.8.2
