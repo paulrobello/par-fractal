@@ -14,6 +14,9 @@ mod capture_web;
 #[cfg(feature = "native")]
 mod persistence;
 
+#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+pub use persistence::clear_settings_files;
+
 use camera_transition::CameraTransition;
 use refine::{RefineState, estimate_full_quality_ms, grid_side_for_cost};
 

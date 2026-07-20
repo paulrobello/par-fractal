@@ -7,7 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Nothing yet._
+### Fixed
+- **`--clear-settings` / `make run-reset` cleared nothing.** Settings are saved
+  through the platform storage abstraction to `<config>/settings/settings.yaml`
+  (ARC-014), but `clear_settings()` deleted the pre-ARC-014 legacy path
+  `<config>/settings.yaml`. A reset printed "No settings to clear" and the app
+  kept loading the stale file, so bad saved parameters could not be recovered
+  from without hand-deleting the file. Clearing now removes every location the
+  loader reads (platform storage *and* the legacy fallback) and prints each path
+  it removed.
+- **Switching to a 3D Julia-family fractal inherited an out-of-range
+  `julia_c`.** `JuliaSet3D`, `HybridMandelbulbJulia3D`, and `QuaternionCubic3D`
+  all feed `julia_c` into their distance estimators but had no reset in
+  `switch_fractal`, so the constant carried over from the previous fractal — the
+  2D attractors leave values far outside the escape radius (Threeply2D leaves
+  `[-55.0, -1.0]`, which the Julia slider clamps to `[-2.0, -1.0]`). Every point
+  escaped immediately, rendering an empty set: only the floor and its shadow
+  were visible. Each type now re-seeds `julia_c` to its preset value on switch.
 
 ## [0.10.0] - 2026-07-20
 

@@ -19,6 +19,13 @@ impl NativeStorage {
         Self { base_dir }
     }
 
+    /// Build storage rooted at an explicit config directory instead of the
+    /// platform default. Lets tests pin the on-disk layout that
+    /// `clear_settings_files` has to match.
+    pub fn with_base_dir(base_dir: PathBuf) -> Self {
+        Self { base_dir }
+    }
+
     fn get_category_dir(&self, category: &str) -> PathBuf {
         self.base_dir.join(category)
     }

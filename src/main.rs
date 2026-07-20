@@ -63,16 +63,18 @@ fn parse_quality_level(s: &str) -> Option<usize> {
 fn clear_settings() {
     if let Some(config_dir) = directories::ProjectDirs::from("com", "fractal", "par-fractal") {
         let config_path = config_dir.config_dir();
-        let settings_file = config_path.join("settings.yaml");
 
-        // Only delete settings.yaml, preserve presets and other user data
-        if settings_file.exists() {
-            match std::fs::remove_file(&settings_file) {
-                Ok(_) => println!("Settings cleared: {}", settings_file.display()),
-                Err(e) => eprintln!("Failed to clear settings: {}", e),
+        // Clears every location the loader reads, preserving presets and other
+        // user data. Deleting only the legacy path here let a reset silently
+        // no-op while the platform-storage copy kept loading.
+        match app::clear_settings_files(config_path) {
+            Ok(removed) if removed.is_empty() => println!("No settings to clear"),
+            Ok(removed) => {
+                for path in removed {
+                    println!("Settings cleared: {}", path.display());
+                }
             }
-        } else {
-            println!("No settings to clear");
+            Err(e) => eprintln!("Failed to clear settings: {}", e),
         }
 
         // Note: User presets in {}/presets/ are preserved

@@ -568,6 +568,12 @@ impl FractalParams {
             FractalType::SierpinskiPyramid3D => {
                 self.settings.max_iterations = 12; // Default iterations for Sierpinski Pyramid
             }
+            FractalType::JuliaSet3D => {
+                // Re-seed julia_c: the 2D attractors leave values far outside
+                // the escape radius here (Threeply2D leaves -55.0), which
+                // renders an empty set.
+                self.settings.julia_c = [-0.7, 0.27015];
+            }
             FractalType::Nova2D | FractalType::Lyapunov2D => {
                 self.settings.max_iterations = 16;
             }
@@ -596,10 +602,12 @@ impl FractalParams {
             FractalType::HybridMandelbulbJulia3D => {
                 self.settings.fractal_scale = 1.5;
                 self.settings.max_iterations = 8; // Lower for performance
+                self.settings.julia_c = [-0.2, 0.8];
             }
             FractalType::QuaternionCubic3D => {
                 self.settings.fractal_scale = 1.5;
                 self.settings.max_iterations = 8; // Lower for performance
+                self.settings.julia_c = [-0.2, 0.6];
             }
             // Strange Attractors 2D - set appropriate view bounds and iterations
             FractalType::Hopalong2D => {

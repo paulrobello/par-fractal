@@ -397,3 +397,31 @@ fn nondefault_settings_roundtrip_identical() {
     assert_eq!(params.settings.attractor_iterations_per_frame, 25_000);
     assert_eq!(params.settings.attractor_log_scale, 3.0);
 }
+
+/// The 3D julia-family fractals all feed `julia_c` into their distance
+/// estimators, so switching into one must re-seed it. Without this, `julia_c`
+/// carries over from the previous fractal — Threeply2D leaves `[-55.0, -1.0]`,
+/// which the Julia slider clamps to `[-2.0, -1.0]`, a constant far outside the
+/// escape radius. The set is then empty and only its floor shadow renders.
+#[test]
+fn test_switch_to_3d_julia_family_reseeds_julia_c() {
+    for fractal_type in [
+        FractalType::JuliaSet3D,
+        FractalType::HybridMandelbulbJulia3D,
+        FractalType::QuaternionCubic3D,
+    ] {
+        let mut params = FractalParams::default();
+        params.switch_fractal(FractalType::Threeply2D);
+        assert_eq!(params.settings.julia_c, [-55.0, -1.0]);
+
+        params.switch_fractal(fractal_type);
+
+        let c = params.settings.julia_c;
+        let magnitude = (c[0] * c[0] + c[1] * c[1]).sqrt();
+        assert!(
+            magnitude < 2.0,
+            "{fractal_type:?} kept |julia_c| = {magnitude} (>= escape radius 2), \
+             which renders an empty set"
+        );
+    }
+}
