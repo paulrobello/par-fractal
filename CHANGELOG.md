@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`--switch-after <FractalType> <secs>` CLI flag** — switches the fractal type
+  after a delay, for scripted type-transition testing (mirrors `--resize-after`;
+  the variant name parses via serde). Added to reproduce and verify the
+  Buddhabrot → attractor switch fix; a lasting test seam for fractal switches.
+
 ### Fixed
 - **Buddhabrot → attractor switch lockup.** Switching from Buddhabrot2D to a
   strange-attractor type (e.g. Hopalong2D) dispatched the Attractor compute

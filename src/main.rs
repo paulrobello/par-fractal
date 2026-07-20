@@ -45,6 +45,7 @@ fn print_help() {
     );
     println!("  --window-size <WxH>      Force the window to WxH physical pixels");
     println!("  --resize-after <s WxH>   Resize the window to WxH after N seconds (QA-027)");
+    println!("  --switch-after <type> <s> Switch to FractalType after N seconds (agent testing)");
     println!("  --help, -h               Show this help message");
 }
 
@@ -164,6 +165,8 @@ fn main() {
     // QA-027: resize the window mid-run to exercise the winit 0.30 resize
     // lifecycle (surface reconfigure + redraw) without driving a human input.
     let mut resize_after: Option<(f32, u32, u32)> = None;
+    // Agent-operability: `--switch-after <FractalType> <secs>` (see AppHandler).
+    let mut switch_after: Option<(fractal::FractalType, f32)> = None;
 
     let mut i = 1;
     while i < args.len() {
@@ -297,6 +300,42 @@ fn main() {
                     return;
                 }
             }
+            "--switch-after" => {
+                // Agent-operability: `--switch-after <FractalType> <secs>`
+                // switches fractal type after a delay (two tokens). The variant
+                // name parses via serde (same wire format as settings.yaml).
+                if i + 2 < args.len() {
+                    let ft = serde_yaml::from_str::<fractal::FractalType>(&args[i + 1]);
+                    let secs = args[i + 2].parse::<f32>();
+                    match (ft, secs) {
+                        (Ok(ft), Ok(secs)) => {
+                            switch_after = Some((ft, secs));
+                            i += 3;
+                        }
+                        (Err(_), _) => {
+                            eprintln!(
+                                "Unknown fractal type '{}' for --switch-after \
+                                 (use a FractalType variant name, e.g. Hopalong2D)",
+                                args[i + 1]
+                            );
+                            print_help();
+                            return;
+                        }
+                        (_, Err(_)) => {
+                            eprintln!(
+                                "Invalid --switch-after delay '{}' (expected seconds)",
+                                args[i + 2]
+                            );
+                            print_help();
+                            return;
+                        }
+                    }
+                } else {
+                    eprintln!("--switch-after requires <FractalType> <secs>");
+                    print_help();
+                    return;
+                }
+            }
             "--resize-after" => {
                 // QA-027: `--resize-after <secs> <WxH>` resizes the window after
                 // a delay (two tokens). Powers the lifecycle smoke test.
@@ -369,6 +408,8 @@ fn main() {
         resize_after,
         start: None,
         resize_taken: false,
+        switch_after,
+        switch_done: false,
         app: None,
     };
 
@@ -398,6 +439,12 @@ struct AppHandler {
     start: Option<std::time::Instant>,
     /// QA-027: tracks that the deferred resize has fired (idempotent).
     resize_taken: bool,
+    /// Agent-operability: `(FractalType, delay_secs)` — switch the fractal type
+    /// after the delay. Powers scripted type-transition tests (e.g. reproducing
+    /// the Buddhabrot → attractor accumulation bind-group switch bug).
+    switch_after: Option<(fractal::FractalType, f32)>,
+    /// Tracks that the deferred switch has fired (idempotent).
+    switch_done: bool,
     app: Option<App>,
 }
 
@@ -479,6 +526,12 @@ impl ApplicationHandler for AppHandler {
                 if s.elapsed() >= std::time::Duration::from_secs_f32(delay)
         );
         let resize_pending = self.resize_after.is_some() && (!self.resize_taken);
+        let switch_due = matches!(
+            (self.switch_after, self.switch_done, self.start),
+            (Some((_, delay)), false, Some(s))
+                if s.elapsed() >= std::time::Duration::from_secs_f32(delay)
+        );
+        let switch_pending = self.switch_after.is_some() && (!self.switch_done);
 
         let Some(app) = self.app.as_mut() else {
             return;
@@ -492,6 +545,12 @@ impl ApplicationHandler for AppHandler {
                     .request_inner_size(winit::dpi::PhysicalSize::new(w, h));
             }
             self.resize_taken = true;
+        }
+        if switch_due {
+            if let Some((ft, _)) = self.switch_after {
+                app.switch_fractal(ft);
+            }
+            self.switch_done = true;
         }
         // Check if app should exit (from CLI delay option)
         if app.should_exit() {
@@ -512,7 +571,11 @@ impl ApplicationHandler for AppHandler {
         // loop ticking: that timer is evaluated inside update() on the redraw
         // path, so without a redraw it would never fire under ControlFlow::Wait.
         // QA-027: a pending --resize-after does too.
-        if app.should_render_next_frame() || app.has_pending_cli_timer() || resize_pending {
+        if app.should_render_next_frame()
+            || app.has_pending_cli_timer()
+            || resize_pending
+            || switch_pending
+        {
             app.window().request_redraw();
         }
     }

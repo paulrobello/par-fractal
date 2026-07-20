@@ -590,6 +590,14 @@ impl App {
             || (self.profile_dump_path.is_some() && !self.profile_dumped)
     }
 
+    /// Agent-operability: switch the active fractal type (forwards to
+    /// `FractalParams::switch_fractal`). Used by the `--switch-after` CLI hook
+    /// to script type transitions for testing (e.g. the Buddhabrot → attractor
+    /// accumulation bind-group switch).
+    pub fn switch_fractal(&mut self, fractal_type: crate::fractal::FractalType) {
+        self.fractal_params.switch_fractal(fractal_type);
+    }
+
     /// ARC-006: mark the scene as needing a re-render. Called from every
     /// image-affecting state change (input handlers, UI actions, camera moves,
     /// palette animation, etc.). Cheap (one bool write); the gating happens in
