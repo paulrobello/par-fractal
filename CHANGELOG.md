@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Sierpinski Gasket rendered as empty space.** It had no arm in
+  `switch_fractal` at all, so it inherited `max_iterations` — and it is an IFS
+  whose every step multiplies the point by ~2.5, so the escape-time default of 80
+  diverges to a distance estimator that never converges. It now seeds 10
+  iterations (alongside fold, min radius, and scale) and renders.
+- **A fractal's appearance depended on which fractal you viewed before it.**
+  A sweep of all 35 types found several shape parameters that a distance
+  estimator reads but `switch_fractal` never seeded, so they silently carried
+  over: `power` for Hybrid Bulb-Julia, and `fractal_scale` for Mandelbulb,
+  Sierpinski Pyramid, Julia 3D, both IFS types, and Apollonian Gasket. Each 3D
+  type now seeds every uniform its estimator reads, and a regression test pins
+  the whole class by switching into each type from two adversarial predecessors
+  and asserting the results match.
 - **Mandelbox rendered as a featureless blob.** `mandelbox_de` derives its
   internal fold scale as `-(power / 4.0)`, so the classic -2.0 needs
   `power == 8.0` — but nothing set it. `switch_fractal`'s Mandelbox arm left

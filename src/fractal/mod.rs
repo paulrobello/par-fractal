@@ -559,6 +559,7 @@ impl FractalParams {
                 self.settings.power = 2.0; // Classic z^2 + c
             }
             FractalType::Mandelbulb3D => {
+                self.settings.fractal_scale = 2.0;
                 self.settings.power = 8.0; // Classic Mandelbulb
             }
             FractalType::MengerSponge3D => {
@@ -566,9 +567,20 @@ impl FractalParams {
                 self.settings.max_iterations = 7; // Default iterations for Menger Sponge
             }
             FractalType::SierpinskiPyramid3D => {
+                self.settings.fractal_scale = 2.0;
                 self.settings.max_iterations = 12; // Default iterations for Sierpinski Pyramid
             }
+            FractalType::SierpinskiGasket3D => {
+                // An IFS, not an escape-time fractal: each step multiplies by
+                // ~2.5, so the inherited 80 default overflows to a DE that
+                // never converges and the gasket renders as empty space.
+                self.settings.fractal_scale = 2.0;
+                self.settings.fractal_fold = 1.0;
+                self.settings.fractal_min_radius = 0.5;
+                self.settings.max_iterations = 10;
+            }
             FractalType::JuliaSet3D => {
+                self.settings.fractal_scale = 2.0;
                 // Re-seed julia_c: the 2D attractors leave values far outside
                 // the escape radius here (Threeply2D leaves -55.0), which
                 // renders an empty set.
@@ -589,9 +601,11 @@ impl FractalParams {
                 self.settings.metallic = 0.32;
             }
             FractalType::OctahedralIFS3D | FractalType::IcosahedralIFS3D => {
+                self.settings.fractal_scale = 2.0;
                 self.settings.fractal_fold = 1.7;
             }
             FractalType::ApollonianGasket3D => {
+                self.settings.fractal_scale = 2.0;
                 self.settings.fractal_fold = 1.05;
                 self.settings.fractal_min_radius = 0.6;
             }
@@ -604,6 +618,7 @@ impl FractalParams {
                 self.settings.fractal_scale = 1.5;
                 self.settings.max_iterations = 8; // Lower for performance
                 self.settings.julia_c = [-0.2, 0.8];
+                self.settings.power = 8.0; // bulb exponent; else inherited
             }
             FractalType::QuaternionCubic3D => {
                 self.settings.fractal_scale = 1.5;

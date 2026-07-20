@@ -460,3 +460,99 @@ fn test_mandelbox_preset_carries_its_own_power() {
         "preset renders a blob without an explicit power"
     );
 }
+
+/// Class-wide guard for the defect behind the Julia 3D, Mandelbox, and
+/// Sierpinski Gasket bugs: a shape parameter that a fractal's distance
+/// estimator reads but `switch_fractal` never seeds silently inherits whatever
+/// the previously selected fractal left behind. Selecting a type from the menu
+/// must produce the same fractal regardless of what you were looking at before.
+///
+/// Each entry lists the uniforms that type's distance estimator in
+/// `shaders/fractal.wgsl` actually reads; only those are compared, since an
+/// unread field may legitimately carry over. Threeply2D and MengerSponge3D are
+/// the adversarial predecessors — between them they leave extreme values in
+/// every shared shape field.
+#[test]
+fn test_3d_defaults_do_not_depend_on_the_previous_fractal() {
+    use Shape::*;
+
+    #[derive(Clone, Copy)]
+    enum Shape {
+        Scale,
+        Fold,
+        MinRadius,
+        Iterations,
+        Power,
+        JuliaC,
+    }
+
+    // (type, uniforms its DE reads)
+    let de_reads: &[(FractalType, &[Shape])] = &[
+        (FractalType::Mandelbulb3D, &[Scale, Power]),
+        (FractalType::MengerSponge3D, &[Scale, Iterations]),
+        (FractalType::SierpinskiPyramid3D, &[Scale, Iterations]),
+        (
+            FractalType::SierpinskiGasket3D,
+            &[Scale, Fold, MinRadius, Iterations],
+        ),
+        (FractalType::JuliaSet3D, &[Scale, JuliaC]),
+        (FractalType::Mandelbox3D, &[Scale, Fold, MinRadius, Power]),
+        (FractalType::OctahedralIFS3D, &[Scale, Fold]),
+        (FractalType::IcosahedralIFS3D, &[Scale, Fold]),
+        (FractalType::ApollonianGasket3D, &[Scale, Fold, MinRadius]),
+        (FractalType::Kleinian3D, &[Scale, Fold, MinRadius]),
+        (
+            FractalType::HybridMandelbulbJulia3D,
+            &[Scale, JuliaC, Iterations, Power],
+        ),
+        (FractalType::QuaternionCubic3D, &[Scale, JuliaC, Iterations]),
+    ];
+
+    for (target, reads) in de_reads {
+        let shape_via = |via: FractalType| -> Vec<String> {
+            let mut p = FractalParams::default();
+            p.switch_fractal(via);
+            p.switch_fractal(*target);
+            reads
+                .iter()
+                .map(|f| match f {
+                    Scale => format!("scale={}", p.settings.fractal_scale),
+                    Fold => format!("fold={}", p.settings.fractal_fold),
+                    MinRadius => format!("min_radius={}", p.settings.fractal_min_radius),
+                    Iterations => format!("iterations={}", p.settings.max_iterations),
+                    Power => format!("power={}", p.settings.power),
+                    JuliaC => format!("julia_c={:?}", p.settings.julia_c),
+                })
+                .collect()
+        };
+
+        assert_eq!(
+            shape_via(FractalType::Threeply2D),
+            shape_via(FractalType::MengerSponge3D),
+            "{target:?} renders differently depending on the previously \
+             selected fractal — a shape parameter its DE reads is not seeded"
+        );
+    }
+}
+
+/// An IFS multiplies its point by ~2.5 per step, so it needs a low iteration
+/// count; the 80 escape-time default diverges and the fractal disappears.
+#[test]
+fn test_ifs_fractals_use_low_iteration_counts() {
+    for fractal_type in [
+        FractalType::SierpinskiGasket3D,
+        FractalType::SierpinskiPyramid3D,
+        FractalType::MengerSponge3D,
+    ] {
+        let mut params = FractalParams::default();
+        assert_eq!(params.settings.max_iterations, 80, "escape-time default");
+
+        params.switch_fractal(fractal_type);
+
+        assert!(
+            params.settings.max_iterations <= 16,
+            "{fractal_type:?} kept max_iterations = {}, which diverges",
+            params.settings.max_iterations
+        );
+    }
+}
