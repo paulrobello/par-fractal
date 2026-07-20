@@ -20,6 +20,8 @@ impl App {
         // instant the worker thread finishes, without blocking the loop.
         self.poll_gpu_scan();
 
+        self.reframe_camera_if_fractal_changed();
+
         // Update FPS counter
         self.frame_count += 1;
         // ENH-006 Task 3: monotonic counter that does NOT reset (unlike

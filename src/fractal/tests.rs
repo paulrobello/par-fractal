@@ -556,3 +556,60 @@ fn test_ifs_fractals_use_low_iteration_counts() {
         );
     }
 }
+
+/// The default camera sits at `+Z` looking at the origin. A 3D fractal whose
+/// world-space extent reaches past that distance renders as a wall of clipped
+/// geometry, because the camera is *inside* it — which is what the sprawling
+/// IFS types did while every 3D type shared one hardcoded distance.
+///
+/// Verified visually per type via `--camera-pos`; this pins the measured
+/// values so a future default change cannot silently re-bury the camera.
+#[test]
+fn test_sprawling_3d_fractals_are_framed_from_outside() {
+    // (type, extent that must fit in front of the camera)
+    let min_distance = [
+        (FractalType::OctahedralIFS3D, 8.0),
+        (FractalType::IcosahedralIFS3D, 8.0),
+        (FractalType::ApollonianGasket3D, 7.0),
+    ];
+    for (fractal_type, minimum) in min_distance {
+        let distance = fractal_type.default_camera_distance();
+        assert!(
+            distance >= minimum,
+            "{fractal_type:?} frames from {distance}, inside its ~{minimum} extent"
+        );
+    }
+}
+
+/// Every 3D type must declare a usable framing distance; a zero or negative
+/// value would put the camera at or behind the origin.
+///
+/// The list is explicit because `FractalType` has no iterator; keep it in sync
+/// with `FractalType::is_3d` when adding a type.
+#[test]
+fn test_every_3d_fractal_declares_a_positive_camera_distance() {
+    for fractal_type in [
+        FractalType::Mandelbulb3D,
+        FractalType::MengerSponge3D,
+        FractalType::SierpinskiPyramid3D,
+        FractalType::SierpinskiGasket3D,
+        FractalType::JuliaSet3D,
+        FractalType::Mandelbox3D,
+        FractalType::OctahedralIFS3D,
+        FractalType::IcosahedralIFS3D,
+        FractalType::ApollonianGasket3D,
+        FractalType::Kleinian3D,
+        FractalType::HybridMandelbulbJulia3D,
+        FractalType::QuaternionCubic3D,
+        FractalType::Pickover3D,
+        FractalType::Lorenz3D,
+        FractalType::Rossler3D,
+    ] {
+        assert!(fractal_type.is_3d(), "{fractal_type:?} is not a 3D type");
+        let distance = fractal_type.default_camera_distance();
+        assert!(
+            distance > 0.0 && distance.is_finite(),
+            "{fractal_type:?} declares camera distance {distance}"
+        );
+    }
+}

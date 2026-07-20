@@ -40,10 +40,14 @@ impl Camera {
         }
     }
 
-    /// Reset `position`, `target`, and `up` to the default view (preserving
-    /// projection parameters such as `fovy` and `aspect`).
-    pub fn reset_to_default(&mut self) {
-        self.position = Vec3::new(0.0, 0.0, 5.0);
+    /// Reset `target` and `up` to the default view and pull the camera back to
+    /// `distance` along +Z (preserving projection parameters such as `fovy` and
+    /// `aspect`).
+    ///
+    /// `distance` comes from `FractalType::default_camera_distance` — framing
+    /// is per fractal type because their world-space extents differ widely.
+    pub fn reset_to_default(&mut self, distance: f32) {
+        self.position = Vec3::new(0.0, 0.0, distance);
         self.target = Vec3::ZERO;
         self.up = Vec3::Y;
     }

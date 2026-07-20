@@ -22,7 +22,7 @@ use refine::{RefineState, estimate_full_quality_ms, grid_side_for_cost};
 
 use crate::camera::{Camera, CameraController};
 use crate::deep_zoom::PerturbationDriver;
-use crate::fractal::{FractalParams, RenderMode};
+use crate::fractal::{FractalParams, FractalType, RenderMode};
 use crate::platform::{PlatformContext, category};
 use crate::renderer::{GpuInfo, Renderer};
 use crate::ui::UI;
@@ -46,6 +46,9 @@ pub struct App {
     camera: Camera,
     camera_controller: CameraController,
     fractal_params: FractalParams,
+    /// Fractal type the camera is currently framed for. Drives
+    /// [`App::reframe_camera_if_fractal_changed`].
+    framed_for: FractalType,
     ui: UI,
     egui_state: egui_winit::State,
     egui_renderer: egui_wgpu::Renderer,
@@ -506,6 +509,9 @@ impl App {
             renderer,
             camera,
             camera_controller,
+            // Seed from the active type so the first frame does not re-frame
+            // away from a restored (or preset-supplied) camera position.
+            framed_for: fractal_params.settings.fractal_type,
             fractal_params,
             ui,
             egui_state,
@@ -599,6 +605,68 @@ impl App {
     /// accumulation bind-group switch).
     pub fn switch_fractal(&mut self, fractal_type: crate::fractal::FractalType) {
         self.fractal_params.switch_fractal(fractal_type);
+        self.mark_scene_dirty();
+    }
+
+    /// Re-frame the camera when the active fractal wants a different viewing
+    /// distance than the one currently framed.
+    ///
+    /// Checked centrally each frame rather than at the `switch_fractal` call
+    /// sites: the type can change from the UI panel, the command palette, a
+    /// function-key shortcut, or the `--switch-after` hook, and every one of
+    /// those has to re-frame or the camera ends up inside the new fractal.
+    ///
+    /// Gated on the *distance* changing, not the type, so navigating around one
+    /// fractal and switching to another of the same scale keeps the view.
+    fn reframe_camera_if_fractal_changed(&mut self) {
+        let current = self.fractal_params.settings.fractal_type;
+        // 2D types ignore the camera, so leave `framed_for` on the last 3D type:
+        // a detour through a 2D fractal must not make the 3D framing look
+        // already-applied when we come back to a differently-scaled 3D type.
+        if !current.is_3d() {
+            return;
+        }
+        if current.default_camera_distance() != self.framed_for.default_camera_distance() {
+            self.apply_default_camera_for_fractal();
+        }
+        self.framed_for = current;
+    }
+
+    /// Pull the camera back to the framing distance the active 3D fractal
+    /// declares, looking at the origin.
+    ///
+    /// 3D types differ in world-space extent by more than a factor of five, so
+    /// the single fixed default put the camera *inside* the larger IFS
+    /// structures. 2D types ignore the camera entirely, so leave it alone.
+    pub fn apply_default_camera_for_fractal(&mut self) {
+        let fractal_type = self.fractal_params.settings.fractal_type;
+        if !fractal_type.is_3d() {
+            return;
+        }
+        self.camera
+            .reset_to_default(fractal_type.default_camera_distance());
+        self.camera_controller
+            .point_at_target(self.camera.position, self.camera.target);
+    }
+
+    /// Agent-operability: place the camera explicitly (`--camera-pos x,y,z`),
+    /// looking at the origin. Lets a harness measure framing for a fractal
+    /// without editing defaults and rebuilding.
+    pub fn set_camera_position(&mut self, position: glam::Vec3) {
+        self.camera.position = position;
+        self.camera.target = glam::Vec3::ZERO;
+        self.camera_controller
+            .point_at_target(self.camera.position, self.camera.target);
+        self.note_camera_framed();
+        self.mark_scene_dirty();
+    }
+
+    /// Record that the camera has been deliberately placed for the active
+    /// fractal, so [`App::reframe_camera_if_fractal_changed`] does not undo it
+    /// on the next frame. Call after any explicit camera placement that
+    /// accompanies a fractal-type change (presets, `--camera-pos`).
+    pub fn note_camera_framed(&mut self) {
+        self.framed_for = self.fractal_params.settings.fractal_type;
     }
 
     /// ARC-006: mark the scene as needing a re-render. Called from every

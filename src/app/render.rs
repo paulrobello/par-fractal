@@ -1098,6 +1098,10 @@ impl App {
                 .set_speed(preset.settings.camera_speed);
             self.camera_controller
                 .point_at_target(self.camera.position, self.camera.target);
+            // A preset carries its own camera *and* fractal type; without this
+            // the per-frame re-frame check would treat the type change as
+            // unframed and overwrite the preset's view.
+            self.note_camera_framed();
 
             // Mark settings for save
             self.settings_last_changed = web_time::Instant::now();
@@ -1132,7 +1136,12 @@ impl App {
         if reset_requested {
             self.fractal_params = FractalParams::default();
             // Reset camera to default position and settings
-            self.camera.reset_to_default();
+            self.camera.reset_to_default(
+                self.fractal_params
+                    .settings
+                    .fractal_type
+                    .default_camera_distance(),
+            );
             self.camera.fovy = self.fractal_params.settings.camera_fov;
             self.camera_controller
                 .set_speed(self.fractal_params.settings.camera_speed);
@@ -1143,7 +1152,12 @@ impl App {
         }
 
         if reset_camera_requested {
-            self.camera.reset_to_default();
+            self.camera.reset_to_default(
+                self.fractal_params
+                    .settings
+                    .fractal_type
+                    .default_camera_distance(),
+            );
             self.camera.fovy = self.fractal_params.settings.camera_fov;
             // Sync controller with reset camera position
             self.camera_controller

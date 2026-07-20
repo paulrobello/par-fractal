@@ -115,6 +115,26 @@ impl FractalType {
         )
     }
 
+    /// Distance along +Z at which the default camera frames this fractal,
+    /// looking at the origin.
+    ///
+    /// World-space extent varies widely across the 3D types: a Mandelbulb fits
+    /// inside radius ~2, while the folding IFS types sprawl past radius 5. A
+    /// single shared default therefore left the camera *inside* the structure
+    /// for the larger ones, which renders as a wall of clipped geometry rather
+    /// than a fractal. Values are measured per type via `--camera-pos`.
+    ///
+    /// Meaningless for 2D types (which ignore the camera); they get the
+    /// baseline so the value is always well defined.
+    pub fn default_camera_distance(&self) -> f32 {
+        match self {
+            FractalType::OctahedralIFS3D => 9.0,
+            FractalType::IcosahedralIFS3D => 9.0,
+            FractalType::ApollonianGasket3D => 8.0,
+            _ => 5.0,
+        }
+    }
+
     /// Returns true if this fractal type uses accumulation rendering
     pub fn uses_accumulation(&self) -> bool {
         self.is_2d_attractor() || self.is_buddhabrot()

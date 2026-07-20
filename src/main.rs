@@ -46,6 +46,9 @@ fn print_help() {
     println!("  --window-size <WxH>      Force the window to WxH physical pixels");
     println!("  --resize-after <s WxH>   Resize the window to WxH after N seconds (QA-027)");
     println!("  --switch-after <type> <s> Switch to FractalType after N seconds (agent testing)");
+    println!(
+        "  --camera-pos <x,y,z>     Place the 3D camera, looking at the origin (agent testing)"
+    );
     println!("  --help, -h               Show this help message");
 }
 
@@ -169,6 +172,9 @@ fn main() {
     let mut resize_after: Option<(f32, u32, u32)> = None;
     // Agent-operability: `--switch-after <FractalType> <secs>` (see AppHandler).
     let mut switch_after: Option<(fractal::FractalType, f32)> = None;
+    // Agent-operability: `--camera-pos x,y,z` overrides the per-type default
+    // camera placement so framing can be measured without a rebuild.
+    let mut camera_pos: Option<glam::Vec3> = None;
 
     let mut i = 1;
     while i < args.len() {
@@ -369,6 +375,30 @@ fn main() {
                     return;
                 }
             }
+            "--camera-pos" => {
+                // Agent-operability: `--camera-pos x,y,z` places the camera
+                // (looking at the origin) after startup and after any
+                // `--switch-after`, so a harness can measure framing.
+                if i + 1 < args.len() {
+                    let parts: Vec<Result<f32, _>> =
+                        args[i + 1].split(',').map(str::parse::<f32>).collect();
+                    match parts.as_slice() {
+                        [Ok(x), Ok(y), Ok(z)] => {
+                            camera_pos = Some(glam::Vec3::new(*x, *y, *z));
+                            i += 2;
+                        }
+                        _ => {
+                            eprintln!("Invalid --camera-pos '{}' (expected x,y,z)", args[i + 1]);
+                            print_help();
+                            return;
+                        }
+                    }
+                } else {
+                    eprintln!("--camera-pos requires a value (x,y,z)");
+                    print_help();
+                    return;
+                }
+            }
             "--list-presets" => {
                 list_presets();
                 return;
@@ -412,6 +442,7 @@ fn main() {
         resize_taken: false,
         switch_after,
         switch_done: false,
+        camera_pos,
         app: None,
     };
 
@@ -447,6 +478,9 @@ struct AppHandler {
     switch_after: Option<(fractal::FractalType, f32)>,
     /// Tracks that the deferred switch has fired (idempotent).
     switch_done: bool,
+    /// Agent-operability: `--camera-pos x,y,z`. Applied at startup and re-applied
+    /// after `switch_after` fires (which otherwise re-frames to the type default).
+    camera_pos: Option<glam::Vec3>,
     app: Option<App>,
 }
 
@@ -488,6 +522,9 @@ impl ApplicationHandler for AppHandler {
         // not process start (App::new blocks on GPU init).
         self.start = Some(std::time::Instant::now());
         self.app = Some(app);
+        if let (Some(pos), Some(app)) = (self.camera_pos, self.app.as_mut()) {
+            app.set_camera_position(pos);
+        }
     }
 
     fn window_event(
@@ -551,6 +588,11 @@ impl ApplicationHandler for AppHandler {
         if switch_due {
             if let Some((ft, _)) = self.switch_after {
                 app.switch_fractal(ft);
+                // switch_fractal re-frames to the type default; an explicit
+                // --camera-pos must still win.
+                if let Some(pos) = self.camera_pos {
+                    app.set_camera_position(pos);
+                }
             }
             self.switch_done = true;
         }
