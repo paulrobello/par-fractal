@@ -15,8 +15,8 @@
 > **Status — verified 2026-07-19 at HEAD `5580784`:** ENH-007 (visual regression harness)
 > shipped complete and was **removed from this list** — its CPU teeth (`tests/reference_math.rs`)
 > and GPU goldens (`tests/golden/`) remain the regression backbone for every remaining item.
-> Of the 7 still open: **3 effectively done (ENH-001, ENH-002, ENH-003); ENH-005 and
-> ENH-006 done; 1 partial (ENH-004); 1 not started (ENH-008).** ENH-001's remaining work
+> Of the 7 still open: **3 effectively done (ENH-001, ENH-002, ENH-003); ENH-005,
+> ENH-006, and ENH-008 done; 1 partial (ENH-004).** ENH-001's remaining work
 > (BLA series-approximation) is a deferred perf optimization whose prerequisite — the
 > ENH-006 profiler — is now shipped, so BLA can be revisited once per-pixel cost is
 > measured as the bottleneck; it is not a correctness gap. Per-item verdicts with file:line evidence appear
@@ -32,7 +32,7 @@
 | ENH-006 | GPU frame profiler (timestamp queries + HUD) | Medium (enables tuning) | Medium (~2 days) | none | **Done** — `GpuProfiler` (`src/renderer/profiler.rs`) + per-pass `timestamp_writes` + EMA HUD (`Shift+G`) + `--profile-dump`/`make profile` (commits `48a4ec0`→`afb8cbe`); degrades cleanly when `TIMESTAMP_QUERY` absent |
 | ENH-005 | Half-resolution bloom pipeline | Medium | Low–Medium (~1 day) | ARC-005 (bloom gating) | **Done** — 3 bloom textures halved via `Renderer::bloom_size` (`src/renderer/{update,initialization}.rs`); blur self-corrects via `textureDimensions`; A/B pixel-identical (corr 1.0); capture path kept full-res |
 | ENH-004 | Per-fractal pipeline specialization | Medium | Medium (~3 days) | ENH-006 (to measure) | **Partial** — 2D/3D entry-point split done; per-type specialization not |
-| ENH-008 | `encase`-based uniform layout automation | Medium (kills the #1 crash class) | Medium (~2 days) | ARC-010 (offset tests as safety net) | Not started (offset tests landed via ARC-010) |
+| ENH-008 | `encase`-based uniform layout automation | Medium (kills the #1 crash class) | Medium (~2 days) | ARC-010 (offset tests as safety net) | **Done** — all 7 GPU uniform structs migrated to `#[derive(encase::ShaderType)]` (glam vec/mat types); ~14 `_padding_*` fields deleted from Rust + WGSL; `Uniforms` 896→768B; byte-pattern layout tests pin encase offsets; golden harness pixel-identical incl. 1e8 perturbation |
 
 ---
 
@@ -174,7 +174,28 @@ converts ENH-003/004/005 and LOD tuning from faith to measurement. **Effort**: ~
 
 ### ENH-008 — `encase`-based uniform layout automation
 **Plan**: `docs/fable/ENH-008-encase-uniform-layout.md`
-**Status (2026-07-17, v0.9.0):** Not started. `encase` is not in `Cargo.toml`; `Uniforms` still uses `#[repr(C)]` + manual `_padding_*` fields + bytemuck (`src/renderer/uniforms.rs`). Its intended safety net, the ARC-010 `offset_of!` layout tests, did land.
+**Status (2026-07-19, HEAD `2a00e4f`):** **Done.** All seven GPU uniform struct
+families migrated from `#[repr(C)] + bytemuck + manual padding` to
+`#[derive(encase::ShaderType)]`: `Uniforms` (896→768B), `BloomUniforms`,
+`BlurUniforms`, `PostProcessUniforms` (64→48B), `AccumulationDisplayUniforms`,
+`AttractorComputeUniforms`, `BuddhabrotComputeUniforms`. vec/mat fields use
+glam types (`Vec2`/`Vec3`/`Vec4`/`Mat4`) via glam's `encase` feature (dep
+direction is glam→encase, not encase→glam — the plan got this backwards).
+~14 `_padding_*` fields deleted from **both** the Rust structs and the WGSL
+declarations; encase and WGSL now independently derive the same compact layout
+from the identical field order. Uploads go through `write_uniform_bytes`
+(encase `UniformBuffer::write`); buffer sizes use `ShaderType::min_size()`.
+Deduped the three local `struct BlurUniforms` copies in the capture/render
+paths (latent drift bug) to reuse the renderer's. **Verification:** per-struct
+byte-pattern layout tests pin encase-computed offsets (the strongest form —
+they assert the bytes the GPU receives); `make checkall` green (113 tests);
+full golden harness pixel-identical across all 5 rows incl. the 1e8
+perturbation deep-zoom golden (corr 1.0, MAE 0.0); 3D Mandelbulb + Buddhabrot
+runtime smokes render real frames (1907 / 286 unique colors, no wgpu
+validation errors). The add-a-field dry-run (plan step 6) confirmed the new
+workflow: a new field compiles with zero padding math and the
+`uniforms_byte_layout` test catches the offset/size shift with a pinpoint
+message.
 
 The 864-byte `Uniforms` struct is hand-mirrored against WGSL with ~14 manual padding fields —
 the project's documented #1 source of silent GPU corruption (AUDIT ARC-010). The `encase` crate

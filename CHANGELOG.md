@@ -74,6 +74,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   structurally untouched (ARC-005 gating). No threshold tweak needed.
 
 ### Changed
+- **Uniform layout automation via `encase` (ENH-008).** All seven GPU uniform
+  struct families (`Uniforms`, `BloomUniforms`, `BlurUniforms`,
+  `PostProcessUniforms`, `AccumulationDisplayUniforms`, `AttractorComputeUniforms`,
+  `BuddhabrotComputeUniforms`) migrated from `#[repr(C)] + bytemuck + ~14 hand-
+  maintained _padding_* fields` to `#[derive(encase::ShaderType)]` with glam
+  vec/mat types (`glam` `encase` feature). encase and WGSL now independently
+  derive the same compact layout from the field order, so the `_padding_*`
+  fields are gone from both Rust and WGSL — eliminates the project's #1 silent-
+  corruption bug class (add/forget-a-padding-field). `Uniforms` shrank 896→768B;
+  uploads use `write_uniform_bytes`; buffer sizes use `ShaderType::min_size()`.
+  Deduped three local `BlurUniforms` copies in the capture/render paths.
+  Byte-pattern layout tests pin the encase-computed offsets; golden harness
+  pixel-identical (incl. 1e8 perturbation deep-zoom).
 - `capture_screenshot` honors `--screenshot-path` (no timestamp / toast / auto-open
   in harness mode); interactive behavior is unchanged.
 

@@ -127,12 +127,12 @@ par-fractal --help                        # Show help (-h)
 The `FractalUniforms` struct in `renderer/uniforms.rs` MUST exactly match the `Uniforms` struct in `shaders/fractal.wgsl`. Any mismatch will cause rendering errors or crashes.
 
 **When modifying uniforms:**
-1. Update `FractalUniforms` in `renderer/uniforms.rs`
-2. Update `Uniforms` in `shaders/fractal.wgsl` to match
-3. Ensure field types and ordering are identical
-4. Maintain 16-byte alignment for GPU compatibility
-5. Verify total struct size matches using `std::mem::size_of::<FractalUniforms>()`
-6. Test all fractal types after changes
+1. Add the field to the `Uniforms` struct in `renderer/uniforms.rs`. vec/mat fields use glam types (`Vec2`/`Vec3`/`Vec4`/`Mat4`) so encase maps them to WGSL `vecN`/`mat4x4` — a raw `[f32; N]` would lay out as a WGSL `array<f32, N>` (16-byte stride), which is wrong for a vector.
+2. Add the same field (same type, same position) to the `Uniforms` struct in `shaders/fractal.wgsl`.
+3. Initialize the field in `Uniforms::new()` (and in `update()` if it tracks params).
+4. encase derives the WGSL-correct layout (alignment + trailing padding) automatically — there are no manual `_padding` fields and no 16-byte alignment math to do (ENH-008).
+5. The `uniforms_byte_layout` byte-pattern test in `layout_tests` will fail until its size and sentinel offsets are updated; update them to the encase-computed values (run the test and read the `left:` value it reports).
+6. Test all fractal types after changes.
 
 **Render Pipeline:**
 ```
@@ -267,10 +267,10 @@ preferred_gpu_index: 0
 6. Update documentation
 
 **Modifying Uniforms:**
-1. Update `Uniforms` struct in `renderer/uniforms.rs`
-2. Update matching struct in `shaders/fractal.wgsl`
-3. Modify `to_uniforms()` method in `fractal/mod.rs`
-4. Verify struct sizes match
+1. Add the field to the `Uniforms` struct in `renderer/uniforms.rs` (glam vec/mat types; see "Uniform Buffer Synchronization" above).
+2. Add the matching field to the `Uniforms` struct in `shaders/fractal.wgsl` (same type + position).
+3. Set it in `Uniforms::new()` / `update()` in `renderer/uniforms.rs` (the GPU uniform is built there — there is no separate `to_uniforms()`).
+4. encase derives the layout — update the `uniforms_byte_layout` test's size and sentinel offsets to match.
 5. Test all fractal types
 6. Run `make checkall`
 
@@ -284,7 +284,7 @@ preferred_gpu_index: 0
 ## Known Constraints
 
 **Uniform Buffer Size:**
-Current size is 864 bytes (compile-asserted via `size_of::<Uniforms>() == 864` in `renderer/uniforms.rs`, with `offset_of!` layout tests in its `layout_tests` module guarding field placement). WGPU has platform-dependent limits (typically 64KB minimum). If adding fields, maintain 16-byte alignment and update both the Rust struct, the WGSL `Uniforms` struct, the size assert, and the sentinel offsets.
+Current size is 768 bytes (ENH-008: derived by `encase` via `<Uniforms as encase::ShaderType>::min_size()` — no longer hand-maintained). The struct uses `#[derive(encase::ShaderType)]`; vec/mat fields are glam types (`Vec2`/`Vec3`/`Vec4`/`Mat4`), and there are **no** manual `_padding_*` fields. The `uniforms_byte_layout` byte-pattern test in `layout_tests` pins a spread of encase-computed offsets plus the total size. WGPU's uniform-buffer limit (typically 64KB minimum) is far above this. Adding a field needs no padding math — add it to both the Rust and WGSL structs, then update the test's size + sentinels.
 
 **WGSL Limitations:**
 - No recursion
