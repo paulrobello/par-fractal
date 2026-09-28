@@ -1,0 +1,6 @@
+{
+  "prompt": "/work-loop",
+  "autoclean": true,
+  "clean_command": "cargo clean",
+  "post_iter_check": "make checkall"
+}

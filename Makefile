@@ -10,7 +10,8 @@ VERSION := $(shell grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
         install-deps doc checkall pre-commit-install pre-commit-uninstall pre-commit-run \
         pre-commit-update lint deploy release cache-clean typecheck \
         visual-test visual-bless profile profile-cpu \
-        web-install web-build web-serve web-clean web-deploy
+        web-install web-build web-serve web-clean web-deploy \
+        grind-start grind-start-anthropic grind-start-zai grind-start-grok grind-start-codex grind-stop grind-clean-logs
 
 # Default target
 .DEFAULT_GOAL := help
@@ -89,6 +90,15 @@ help:
 	@echo "  update             - Update dependencies"
 	@echo "  profile            - Dump GPU profile to target/profile.yaml (ENH-006)"
 	@echo "  profile-cpu        - CPU sampling profile via perf (Linux only)"
+	@echo ""
+	@echo "Grind loop:"
+	@echo "  grind-start        - Run the grind loop (foreground; z.ai backend, effort high)"
+	@echo "  grind-start-anthropic - Run the grind loop (Anthropic backend, opus[1m])"
+	@echo "  grind-start-zai    - Run the grind loop (z.ai backend)"
+	@echo "  grind-start-grok   - Run the grind loop (Grok backend)"
+	@echo "  grind-start-codex  - Run the grind loop (Codex backend)"
+	@echo "  grind-stop         - Stop the loop after the current iteration (writes .exit-grind)"
+	@echo "  grind-clean-logs   - Delete all but the newest 2 grind run dirs"
 	@echo ""
 	@echo "==================================================================="
 
@@ -600,3 +610,49 @@ web-deploy:
 	@echo "Site will be available at:"
 	@echo "  https://par-fractal.pardev.net"
 	@echo ""
+
+# ==== Grind loop (grind.sh, lives in ~/Repos/par-grind) ====================
+# The loop runner is project-agnostic; this repo's knobs (prompt, clean
+# command, post-iteration check) are in .grind.local.json. GRIND_* env vars
+# still override the config file. grind-start runs in the FOREGROUND — it
+# streams each iteration's output and owns the terminal, so `make grind-stop`
+# is run from a second shell (or by an agent). The sentinel is checked at the
+# top of each iteration, so stopping takes effect once the in-flight session
+# ends, not immediately; Ctrl-C on grind-start is still the hard stop.
+# Invoked via `bash` so `ps` shows `bash …/grind.sh <repo>` — the shape
+# grind-probe.sh / grind-watchdog.sh match on; a shebang-direct invocation
+# hides field 5 from them and reads as grind GONE.
+GRIND_SH := $(HOME)/Repos/par-grind/grind.sh
+
+grind-start: ## Run the grind loop (foreground; z.ai backend, effort high)
+	GRIND_BACKEND=zai GRIND_EFFORT=high bash $(GRIND_SH) "$(CURDIR)"
+
+grind-start-anthropic: ## Run the grind loop against the Anthropic backend (foreground; model opus[1m], effort high)
+	GRIND_BACKEND=anthropic GRIND_MODEL=opus[1m] GRIND_EFFORT=high bash $(GRIND_SH) "$(CURDIR)"
+
+grind-start-zai: ## Run the grind loop against the z.ai backend (foreground; needs ZAI_API_KEY)
+	GRIND_BACKEND=zai bash $(GRIND_SH) "$(CURDIR)"
+
+grind-start-grok: ## Run the grind loop against the Grok backend (foreground; needs grok CLI login)
+	GRIND_BACKEND=grok bash $(GRIND_SH) "$(CURDIR)"
+
+grind-start-codex: ## Run the grind loop against the Codex backend (foreground; needs codex CLI login)
+	GRIND_BACKEND=codex bash $(GRIND_SH) "$(CURDIR)"
+
+grind-stop: ## Ask a running grind loop to stop after the current iteration
+	@touch .exit-grind
+	@echo "wrote .exit-grind — the loop stops after the current iteration finishes"
+
+# 2*/ matches only the date-named run dirs — the latest symlink, the run.jsonl
+# ledger, and stdout-*.log live at the root and never match. The newest 2 by
+# mtime are kept (the active run is always newest, and the latest symlink's
+# own target is excluded from removal as a belt-and-braces guard).
+grind-clean-logs: ## Delete all but the newest 2 grind run dirs (latest symlink, run.jsonl, stdout logs kept)
+	@latest=$$(readlink .grind-logs/latest 2>/dev/null | xargs basename 2>/dev/null); \
+	old=$$(ls -dt .grind-logs/2*/ 2>/dev/null | tail -n +3 | sed 's:/$$::'); \
+	[ -n "$$old" ] || { echo "grind-clean-logs: nothing to remove (<= 2 run dirs)"; exit 0; }; \
+	if [ -n "$$latest" ]; then old=$$(echo "$$old" | grep -v "/$$latest$$"); fi; \
+	[ -n "$$old" ] || { echo "grind-clean-logs: nothing to remove"; exit 0; }; \
+	echo "$$old" | sed 's/^/  removing /'; \
+	echo "$$old" | xargs rm -rf; \
+	echo "grind-clean-logs: $$(ls -d .grind-logs/2*/ 2>/dev/null | wc -l | tr -d ' ') run dir(s) remain"

@@ -30,3 +30,4 @@ todos.md
 .claude/.cc2cc-session-id
 .claude/scheduled_tasks.lock
 .claude/statusline-*.local.json
+.exit-grind
