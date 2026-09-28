@@ -157,8 +157,8 @@ fn compare_corr(a: &image::RgbaImage, b: &image::RgbaImage) -> f64 {
     let bv = b.as_raw();
     let n = (av.len() / 4) as f64;
     let luma = |p: &[u8]| (p[0] as f64 + p[1] as f64 + p[2] as f64) / 3.0;
-    let la: Vec<f64> = av.chunks_exact(4).map(luma).collect();
-    let lb: Vec<f64> = bv.chunks_exact(4).map(luma).collect();
+    let la: Vec<f64> = av.as_chunks::<4>().0.iter().map(|p| luma(p)).collect();
+    let lb: Vec<f64> = bv.as_chunks::<4>().0.iter().map(|p| luma(p)).collect();
     let ma = la.iter().sum::<f64>() / n;
     let mb = lb.iter().sum::<f64>() / n;
     let cov = la
@@ -185,7 +185,7 @@ fn compare_rgba(a: &image::RgbaImage, b: &image::RgbaImage) -> (f64, f64) {
     let mut bad = 0u64;
     let mut sum_abs: f64 = 0.0;
     let threshold = 8i32;
-    for (pa, pb) in av.chunks_exact(4).zip(bv.chunks_exact(4)) {
+    for (pa, pb) in av.as_chunks::<4>().0.iter().zip(bv.as_chunks::<4>().0) {
         let mut pixel_bad = false;
         for (ca, cb) in pa.iter().zip(pb.iter()) {
             let d = (*ca as i32 - *cb as i32).abs();

@@ -61,7 +61,7 @@ impl App {
             if self.screenshot_path.is_some() {
                 let n = width * height;
                 let (mut white, mut black, mut other, mut sum) = (0u32, 0u32, 0u32, 0u64);
-                for px in image_data.chunks_exact(4) {
+                for px in image_data.as_chunks::<4>().0 {
                     match (px[0], px[1], px[2]) {
                         (255, 255, 255) => white += 1,
                         (0, 0, 0) => black += 1,

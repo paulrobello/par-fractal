@@ -294,12 +294,11 @@ impl App {
     /// non-destructively while the save path migrates over.
     fn load_settings_via_platform() -> Option<crate::fractal::Settings> {
         let storage = PlatformContext::new().storage;
-        if let Ok(Some(bytes)) = storage.load(category::SETTINGS, "settings") {
-            if let Ok(yaml) = std::str::from_utf8(&bytes) {
-                if let Ok(settings) = serde_yaml::from_str::<crate::fractal::Settings>(yaml) {
-                    return Some(settings);
-                }
-            }
+        if let Ok(Some(bytes)) = storage.load(category::SETTINGS, "settings")
+            && let Ok(yaml) = std::str::from_utf8(&bytes)
+            && let Ok(settings) = serde_yaml::from_str::<crate::fractal::Settings>(yaml)
+        {
+            return Some(settings);
         }
 
         // Legacy native fallback: pre-ARC-014 settings lived at

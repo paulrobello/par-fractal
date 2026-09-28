@@ -73,18 +73,19 @@ impl App {
         // `timings_ms` still writes the (empty) map, which is the scriptable
         // "feature unavailable" signal; write errors log + continue so a
         // profile-dump failure never crashes the render loop.
-        if let Some(path) = self.profile_dump_path.clone() {
-            if !self.profile_dumped && self.total_frame_count >= PROFILE_DUMP_FRAME {
-                self.profile_dumped = true;
-                match serde_yaml::to_string(&self.renderer.profiler.timings_ms) {
-                    Ok(yaml) => match std::fs::write(&path, yaml) {
-                        Ok(()) => log::info!("wrote GPU profile to {}", path.display()),
-                        Err(e) => {
-                            log::error!("failed to write GPU profile to {}: {}", path.display(), e)
-                        }
-                    },
-                    Err(e) => log::error!("failed to serialize GPU profile: {}", e),
-                }
+        if let Some(path) = self.profile_dump_path.clone()
+            && !self.profile_dumped
+            && self.total_frame_count >= PROFILE_DUMP_FRAME
+        {
+            self.profile_dumped = true;
+            match serde_yaml::to_string(&self.renderer.profiler.timings_ms) {
+                Ok(yaml) => match std::fs::write(&path, yaml) {
+                    Ok(()) => log::info!("wrote GPU profile to {}", path.display()),
+                    Err(e) => {
+                        log::error!("failed to write GPU profile to {}: {}", path.display(), e)
+                    }
+                },
+                Err(e) => log::error!("failed to serialize GPU profile: {}", e),
             }
         }
 

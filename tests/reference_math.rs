@@ -257,5 +257,5 @@ fn grayscale_round_trip_shape() {
     let rgba = reference::smooth_to_grayscale_rgba(&buf, (8, 8));
     assert_eq!(rgba.len(), 8 * 8 * 4);
     // Every pixel is opaque (alpha 255).
-    assert!(rgba.chunks_exact(4).all(|px| px[3] == 255));
+    assert!(rgba.as_chunks::<4>().0.iter().all(|px| px[3] == 255));
 }

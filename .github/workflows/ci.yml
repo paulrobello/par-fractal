@@ -20,7 +20,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v7
 
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
@@ -32,19 +32,19 @@ jobs:
         sudo apt-get install -y libxkbcommon-dev libwayland-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev
 
     - name: Cache cargo registry
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.cargo/registry
         key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Cache cargo index
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.cargo/git
         key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Cache target directory
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: target
         key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
@@ -61,7 +61,7 @@ jobs:
     timeout-minutes: 15
 
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v7
 
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
@@ -85,7 +85,7 @@ jobs:
     timeout-minutes: 15
 
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v7
 
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
@@ -93,7 +93,7 @@ jobs:
         targets: wasm32-unknown-unknown
 
     - name: Cache cargo
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: |
           ~/.cargo/bin/
@@ -120,7 +120,7 @@ jobs:
     timeout-minutes: 10
 
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v7
 
     # v2.0.0 as of 2026-07-16
     - uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998
