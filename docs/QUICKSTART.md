@@ -18,7 +18,7 @@ Get up and running with Par Fractal in minutes and start exploring beautiful mat
 ## Prerequisites
 
 **Required:**
-- Rust 1.85+ (Edition 2024)
+- Rust 1.98+ (Edition 2024)
 - Modern GPU with driver support for Vulkan, Metal, or DirectX 12
 
 **Platform-Specific:**
@@ -32,7 +32,7 @@ rustc --version
 ```
 
 ```text
-rustc 1.85.0 (or higher)
+rustc 1.98.0 (or higher)
 ```
 
 **Install Rust (if needed):**
@@ -54,7 +54,7 @@ cargo install par-fractal
 par-fractal
 ```
 
-Requires Rust 1.85+ (Edition 2024) and Cargo. Install from [rustup.rs](https://rustup.rs/).
+Requires Rust 1.98+ (Edition 2024) and Cargo. Install from [rustup.rs](https://rustup.rs/).
 
 ### Option 2: Build from Source
 
@@ -465,7 +465,7 @@ Save favorite views:
 
 **Solutions:**
 1. Build in release mode: `cargo build --release`
-2. Check Rust version: `rustc --version` (need 1.85+)
+2. Check Rust version: `rustc --version` (need 1.98+)
 3. Update GPU drivers
 4. Check console for error messages:
    ```bash

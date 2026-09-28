@@ -3,7 +3,7 @@
 [![Crates.io](https://img.shields.io/crates/v/par-fractal)](https://crates.io/crates/par-fractal)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Runs on Linux | MacOS | Windows | Web](https://img.shields.io/badge/runs%20on-Linux%20%7C%20MacOS%20%7C%20Windows%20%7C%20Web-blue)
-![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)
+![Rust](https://img.shields.io/badge/rust-1.98%2B-orange.svg)
 
 A high-performance, cross-platform GPU-accelerated fractal renderer built with Rust and WebGPU. Features stunning 2D and immersive 3D fractal visualization, perturbation-based deep zoom, and advanced rendering techniques.
 
@@ -183,7 +183,7 @@ cargo install par-fractal
 par-fractal
 ```
 
-Requires Rust 1.85+ (Edition 2024). Install from [rustup.rs](https://rustup.rs/).
+Requires Rust 1.98+ (Edition 2024). Install from [rustup.rs](https://rustup.rs/).
 
 ### Pre-built Binaries
 
@@ -284,7 +284,7 @@ Cross-platform compatibility through WebGPU (wgpu-rs).
 
 ## Technology
 
-- **Rust** 1.85+ (Edition 2024) - Core implementation
+- **Rust** 1.98+ (Edition 2024) - Core implementation
 - **wgpu** - Cross-platform GPU API (WebGPU)
 - **winit** - Window creation and event handling
 - **egui** - Immediate mode GUI

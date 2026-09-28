@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Par Fractal is a cross-platform GPU-accelerated fractal renderer built with Rust and WebGPU. It supports both 2D escape-time fractals (Mandelbrot, Julia, etc.) and 3D ray-marched fractals (Mandelbulb, Menger Sponge, etc.) with advanced rendering features including PBR shading, ambient occlusion, soft shadows, and depth of field.
 
 **Tech Stack:**
-- Rust 1.85+ (Edition 2024)
+- Rust 1.98+ (Edition 2024)
 - wgpu (WebGPU/wgpu-rs) - Cross-platform GPU API
 - winit - Window creation and event handling
 - egui - Immediate mode GUI
