@@ -57,6 +57,9 @@ pub struct App {
     last_mouse_pos: Option<(f32, f32)>,
     cursor_pos: (f32, f32), // Current cursor position for zoom-at-cursor
     shift_pressed: bool,    // Track shift key for continuous zoom
+    // ENH-002: manual double-click detection (winit 0.30 has no click_count)
+    last_click_at: Option<web_time::Instant>,
+    last_click_pos: Option<(f32, f32)>,
     // Multi-touch pinch-to-zoom tracking
     active_touches: std::collections::HashMap<u64, (f32, f32)>, // touch_id -> (x, y)
     initial_pinch_distance: Option<f32>, // Distance between two fingers at pinch start
@@ -520,6 +523,8 @@ impl App {
             last_mouse_pos: None,
             cursor_pos: (0.0, 0.0),
             shift_pressed: false,
+            last_click_at: None,
+            last_click_pos: None,
             active_touches: std::collections::HashMap::new(),
             initial_pinch_distance: None,
             last_touch_time: None,
@@ -923,6 +928,63 @@ impl App {
                 log::error!("Failed to save window size: {}", e);
             }
         }
+    }
+
+    /// ENH-002: keyboard undo (Ctrl/Cmd+Z). Applies the history snapshot to
+    /// the authored settings WITHOUT pushing a new history entry — the same
+    /// from_history semantics the UI buttons use.
+    pub fn apply_undo(&mut self) -> bool {
+        match self.ui.undo() {
+            Some(settings) => {
+                self.fractal_params.settings = settings;
+                self.after_history_jump();
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// ENH-002: keyboard redo (Ctrl/Cmd+Y and Ctrl/Cmd+Shift+Z).
+    pub fn apply_redo(&mut self) -> bool {
+        match self.ui.redo() {
+            Some(settings) => {
+                self.fractal_params.settings = settings;
+                self.after_history_jump();
+                true
+            }
+            None => false,
+        }
+    }
+
+    fn after_history_jump(&mut self) {
+        self.settings_last_changed = web_time::Instant::now();
+        self.settings_need_save = true;
+        self.mark_scene_dirty();
+    }
+
+    /// ENH-002: double-click on a 2D fractal — the clicked point becomes the
+    /// view center with one zoom step (x2), an undo entry is recorded (the
+    /// post-change push matches the UI slider path), and the stale precise
+    /// center is dropped by [`FractalParams::center_at`].
+    fn double_click_center_zoom(&mut self, pos: (f32, f32)) {
+        if self.fractal_params.settings.render_mode != RenderMode::TwoD {
+            return;
+        }
+        // Screen (physical px) -> NDC, same convention as the pinch/zoom_at seam.
+        let screen_x = (pos.0 / self.renderer.size.width as f32) * 2.0 - 1.0;
+        let screen_y = 1.0 - (pos.1 / self.renderer.size.height as f32) * 2.0;
+        let aspect = self.renderer.size.width as f64 / self.renderer.size.height as f64;
+        let pre_change = self.fractal_params.settings.clone();
+        self.fractal_params
+            .center_at((screen_x as f64, screen_y as f64), 2.0, aspect);
+        self.ui.record_change(&pre_change, &self.fractal_params);
+        self.after_history_jump();
+        log::info!(
+            "Double-click: centered on ({:+.6}, {:+.6}), zoom -> {:.3}",
+            self.fractal_params.settings.center_2d[0],
+            self.fractal_params.settings.center_2d[1],
+            self.fractal_params.settings.zoom_2d
+        );
     }
 
     /// QA-032/QA-033: the single shared view reset (R key, palette, panel).

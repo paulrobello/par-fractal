@@ -76,7 +76,7 @@ Complete guide to all 20 2D fractals available in Par Fractal, including mathema
 - Mouse drag to pan
 - Mouse wheel to zoom
 - Zoom centers on cursor position
-- Double-click to center and zoom
+- Double-click to center the clicked point and zoom in one step (Ctrl/Cmd+Z undoes it)
 
 ## High-Precision Zoom Mode
 

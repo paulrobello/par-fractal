@@ -28,39 +28,47 @@ pub(super) struct HistoryEntry {
 
 /// Undo/redo functionality for UI
 impl UI {
-    pub(super) fn save_to_history(&mut self, params: &FractalParams) {
-        // If we're not at the end of history, truncate everything after current position
-        if self.history_index < self.history.len() {
-            self.history.truncate(self.history_index);
+    /// ENH-002: record one parameter change. `pre_change` is the settings
+    /// snapshot taken BEFORE the mutation (the UI captures it at the top of
+    /// `render`), `post` the mutated params.
+    ///
+    /// Two invariants make undo/redo actually work (both broken before —
+    /// undo used to return the CURRENT state, i.e. a no-op):
+    /// - the FIRST entry anchors the pre-change (initial) state, so there is
+    ///   always an older state to undo into;
+    /// - `history_index` anchors at the LAST entry (`len - 1`), not one past
+    ///   it, so `undo`'s `index - 1` lands on the previous state.
+    pub(crate) fn record_change(&mut self, pre_change: &RenderSettings, post: &FractalParams) {
+        if self.history.is_empty() {
+            self.push_snapshot(pre_change.clone());
+        }
+        self.push_snapshot(post.settings.clone());
+    }
+
+    fn push_snapshot(&mut self, settings: RenderSettings) {
+        // If we've undone into history, truncate everything AFTER the current
+        // position (index anchors AT the current state, so the redo tail
+        // starts at index + 1).
+        if self.history_index + 1 < self.history.len() {
+            self.history.truncate(self.history_index + 1);
         }
 
-        // Check if settings actually changed from last saved state. Only the
-        // authored `RenderSettings` is compared — runtime state (LOD FPS ring,
-        // accumulation counters) is intentionally excluded so it doesn't
-        // generate spurious history entries on every frame.
-        let should_save = if let Some(ref last) = self.last_saved_settings {
-            !settings_equal(&params.settings, last)
-        } else {
-            true
-        };
+        self.history.push_back(HistoryEntry {
+            settings,
+            timestamp: web_time::Instant::now(),
+        });
 
-        if should_save {
-            self.history.push_back(HistoryEntry {
-                settings: params.settings.clone(),
-                timestamp: web_time::Instant::now(),
-            });
-
-            // Maintain max history size. ARC-019: VecDeque keeps the
-            // Oldest entry at the front, so pop_front is O(1) (vs the
-            // previous Vec::remove(0) which shifted every entry).
-            if self.history.len() > self.max_history_size {
-                self.history.pop_front();
-            }
-            // Index always tracks the just-pushed tail.
-            self.history_index = self.history.len();
-
-            self.last_saved_settings = Some(params.settings.clone());
+        // Maintain max history size. ARC-019: VecDeque keeps the
+        // Oldest entry at the front, so pop_front is O(1) (vs the
+        // previous Vec::remove(0) which shifted every entry).
+        if self.history.len() > self.max_history_size {
+            self.history.pop_front();
         }
+        // Index anchors at the just-pushed tail (the current state), NOT one
+        // past it — see `record_change`.
+        self.history_index = self.history.len() - 1;
+
+        self.last_saved_settings = Some(self.history.back().unwrap().settings.clone());
     }
 
     /// Roll the user's authored render settings back one step.
@@ -68,7 +76,7 @@ impl UI {
     /// Returns the previous [`RenderSettings`] snapshot, or `None` if there is
     /// nothing to undo. The caller writes it back into `params.settings`,
     /// leaving `params.lod` and `params.accum` untouched (ARC-015).
-    pub(super) fn undo(&mut self) -> Option<RenderSettings> {
+    pub(crate) fn undo(&mut self) -> Option<RenderSettings> {
         if self.can_undo() {
             self.history_index = self.history_index.saturating_sub(1);
             Some(self.history[self.history_index].settings.clone())
@@ -82,7 +90,7 @@ impl UI {
     /// Returns the next [`RenderSettings`] snapshot, or `None` if there is
     /// nothing to redo. As with [`undo`](Self::undo), only `RenderSettings`
     /// is restored.
-    pub(super) fn redo(&mut self) -> Option<RenderSettings> {
+    pub(crate) fn redo(&mut self) -> Option<RenderSettings> {
         if self.can_redo() {
             self.history_index += 1;
             Some(self.history[self.history_index].settings.clone())
@@ -91,24 +99,11 @@ impl UI {
         }
     }
 
-    pub(super) fn can_undo(&self) -> bool {
+    pub(crate) fn can_undo(&self) -> bool {
         self.history_index > 0 && !self.history.is_empty()
     }
 
-    pub(super) fn can_redo(&self) -> bool {
+    pub(crate) fn can_redo(&self) -> bool {
         !self.history.is_empty() && self.history_index < self.history.len() - 1
     }
-}
-
-/// Helper to compare authored render settings.
-///
-/// Uses pointer equality as a cheap short-circuit when the same
-/// `RenderSettings` instance is compared against itself (e.g. the UI passes
-/// the live `params.settings` reference both as the new value and as the
-/// cached previous value during a no-op render). Two distinct instances are
-/// always considered "changed" — this matches the pre-ARC-015 behavior and
-/// only affects whether a redundant history entry is created, not
-/// correctness.
-fn settings_equal(a: &RenderSettings, b: &RenderSettings) -> bool {
-    std::ptr::eq(a, b)
 }

@@ -102,6 +102,15 @@ Par Fractal provides intuitive controls for exploring both 2D and 3D fractals. C
 | **P** | Next Static Palette | Cycle to next static color palette |
 | **Shift+P** | Next Procedural Palette | Cycle to next procedural palette |
 
+### Editing (Undo/Redo)
+
+| Key | Action | Description |
+|-----|--------|-------------|
+| **Ctrl/Cmd+Z** | Undo | Revert the last parameter change |
+| **Ctrl/Cmd+Y** | Redo | Reapply an undone parameter change |
+| **Ctrl/Cmd+Shift+Z** | Redo | Alias of Ctrl/Cmd+Y |
+| **Double-click** (2D) | Center + zoom | The clicked point becomes the view center, zoom x2 |
+
 ### Command Palette
 
 | Key | Action | Description |

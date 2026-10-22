@@ -85,6 +85,41 @@ impl App {
                     self.ui.show_performance_overlay = !self.ui.show_performance_overlay;
                     return true;
                 }
+                KeyCode::KeyZ => {
+                    // ENH-002: Ctrl/Cmd+Z undo, Ctrl/Cmd+Shift+Z redo. Cmd on
+                    // macOS, Ctrl elsewhere (same convention as Ctrl+K).
+                    #[cfg(target_os = "macos")]
+                    let modifier_pressed =
+                        self.egui_state.egui_ctx().input(|i| i.modifiers.command);
+                    #[cfg(not(target_os = "macos"))]
+                    let modifier_pressed = self.egui_state.egui_ctx().input(|i| i.modifiers.ctrl);
+
+                    if modifier_pressed {
+                        let shift = self.egui_state.egui_ctx().input(|i| i.modifiers.shift);
+                        let applied = if shift {
+                            self.apply_redo()
+                        } else {
+                            self.apply_undo()
+                        };
+                        if applied {
+                            log::info!("{} via keyboard", if shift { "Redo" } else { "Undo" });
+                        }
+                        return true;
+                    }
+                }
+                KeyCode::KeyY => {
+                    // ENH-002: Ctrl/Cmd+Y is the canonical redo binding.
+                    #[cfg(target_os = "macos")]
+                    let modifier_pressed =
+                        self.egui_state.egui_ctx().input(|i| i.modifiers.command);
+                    #[cfg(not(target_os = "macos"))]
+                    let modifier_pressed = self.egui_state.egui_ctx().input(|i| i.modifiers.ctrl);
+
+                    if modifier_pressed && self.apply_redo() {
+                        log::info!("Redo via keyboard");
+                        return true;
+                    }
+                }
                 KeyCode::KeyR => {
                     self.reset_view();
                     self.mark_scene_dirty();
@@ -511,8 +546,31 @@ impl App {
                 // Don't handle mouse input if we have active touches
                 // (touch events set their own mouse_pressed state)
                 if self.active_touches.is_empty() {
-                    self.mouse_pressed = *state == ElementState::Pressed;
-                    if !self.mouse_pressed {
+                    let pressed = *state == ElementState::Pressed;
+                    // ENH-002: double-click-to-center-zoom. winit 0.30 has no
+                    // click_count, so detect it manually: a second press on
+                    // the same spot within 400 ms. cursor_pos is the physical
+                    // pixel position tracked by CursorMoved.
+                    if pressed {
+                        let now = web_time::Instant::now();
+                        let pos = self.cursor_pos;
+                        let is_double = self
+                            .last_click_at
+                            .is_some_and(|t| now.duration_since(t).as_millis() < 400)
+                            && self.last_click_pos.is_some_and(|p| {
+                                ((p.0 - pos.0).powi(2) + (p.1 - pos.1).powi(2)) < 36.0
+                            });
+                        self.last_click_at = Some(now);
+                        self.last_click_pos = Some(pos);
+                        if is_double {
+                            // Require a fresh press pair for the next double-click.
+                            self.last_click_at = None;
+                            self.double_click_center_zoom(pos);
+                            return true;
+                        }
+                    }
+                    self.mouse_pressed = pressed;
+                    if !pressed {
                         self.last_mouse_pos = None;
                     }
                 }

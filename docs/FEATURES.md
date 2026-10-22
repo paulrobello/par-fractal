@@ -386,7 +386,7 @@ Mathematically-generated palettes using cosine-based formulas for smooth, contin
 **History Management:**
 - Full parameter change history
 - **Ctrl/Cmd+Z** - Undo
-- **Ctrl/Cmd+Shift+Z** - Redo
+- **Ctrl/Cmd+Y** (or Ctrl/Cmd+Shift+Z) - Redo
 - Configurable history depth (default 50)
 
 **Tracked Changes:**

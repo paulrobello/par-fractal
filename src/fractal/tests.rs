@@ -778,3 +778,22 @@ fn default_2d_view_matches_switch_fractal_framing() {
         );
     }
 }
+
+/// ENH-002: double-click math — `center_at` puts the clicked fractal point
+/// at the view center and zooms by the factor about the new center.
+#[test]
+fn center_at_centers_clicked_point_and_zooms() {
+    let mut params = FractalParams::default();
+    params.switch_fractal(FractalType::Mandelbrot2D);
+    params.settings.center_2d = [0.0, 0.0];
+    params.settings.zoom_2d = 1.0;
+    params.settings.center_2d_precise = Some(["-0.75".to_string(), "0.1".to_string()]);
+
+    // Click at NDC (0.5, 0.25), square aspect: fractal point (1.0, 0.5).
+    params.center_at((0.5, 0.25), 2.0, 1.0);
+
+    assert_eq!(params.settings.center_2d, [1.0, 0.5]);
+    assert_eq!(params.settings.zoom_2d, 2.0);
+    // Re-centering drops the precise override (same rule as zoom_at).
+    assert_eq!(params.settings.center_2d_precise, None);
+}

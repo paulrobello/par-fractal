@@ -246,6 +246,7 @@ make checkall       # Run all checks
 | **F12** | Take screenshot |
 | **/** or **Ctrl/Cmd+K** | Open command palette |
 | **Ctrl/Cmd+Z** | Undo |
+| **Ctrl/Cmd+Y** (or Ctrl/Cmd+Shift+Z) | Redo |
 | **1-0** | Quick switch 2D fractals (Mandelbrot, Julia, ..., Nova) |
 | **F1-F10** | Quick switch 3D fractals (Mandelbulb, Menger, ..., Hybrid) |
 | **P** | Cycle static palettes |

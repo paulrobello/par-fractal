@@ -127,6 +127,23 @@ impl FractalParams {
         }
     }
 
+    /// ENH-002: re-center the view on the fractal point under the cursor and
+    /// zoom by `factor` about the NEW center (double-click-to-center-zoom).
+    /// Unlike [`Self::zoom_at`] — which keeps the clicked point under the
+    /// cursor — this makes the clicked point the view center, matching the
+    /// documented double-click behavior (FRACTALS2D).
+    ///
+    /// Re-centering always navigates to a new point, so the precise decimal
+    /// override is dropped (same rule as [`Self::zoom_at`], ENH-001 Phase C).
+    pub fn center_at(&mut self, cursor_ndc: (f64, f64), factor: f64, aspect: f64) {
+        self.settings.center_2d = [
+            self.settings.center_2d[0] + (cursor_ndc.0 * 2.0 / self.settings.zoom_2d) * aspect,
+            self.settings.center_2d[1] + cursor_ndc.1 * 2.0 / self.settings.zoom_2d,
+        ];
+        self.settings.zoom_2d *= factor;
+        self.settings.center_2d_precise = None;
+    }
+
     /// Serialize to the on-disk [`Settings`] representation.
     ///
     /// Camera position/target and UI state are written by the caller (the

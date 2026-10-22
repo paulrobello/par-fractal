@@ -472,6 +472,9 @@ impl UI {
         let mut actions = UiActions::default();
         let mut randomize_requested = false;
         let mut from_history = false; // Don't save to history if change came from undo/redo
+        // ENH-002: pre-change snapshot — captured before any widget mutates
+        // params so the history can anchor the state undo returns to.
+        let pre_change_settings = params.settings.clone();
 
         egui::Window::new("Fractal Controls")
             .default_width(320.0)
@@ -595,14 +598,15 @@ impl UI {
 
         // Handle randomization request
         if randomize_requested {
-            self.save_to_history(params);
             params.randomize();
             actions.changed = true;
         }
 
-        // Save to history when parameters change (but not if change came from undo/redo)
+        // Record the change when parameters changed (but not if the change
+        // came from undo/redo). ENH-002: record_change anchors the pre-change
+        // snapshot so undo has an older state to return to.
         if actions.changed && !from_history {
-            self.save_to_history(params);
+            self.record_change(&pre_change_settings, params);
         }
 
         // Capture & Recording Window
