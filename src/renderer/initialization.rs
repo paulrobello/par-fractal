@@ -13,8 +13,9 @@ use wgpu::util::DeviceExt;
 impl Renderer {
     #[cfg(not(target_arch = "wasm32"))]
     pub async fn enumerate_gpus() -> Vec<GpuInfo> {
-        let mut desc = wgpu::InstanceDescriptor::new_without_display_handle();
-        desc.backends = wgpu::Backends::all();
+        // DOC-003: honor WGPU_BACKEND (and the other WGPU_* env vars) so the
+        // documented backend-forcing workflow and the make run-* targets work.
+        let desc = wgpu::InstanceDescriptor::new_without_display_handle_from_env();
         let instance = wgpu::Instance::new(desc);
 
         let adapters = instance.enumerate_adapters(wgpu::Backends::all()).await;
@@ -50,8 +51,9 @@ impl Renderer {
         size: winit::dpi::PhysicalSize<u32>,
         preferred_gpu_index: Option<usize>,
     ) -> Self {
-        let mut desc = wgpu::InstanceDescriptor::new_without_display_handle();
-        desc.backends = wgpu::Backends::all();
+        // DOC-003: honor WGPU_BACKEND (and the other WGPU_* env vars) so the
+        // documented backend-forcing workflow and the make run-* targets work.
+        let desc = wgpu::InstanceDescriptor::new_without_display_handle_from_env();
         let instance = wgpu::Instance::new(desc);
 
         let surface = instance.create_surface(window).unwrap();
