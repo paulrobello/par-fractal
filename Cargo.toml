@@ -41,6 +41,8 @@ members = ["web"]
 [features]
 default = ["native"]
 native = [
+    "dep:clap",
+    "dep:clap_complete",
     "dep:pollster",
     "dep:directories",
     "dep:rfd",
@@ -74,6 +76,9 @@ path = "src/bin/imgdiff.rs"
 required-features = ["native"]
 
 [dependencies]
+# ENH-003: CLI parser + shell completions (binary-only surface).
+clap = { version = "4.5", features = ["derive"], optional = true }
+clap_complete = { version = "4.5", optional = true }
 # Core graphics
 wgpu = "30.0.1"  # egui-wgpu 0.37 pairs with wgpu 30
 winit = "0.30.13"

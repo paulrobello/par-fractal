@@ -38,6 +38,9 @@
 pub mod app;
 /// 3D camera state and a keyboard/mouse/touch camera controller.
 pub mod camera;
+/// CLI definition (clap derive), native binary only (ENH-003).
+#[cfg(feature = "native")]
+pub mod cli;
 /// Quick command palette for fractal, effect, color, camera, and recording
 /// actions.
 pub mod command_palette;

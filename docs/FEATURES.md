@@ -427,6 +427,8 @@ Complete reference (source of truth: `print_help` in `src/main.rs` — update bo
 | `--resize-after <s WxH>` | seconds, W×H | Resize the window to WxH after N seconds |
 | `--switch-after <type> <s>` | FractalType, seconds | Switch fractal type after N seconds (agent testing) |
 | `--camera-pos <x,y,z>` | coordinates | Place the 3D camera looking at the origin (agent testing) |
+| `--version`, `-V` | — | Print version and exit |
+| `--generate-completions <shell>` | bash\|zsh\|fish\|... | Emit shell completions and exit (hidden) |
 | `--help`, `-h` | — | Show help and exit |
 
 Example: `par-fractal --quality ultra --window-size 1280x720 --screenshot-delay 8 --screenshot-path out.png --exit-delay 10`

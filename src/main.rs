@@ -4,38 +4,10 @@
 //! methods" ghost and the `#[allow(dead_code)] mod platform` silencer).
 use par_fractal::app::{self, App};
 use par_fractal::fractal;
-use par_fractal::launch_params::parse_quality_level;
-use std::env;
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::{Window, WindowId};
-
-fn print_help() {
-    println!("Par Fractal - GPU Accelerated Fractal Renderer");
-    println!();
-    println!("Usage: par-fractal [OPTIONS]");
-    println!();
-    println!("Options:");
-    println!("  --clear-settings         Clear all saved settings and start fresh");
-    println!("  --preset <name>          Load a specific preset on startup");
-    println!("  --quality <level>        Set quality level: low, medium, high, ultra");
-    println!("  -q <level>               Short form of --quality");
-    println!("  --list-presets           List all available presets and exit");
-    println!("  --screenshot-delay <s>   Take a screenshot after N seconds");
-    println!("  --exit-delay <s>         Exit application after N seconds");
-    println!("  --screenshot-path <path> Write the screenshot to this exact path (no timestamp)");
-    println!(
-        "  --profile-dump <path>    Write EMA-smoothed GPU profile timings (YAML) after warmup"
-    );
-    println!("  --window-size <WxH>      Force the window to WxH physical pixels");
-    println!("  --resize-after <s WxH>   Resize the window to WxH after N seconds (QA-027)");
-    println!("  --switch-after <type> <s> Switch to FractalType after N seconds (agent testing)");
-    println!(
-        "  --camera-pos <x,y,z>     Place the 3D camera, looking at the origin (agent testing)"
-    );
-    println!("  --help, -h               Show this help message");
-}
 
 fn clear_settings() {
     if let Some(config_dir) = directories::ProjectDirs::from("com", "fractal", "par-fractal") {
@@ -129,265 +101,78 @@ fn list_presets() {
 }
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
+    let cli = <par_fractal::cli::Cli as clap::Parser>::parse();
 
-    let mut screenshot_delay: Option<f32> = None;
-    let mut exit_delay: Option<f32> = None;
-    let mut preset_name: Option<String> = None;
-    let mut quality_level: Option<usize> = None;
-    let mut screenshot_path: Option<std::path::PathBuf> = None;
-    // ENH-006 Task 3: write the EMA-smoothed per-scope GPU timings to YAML
-    // after a warmup window so agents/ci can measure optimizations. Runtime
-    // only — never persisted (same shape as `--exit-delay` / `--screenshot-*`).
-    let mut profile_dump_path: Option<std::path::PathBuf> = None;
-    let mut window_size: Option<(u32, u32)> = None;
-    // QA-027: resize the window mid-run to exercise the winit 0.30 resize
-    // lifecycle (surface reconfigure + redraw) without driving a human input.
-    let mut resize_after: Option<(f32, u32, u32)> = None;
-    // Agent-operability: `--switch-after <FractalType> <secs>` (see AppHandler).
-    let mut switch_after: Option<(fractal::FractalType, f32)> = None;
-    // Agent-operability: `--camera-pos x,y,z` overrides the per-type default
-    // camera placement so framing can be measured without a rebuild.
-    let mut camera_pos: Option<glam::Vec3> = None;
-
-    let mut i = 1;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--clear-settings" => {
-                clear_settings();
-                i += 1;
-            }
-            "--screenshot-path" => {
-                if i + 1 < args.len() {
-                    screenshot_path = Some(std::path::PathBuf::from(&args[i + 1]));
-                    i += 2;
-                } else {
-                    eprintln!("--screenshot-path requires a value");
-                    print_help();
-                    return;
-                }
-            }
-            "--profile-dump" => {
-                if i + 1 < args.len() {
-                    profile_dump_path = Some(std::path::PathBuf::from(&args[i + 1]));
-                    i += 2;
-                } else {
-                    eprintln!("--profile-dump requires a value");
-                    print_help();
-                    return;
-                }
-            }
-            "--window-size" => {
-                if i + 1 < args.len() {
-                    match args[i + 1].split_once('x') {
-                        Some((w, h)) => match (w.parse::<u32>(), h.parse::<u32>()) {
-                            (Ok(w), Ok(h)) if w > 0 && h > 0 => {
-                                window_size = Some((w, h));
-                                i += 2;
-                            }
-                            _ => {
-                                eprintln!(
-                                    "Invalid --window-size '{}' (expected WxH, e.g. 256x256)",
-                                    args[i + 1]
-                                );
-                                print_help();
-                                return;
-                            }
-                        },
-                        None => {
-                            eprintln!(
-                                "Invalid --window-size '{}' (expected WxH, e.g. 256x256)",
-                                args[i + 1]
-                            );
-                            print_help();
-                            return;
-                        }
-                    }
-                } else {
-                    eprintln!("--window-size requires a value (WxH)");
-                    print_help();
-                    return;
-                }
-            }
-            "--preset" => {
-                if i + 1 < args.len() {
-                    preset_name = Some(args[i + 1].clone());
-                    i += 2;
-                } else {
-                    eprintln!("--preset requires a preset name");
-                    print_help();
-                    return;
-                }
-            }
-            "--quality" | "-q" => {
-                if i + 1 < args.len() {
-                    match parse_quality_level(&args[i + 1]) {
-                        Some(level) => {
-                            quality_level = Some(level);
-                            i += 2;
-                        }
-                        None => {
-                            eprintln!(
-                                "Invalid quality level '{}'. Valid options: low, medium, high, ultra",
-                                args[i + 1]
-                            );
-                            print_help();
-                            return;
-                        }
-                    }
-                } else {
-                    eprintln!("--quality requires a value (low, medium, high, ultra)");
-                    print_help();
-                    return;
-                }
-            }
-            "--screenshot-delay" => {
-                if i + 1 < args.len() {
-                    match args[i + 1].parse::<f32>() {
-                        Ok(delay) => {
-                            screenshot_delay = Some(delay);
-                            i += 2;
-                        }
-                        Err(_) => {
-                            eprintln!(
-                                "Invalid delay value for --screenshot-delay: {}",
-                                args[i + 1]
-                            );
-                            print_help();
-                            return;
-                        }
-                    }
-                } else {
-                    eprintln!("--screenshot-delay requires a value");
-                    print_help();
-                    return;
-                }
-            }
-            "--exit-delay" => {
-                if i + 1 < args.len() {
-                    match args[i + 1].parse::<f32>() {
-                        Ok(delay) => {
-                            exit_delay = Some(delay);
-                            i += 2;
-                        }
-                        Err(_) => {
-                            eprintln!("Invalid delay value for --exit-delay: {}", args[i + 1]);
-                            print_help();
-                            return;
-                        }
-                    }
-                } else {
-                    eprintln!("--exit-delay requires a value");
-                    print_help();
-                    return;
-                }
-            }
-            "--switch-after" => {
-                // Agent-operability: `--switch-after <FractalType> <secs>`
-                // switches fractal type after a delay (two tokens). The variant
-                // name parses via serde (same wire format as settings.yaml).
-                if i + 2 < args.len() {
-                    let ft = serde_yaml::from_str::<fractal::FractalType>(&args[i + 1]);
-                    let secs = args[i + 2].parse::<f32>();
-                    match (ft, secs) {
-                        (Ok(ft), Ok(secs)) => {
-                            switch_after = Some((ft, secs));
-                            i += 3;
-                        }
-                        (Err(_), _) => {
-                            eprintln!(
-                                "Unknown fractal type '{}' for --switch-after \
-                                 (use a FractalType variant name, e.g. Hopalong2D)",
-                                args[i + 1]
-                            );
-                            print_help();
-                            return;
-                        }
-                        (_, Err(_)) => {
-                            eprintln!(
-                                "Invalid --switch-after delay '{}' (expected seconds)",
-                                args[i + 2]
-                            );
-                            print_help();
-                            return;
-                        }
-                    }
-                } else {
-                    eprintln!("--switch-after requires <FractalType> <secs>");
-                    print_help();
-                    return;
-                }
-            }
-            "--resize-after" => {
-                // QA-027: `--resize-after <secs> <WxH>` resizes the window after
-                // a delay (two tokens). Powers the lifecycle smoke test.
-                if i + 2 < args.len() {
-                    match (args[i + 1].parse::<f32>(), args[i + 2].split_once('x')) {
-                        (Ok(secs), Some((w, h))) => match (w.parse::<u32>(), h.parse::<u32>()) {
-                            (Ok(width), Ok(height)) => {
-                                resize_after = Some((secs, width, height));
-                                i += 3;
-                            }
-                            _ => {
-                                eprintln!(
-                                    "Invalid --resize-after size '{}' (expected WxH)",
-                                    args[i + 2]
-                                );
-                                print_help();
-                                return;
-                            }
-                        },
-                        _ => {
-                            eprintln!("Invalid --resize-after (expected <secs WxH>)");
-                            print_help();
-                            return;
-                        }
-                    }
-                } else {
-                    eprintln!("--resize-after requires <secs WxH>");
-                    print_help();
-                    return;
-                }
-            }
-            "--camera-pos" => {
-                // Agent-operability: `--camera-pos x,y,z` places the camera
-                // (looking at the origin) after startup and after any
-                // `--switch-after`, so a harness can measure framing.
-                if i + 1 < args.len() {
-                    let parts: Vec<Result<f32, _>> =
-                        args[i + 1].split(',').map(str::parse::<f32>).collect();
-                    match parts.as_slice() {
-                        [Ok(x), Ok(y), Ok(z)] => {
-                            camera_pos = Some(glam::Vec3::new(*x, *y, *z));
-                            i += 2;
-                        }
-                        _ => {
-                            eprintln!("Invalid --camera-pos '{}' (expected x,y,z)", args[i + 1]);
-                            print_help();
-                            return;
-                        }
-                    }
-                } else {
-                    eprintln!("--camera-pos requires a value (x,y,z)");
-                    print_help();
-                    return;
-                }
-            }
-            "--list-presets" => {
-                list_presets();
-                return;
-            }
-            "--help" | "-h" => {
-                print_help();
-                return;
-            }
-            _ => {
-                eprintln!("Unknown option: {}", args[i]);
-                print_help();
-                return;
-            }
-        }
+    // Hidden agent helper: emit completions and exit (ENH-003).
+    if let Some(shell) = cli.generate_completions {
+        let mut cmd = <par_fractal::cli::Cli as clap::CommandFactory>::command();
+        let name = cmd.get_name().to_string();
+        clap_complete::generate(shell, &mut cmd, name, &mut std::io::stdout());
+        return;
     }
+
+    if cli.list_presets {
+        list_presets();
+        return;
+    }
+
+    // NOTE: --clear-settings clears AND continues launching (historical
+    // behavior — preserved identically by ENH-003).
+    if cli.clear_settings {
+        clear_settings();
+    }
+
+    // ENH-003: post-parse validation for the two-token flags (clap's
+    // value_parser applies per-value, so their typed checks live here).
+    let resize_after = cli.resize_after.as_ref().map(|pair| {
+        let secs: f32 = pair[0].parse().unwrap_or_else(|_| {
+            eprintln!(
+                "Invalid --resize-after delay '{}' (expected seconds)",
+                pair[0]
+            );
+            std::process::exit(2);
+        });
+        if !secs.is_finite() || secs < 0.0 {
+            eprintln!(
+                "Invalid --resize-after delay '{}' (must be finite and >= 0)",
+                pair[0]
+            );
+            std::process::exit(2);
+        }
+        let (w, h) = pair[1].split_once('x').unwrap_or_else(|| {
+            eprintln!("Invalid --resize-after size '{}' (expected WxH)", pair[1]);
+            std::process::exit(2);
+        });
+        let (width, height) = match (w.parse::<u32>(), h.parse::<u32>()) {
+            (Ok(width), Ok(height)) if width > 0 && height > 0 => (width, height),
+            _ => {
+                eprintln!("Invalid --resize-after size '{}' (expected WxH)", pair[1]);
+                std::process::exit(2);
+            }
+        };
+        (secs, width, height)
+    });
+
+    let switch_after = cli.switch_after.as_ref().map(|pair| {
+        let ft = serde_yaml::from_str::<fractal::FractalType>(&pair[0]).unwrap_or_else(|_| {
+            eprintln!(
+                "Unknown fractal type '{}' for --switch-after (use a FractalType variant name, e.g. Hopalong2D)",
+                pair[0]
+            );
+            std::process::exit(2);
+        });
+        let secs: f32 = pair[1]
+            .parse()
+            .unwrap_or_else(|_| {
+                eprintln!("Invalid --switch-after delay '{}' (expected seconds)", pair[1]);
+                std::process::exit(2);
+            });
+        if !secs.is_finite() {
+            eprintln!("Invalid --switch-after delay '{}' (must be finite)", pair[1]);
+            std::process::exit(2);
+        }
+        (ft, secs)
+    });
 
     env_logger::init();
 
@@ -401,15 +186,17 @@ fn main() {
     let (initial_width, initial_height) = prefs.window_size_or_default();
     // ENH-007: `--window-size` overrides the saved preference so the visual-
     // regression harness gets a fixed capture resolution.
-    let initial_window_size = window_size.unwrap_or((initial_width, initial_height));
+    let initial_window_size = cli.window_size.unwrap_or((initial_width, initial_height));
+
+    let camera_pos = cli.camera_pos.map(glam::Vec3::from_array);
 
     let mut handler = AppHandler {
-        screenshot_delay,
-        exit_delay,
-        preset_name,
-        quality_level,
-        screenshot_path,
-        profile_dump_path,
+        screenshot_delay: cli.screenshot_delay,
+        exit_delay: cli.exit_delay,
+        preset_name: cli.preset,
+        quality_level: cli.quality,
+        screenshot_path: cli.screenshot_path,
+        profile_dump_path: cli.profile_dump,
         initial_window_size,
         resize_after,
         start: None,
