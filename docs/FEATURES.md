@@ -411,14 +411,25 @@ Mathematically-generated palettes using cosine-based formulas for smooth, contin
 
 ### CLI Options
 
-**Command-Line Features:**
-- `--clear-settings` - Reset all saved preferences
-- `--preset "name"` - Load specific preset on startup
-- `--quality <level>` / `-q <level>` - Set quality level (low, medium, high, ultra)
-- `--list-presets` - List available presets
-- `--screenshot-delay N` - Take screenshot after N seconds
-- `--exit-delay N` - Exit application after N seconds
-- Useful for automation and batch rendering
+Complete reference (source of truth: `print_help` in `src/main.rs` — update both together).
+
+| Flag | Argument | Effect |
+|------|----------|--------|
+| `--clear-settings` | — | Clear all saved settings and start fresh |
+| `--preset <name>` | preset name | Load a specific preset on startup |
+| `--quality <level>`, `-q` | `low\|medium\|high\|ultra` | Set the LOD quality level |
+| `--list-presets` | — | List available presets and exit |
+| `--screenshot-delay <s>` | seconds (f32) | Take a screenshot N seconds after start |
+| `--screenshot-path <path>` | file path | Write the screenshot to this exact path (no timestamp) |
+| `--exit-delay <s>` | seconds (f32) | Exit the application after N seconds |
+| `--profile-dump <path>` | file path | Write EMA-smoothed GPU profile timings (YAML) after warmup |
+| `--window-size <WxH>` | W×H physical pixels | Force the window size |
+| `--resize-after <s WxH>` | seconds, W×H | Resize the window to WxH after N seconds |
+| `--switch-after <type> <s>` | FractalType, seconds | Switch fractal type after N seconds (agent testing) |
+| `--camera-pos <x,y,z>` | coordinates | Place the 3D camera looking at the origin (agent testing) |
+| `--help`, `-h` | — | Show help and exit |
+
+Example: `par-fractal --quality ultra --window-size 1280x720 --screenshot-delay 8 --screenshot-path out.png --exit-delay 10`
 
 **Web URL Parameters:**
 - `?quality=<level>` or `?q=<level>` - Set quality level

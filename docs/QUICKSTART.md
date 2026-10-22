@@ -560,3 +560,23 @@ sudo xattr -r -d com.apple.quarantine /Applications/par-fractal.app
 - [Controls Reference](CONTROLS.md) - All keyboard and mouse controls
 - [Architecture](ARCHITECTURE.md) - System design and internals
 - [Main README](../README.md) - Project overview
+
+## Configuration Files
+
+Settings persist via `ProjectDirs::from("com", "fractal", "par-fractal").config_dir()`:
+
+| Platform | Location |
+|----------|----------|
+| macOS | `~/Library/Application Support/com.fractal.par-fractal/` |
+| Linux | `~/.config/fractal/par-fractal/` |
+| Windows | `%APPDATA%\fractal\par-fractal\config\` |
+| Web | browser localStorage |
+
+Inside that directory:
+
+- `settings/settings.yaml` — all render/fractal parameters (one flat YAML document; a
+  legacy `settings.yaml` directly in the folder is still read as a fallback)
+- `preferences.yaml` — window size and preferred GPU index
+- `presets/` — presets you save from the app
+
+Reset everything with `par-fractal --clear-settings`.

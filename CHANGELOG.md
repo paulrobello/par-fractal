@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+> DOC-002 decision (2026-10-21): the 0.9.0 and 0.10.0 sections below are NOT
+> tagged or published — remote tags and crates.io end at v0.8.3. They are kept
+> as dated staging sections and will be retagged at release time. Do not link
+> compare-URLs for them until the tags exist.
+
 ### Fixed
 - **The 3D attractors rendered many times oversized, with the camera buried
   inside them.** Lorenz was the worst — ~10x — and its saved settings offered no
@@ -103,7 +108,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   agent-operability hook the per-type framing distances above were measured
   with, and what a future re-measure would use.
 
-## [0.10.0] - 2026-07-20
+## 0.10.0 (UNRELEASED — not yet tagged or published)
 
 ### Added
 - **`--switch-after <FractalType> <secs>` CLI flag** — switches the fractal type
@@ -282,7 +287,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   paths do — preserved as-is (behavior-neutral) and flagged in the release
   checklist.
 
-## [0.9.0] - 2026-07-17
+## 0.9.0 (UNRELEASED — not yet tagged or published)
 
 Full remediation of the 2026-07-16 audit (81 issues across security, architecture, code quality, and documentation). See `git log` for per-commit detail.
 
@@ -608,8 +613,6 @@ Full remediation of the 2026-07-16 audit (81 issues across security, architectur
 - Cross-platform support: Windows (DX12/Vulkan), macOS (Metal), Linux (Vulkan)
 
 <!-- v0.8.2 has no git tag; compare anchors use v0.8.1 as the base. -->
-[0.10.0]: https://github.com/paulrobello/par-fractal/compare/v0.9.0...v0.10.0
-[0.9.0]: https://github.com/paulrobello/par-fractal/compare/v0.8.3...v0.9.0
 [0.8.3]: https://github.com/paulrobello/par-fractal/compare/v0.8.1...v0.8.3
 [0.8.2]: https://github.com/paulrobello/par-fractal/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/paulrobello/par-fractal/compare/v0.8.0...v0.8.1

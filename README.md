@@ -183,6 +183,12 @@ cargo install par-fractal
 par-fractal
 ```
 
+> **Note:** the published crate currently trails this documentation — the
+> latest crates.io release is 0.8.3, while some documented features (perturbation
+> deep zoom past ~1e11, the GPU profiler) land in the unreleased 0.9.0/0.10.0
+> work (see the CHANGELOG). Building from source (`cargo install --path .` or
+> `make build-release`) delivers everything documented here.
+
 Requires Rust 1.99+ (Edition 2024). Install from [rustup.rs](https://rustup.rs/).
 
 ### Pre-built Binaries

@@ -297,54 +297,7 @@ Par Fractal includes 48 professionally-designed static color palettes and 12 pro
 
 ### Command-Line Interface
 
-**Available Options:**
-
-```bash
-par-fractal [OPTIONS]
-
-Options:
-  --clear-settings         Clear all saved settings
-  --preset <name>          Load preset on startup
-  --quality <level>        Set quality: low, medium, high, ultra
-  -q <level>               Short form of --quality
-  --list-presets           List all available presets
-  --screenshot-delay <s>   Auto-screenshot after N seconds
-  --exit-delay <s>         Auto-exit after N seconds
-  --help, -h               Show help message
-```
-
-**Examples:**
-
-```bash
-# List all presets
-par-fractal --list-presets
-
-# Load specific preset
-par-fractal --preset "Mandelbulb Power 8"
-
-# Set quality level
-par-fractal --quality low
-par-fractal -q high
-
-# Automated screenshot capture
-par-fractal --preset "Ocean Julia" --screenshot-delay 5 --exit-delay 6
-```
-
-**Web URL Parameters:**
-
-```
-# Quality levels: ultra (u), high (h), medium (m), low (l)
-https://par-fractal.pardev.net/?quality=high
-https://par-fractal.pardev.net/?q=l              # Short forms work too
-
-# Combine quality and preset
-https://par-fractal.pardev.net/?q=medium&preset=Mandelbulb
-
-# Also works with hash format
-https://par-fractal.pardev.net/#quality=low&p=Mandelbulb
-```
-
-## Additional Resources
+Complete flag reference: [FEATURES.md → CLI Options](FEATURES.md#cli-options).
 
 ### Main Project Documentation
 

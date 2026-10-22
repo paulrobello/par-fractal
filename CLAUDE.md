@@ -71,15 +71,12 @@ make run-windows-vulkan  # Force Vulkan (Windows)
 ```
 
 ### CLI Options
-```bash
-par-fractal --clear-settings              # Reset all saved preferences
-par-fractal --preset "preset-name"        # Load specific preset
-par-fractal --quality high                # Set quality: low|medium|high|ultra (-q short form)
-par-fractal --list-presets                # List available presets and exit
-par-fractal --screenshot-delay 5.0        # Screenshot after 5 seconds
-par-fractal --exit-delay 10.0             # Exit after 10 seconds
-par-fractal --help                        # Show help (-h)
-```
+
+Complete flag reference: [docs/FEATURES.md → CLI Options](docs/FEATURES.md#cli-options)
+(source of truth: `print_help` in `src/main.rs`). The flags the agent loop uses most:
+`--clear-settings`, `--preset <name>`, `--quality <level>`, `--list-presets`,
+`--screenshot-delay <s>`, `--screenshot-path <path>`, `--exit-delay <s>`,
+`--window-size <WxH>`, `--switch-after <type> <s>`, `--camera-pos <x,y,z>`.
 
 ## Architecture
 
@@ -233,29 +230,34 @@ Debug builds are significantly slower. Always use `make r` (release mode) for ac
 
 ## Configuration Files
 
-**Settings Location:**
-- Linux/macOS: `~/.config/par-fractal/`
-- Windows: `%APPDATA%\par-fractal\`
+**Settings Location** (`ProjectDirs::from("com", "fractal", "par-fractal").config_dir()`, DOC-008-verified):
+- macOS: `~/Library/Application Support/com.fractal.par-fractal/`
+- Linux: `~/.config/fractal/par-fractal/`
+- Windows: `%APPDATA%\fractal\par-fractal\config\`
+- Web: browser localStorage
 
 **Files:**
-- `settings.yaml` - Main application settings
+- `settings/settings.yaml` - Main application settings (legacy `<config>/settings.yaml` still read)
+- `preferences.yaml` - Window size and preferred GPU index (separate from fractal settings)
 - `presets/` - User-saved presets
 
-**Settings Structure:**
+**Settings Structure** — one FLAT document (no nesting):
 ```yaml
-fractal_params:
-  fractal_type: Mandelbulb3D
-  max_iterations: 500
-  power: 8.0
-  # ... all fractal parameters
-camera:
-  position: [x, y, z]
-  rotation: [yaw, pitch, roll]
-window:
-  width: 1920
-  height: 1080
-preferred_gpu_index: 0
+fractal_type: Mandelbulb3D
+max_iterations: 500
+power: 8.0
+center_2d: [0.0, 0.0]
+zoom_2d: 1.0
+# ... all fractal parameters at the top level
+camera_position: [0.0, 0.0, 5.0]
+camera_target: [0.0, 0.0, 0.0]
+ui_state:
+  show_fps: false
+lod_config:
+  enabled: false
 ```
+
+Note: `preferred_gpu_index` lives in `preferences.yaml`, not `settings.yaml`.
 
 ## Common Development Tasks
 

@@ -161,12 +161,7 @@ graph TD
 - Window setup with saved preferences
 
 **Key Features:**
-- `--clear-settings` - Reset all saved preferences
-- `--preset <name>` - Load specific preset on startup
-- `--quality <level>` / `-q <level>` - Set quality level (low, medium, high, ultra)
-- `--list-presets` - Display available presets
-- `--screenshot-delay <s>` - Automated screenshot capture
-- `--exit-delay <s>` - Automated application exit
+- Complete CLI flag reference: [FEATURES.md → CLI Options](FEATURES.md#cli-options)
 
 ### Application State
 
@@ -214,11 +209,12 @@ graph TD
 - Video recording management
 - File saving and auto-opening
 
-**`app/persistence.rs`** - Settings Persistence (Native Only)
-- Settings save/load to YAML files
+**`app/persistence.rs`** - Settings Persistence
+- Settings save/load via the platform `Storage` trait: YAML files on native
+  (`<config>/settings/settings.yaml`), browser localStorage on web (ARC-014)
 - Automatic periodic saving
 - Camera position persistence
-- Window size restoration
+- Window size restoration (in `preferences.yaml` on native)
 
 **Key State:**
 ```rust
