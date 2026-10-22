@@ -220,7 +220,7 @@ check:
 # ARC-020: house-convention alias (`make typecheck` == `make check`).
 typecheck: check
 
-checkall: test lint
+checkall: test lint web-check
 	@echo ""
 	@echo "======================================================================"
 	@echo "  All code quality checks passed!"
@@ -585,6 +585,20 @@ web-serve:
 	@echo "Open http://127.0.0.1:8080 in your browser"
 	@echo ""
 	cd web && trunk serve
+
+# ARC-021: wasm compilation gate. Skips gracefully when the wasm target is
+# not installed (CI installs it; local dev machines opt in via
+# `rustup target add wasm32-unknown-unknown`).
+web-check:
+	@if ! rustup target list --installed | grep -q wasm32-unknown-unknown; then \
+		echo "web-check: wasm32-unknown-unknown target not installed — skipping."; \
+	else \
+		echo "web-check: checking root lib (web feature)…"; \
+		cargo check --quiet --lib --target wasm32-unknown-unknown --no-default-features --features web; \
+		echo "web-check: checking par-fractal-web member…"; \
+		cargo check --quiet -p par-fractal-web --target wasm32-unknown-unknown; \
+		echo "web-check: wasm targets compile clean."; \
+	fi
 
 web-clean:
 	@echo "Cleaning web build artifacts..."

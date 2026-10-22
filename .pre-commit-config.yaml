@@ -54,3 +54,14 @@ repos:
         language: system
         types: [rust]
         pass_filenames: false
+
+  # ARC-021: wasm compilation gate (skips itself when the target is absent)
+  - repo: local
+    hooks:
+      - id: wasm-check
+        name: make web-check
+        description: Compile-check the wasm targets (root lib web feature + par-fractal-web member)
+        entry: make web-check
+        language: system
+        types: [rust]
+        pass_filenames: false

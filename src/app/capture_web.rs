@@ -384,6 +384,10 @@ pub fn render_high_resolution_web(
     // Passes 2-6 (ARC-023): the SAME Renderer::encode_post_chain the
     // interactive frame and the native capture use — FXAA applies, grading
     // identical, bloom at half width, accumulation copies the scene out.
+    // The web hi-res scene pass renders the standard pipeline only (no
+    // accumulation-display branch), so accumulation is always false here —
+    // matching what the scene texture actually holds.
+    let use_accumulation = false;
     let targets = PostChainTargets {
         scene_bind_group: &scene_bind_group,
         bright_view: &bright_view,
@@ -396,8 +400,8 @@ pub fn render_high_resolution_web(
         composite_final_bind_group: &composite_final_bind_group,
     };
     let opts = PostOptions {
-        bloom_enabled: params.settings.bloom_enabled,
-        fxaa_enabled: params.settings.fxaa_enabled,
+        bloom_enabled: fractal_params.settings.bloom_enabled,
+        fxaa_enabled: fractal_params.settings.fxaa_enabled,
         use_accumulation,
         bloom_already_cleared: true,
     };

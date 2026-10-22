@@ -985,11 +985,16 @@ impl App {
         // directly (its old ResetView hard-coded [0,0]/1.0 and left a stale
         // precise center behind).
         // ARC-025: the Save Settings button persists via the App path.
+        // (save_all_settings is native-only; web saves happen through the
+        // auto-save path into localStorage.)
+        #[cfg(not(target_arch = "wasm32"))]
         if save_requested {
             self.save_all_settings();
             self.ui.show_toast("Settings saved".to_string());
             log::info!("Settings saved manually");
         }
+        #[cfg(target_arch = "wasm32")]
+        let _ = save_requested;
 
         if self.ui.pending_reset_view {
             self.ui.pending_reset_view = false;
