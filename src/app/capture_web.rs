@@ -15,8 +15,8 @@ use crate::camera::Camera;
 use crate::fractal::FractalParams;
 use crate::platform::Capture;
 use crate::platform::web::WebCapture;
-use crate::renderer::Renderer;
 use crate::renderer::uniforms::write_uniform_bytes;
+use crate::renderer::{PostChainTargets, PostOptions, Renderer};
 use std::sync::{Arc, Mutex};
 
 /// State shared between the map_async callback and the async task
@@ -180,10 +180,32 @@ pub fn render_high_resolution_web(
     let bright_texture = create_hdr_texture("High-Res Bright");
     let bright_view = bright_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-    let blur_temp_texture = create_hdr_texture("High-Res Blur Temp");
+    // ARC-023: bloom chain at HALF the target size, matching the interactive
+    // path (ENH-005); the blur shader derives its texel size from
+    // textureDimensions, so exports match on-screen bloom width.
+    let (bloom_w, bloom_h) = Renderer::bloom_size(width, height);
+    let bloom_extent = wgpu::Extent3d {
+        width: bloom_w,
+        height: bloom_h,
+        depth_or_array_layers: 1,
+    };
+    let create_bloom_texture = |label: &str| {
+        renderer.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some(label),
+            size: bloom_extent,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: hdr_format,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        })
+    };
+
+    let blur_temp_texture = create_bloom_texture("High-Res Blur Temp");
     let blur_temp_view = blur_temp_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-    let bloom_texture = create_hdr_texture("High-Res Bloom");
+    let bloom_texture = create_bloom_texture("High-Res Bloom");
     let bloom_view = bloom_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
     let composite_texture = create_hdr_texture("High-Res Composite");
@@ -359,129 +381,27 @@ pub fn render_high_resolution_web(
         pass.draw(0..4, 0..1);
     }
 
-    // Pass 2: Extract bright pixels for bloom
-    {
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("HR Bloom Extract"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &bright_view,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            occlusion_query_set: None,
-            timestamp_writes: None,
-            multiview_mask: None,
-        });
-        pass.set_pipeline(&renderer.bloom_extract_pipeline);
-        pass.set_bind_group(0, &scene_bind_group, &[]);
-        pass.set_bind_group(1, &renderer.bloom_params_bind_group, &[]);
-        pass.set_vertex_buffer(0, renderer.postprocess_vertex_buffer.slice(..));
-        pass.draw(0..4, 0..1);
-    }
-
-    // Pass 3: Horizontal blur
-    {
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("HR Blur H"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &blur_temp_view,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            occlusion_query_set: None,
-            timestamp_writes: None,
-            multiview_mask: None,
-        });
-        pass.set_pipeline(&renderer.blur_pipeline);
-        pass.set_bind_group(0, &bright_bind_group, &[]);
-        pass.set_bind_group(1, &renderer.blur_h_params_bind_group, &[]);
-        pass.set_vertex_buffer(0, renderer.postprocess_vertex_buffer.slice(..));
-        pass.draw(0..4, 0..1);
-    }
-
-    // Pass 4: Vertical blur (ARC-022: bind group carries its own (0,1) buffer)
-    {
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("HR Blur V"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &bloom_view,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            occlusion_query_set: None,
-            timestamp_writes: None,
-            multiview_mask: None,
-        });
-        pass.set_pipeline(&renderer.blur_pipeline);
-        pass.set_bind_group(0, &blur_temp_bind_group, &[]);
-        pass.set_bind_group(1, &renderer.blur_v_params_bind_group, &[]);
-        pass.set_vertex_buffer(0, renderer.postprocess_vertex_buffer.slice(..));
-        pass.draw(0..4, 0..1);
-    }
-
-    // Pass 5: Composite (scene + bloom + color grading + vignette)
-    {
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("HR Composite"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &composite_view,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            occlusion_query_set: None,
-            timestamp_writes: None,
-            multiview_mask: None,
-        });
-        pass.set_pipeline(&renderer.composite_pipeline);
-        pass.set_bind_group(0, &composite_bind_group, &[]);
-        pass.set_bind_group(1, &renderer.composite_params_bind_group, &[]);
-        pass.set_vertex_buffer(0, renderer.postprocess_vertex_buffer.slice(..));
-        pass.draw(0..4, 0..1);
-    }
-
-    // Pass 6: Final copy to 8-bit output
-    {
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("HR Final Copy"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &output_view,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            occlusion_query_set: None,
-            timestamp_writes: None,
-            multiview_mask: None,
-        });
-        pass.set_pipeline(&renderer.copy_pipeline);
-        pass.set_bind_group(0, &composite_final_bind_group, &[]);
-        pass.set_vertex_buffer(0, renderer.postprocess_vertex_buffer.slice(..));
-        pass.draw(0..4, 0..1);
-    }
+    // Passes 2-6 (ARC-023): the SAME Renderer::encode_post_chain the
+    // interactive frame and the native capture use — FXAA applies, grading
+    // identical, bloom at half width, accumulation copies the scene out.
+    let targets = PostChainTargets {
+        scene_bind_group: &scene_bind_group,
+        bright_view: &bright_view,
+        blur_temp_view: &blur_temp_view,
+        bloom_view: &bloom_view,
+        composite_view: &composite_view,
+        bright_bind_group: &bright_bind_group,
+        blur_temp_bind_group: &blur_temp_bind_group,
+        composite_bind_group: &composite_bind_group,
+        composite_final_bind_group: &composite_final_bind_group,
+    };
+    let opts = PostOptions {
+        bloom_enabled: params.settings.bloom_enabled,
+        fxaa_enabled: params.settings.fxaa_enabled,
+        use_accumulation,
+        bloom_already_cleared: true,
+    };
+    renderer.encode_post_chain(&mut encoder, &targets, &output_view, &opts);
 
     // Create buffer to copy texture to
     let bytes_per_row = (width * 4 + 255) & !255; // Align to 256 bytes

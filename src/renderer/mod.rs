@@ -8,6 +8,8 @@ mod initialization;
 /// [`crate::deep_zoom::ReferenceOrbit`] for the per-pixel delta shader to
 /// read in fragment stage.
 pub mod orbit_buffer;
+pub(crate) mod post_chain;
+pub(crate) use post_chain::{PostChainTargets, PostOptions};
 /// ENH-006 Task 1: GPU frame profiler. Per-pass timestamp queries with a
 /// 3-deep staging ring for ~2-frame-latent, non-blocking readback, exposing
 /// `GpuProfiler::timings_ms` for the HUD (Task 2) and CLI dump (Task 3).
@@ -50,11 +52,11 @@ pub struct GpuInfo {
 /// fields are public so other modules can resize buffers, rebind, or read GPU
 /// state during frame updates.
 pub struct Renderer {
-    pub surface: wgpu::Surface<'static>,
-    pub device: wgpu::Device,
-    pub queue: wgpu::Queue,
-    pub config: wgpu::SurfaceConfiguration,
-    pub size: winit::dpi::PhysicalSize<u32>,
+    pub(crate) surface: wgpu::Surface<'static>,
+    pub(crate) device: wgpu::Device,
+    pub(crate) queue: wgpu::Queue,
+    pub(crate) config: wgpu::SurfaceConfiguration,
+    pub(crate) size: winit::dpi::PhysicalSize<u32>,
 
     // Main fractal rendering
     // ARC-009/ENH-004: two pipelines sharing one layout/module — `fs_main_2d`
@@ -62,101 +64,101 @@ pub struct Renderer {
     // ray-march + lighting path. Selected per frame via
     // `FractalType::is_3d()`; the unused path is dead-code-eliminated per
     // entry point by naga/the backend.
-    pub pipeline_2d: wgpu::RenderPipeline,
-    pub pipeline_3d: wgpu::RenderPipeline,
+    pub(crate) pipeline_2d: wgpu::RenderPipeline,
+    pub(crate) pipeline_3d: wgpu::RenderPipeline,
     /// ENH-004 Stage 2: the shader module and pipeline layout retained past
     /// init so specialized 3D pipelines can be compiled lazily at runtime
     /// (one per fractal type, overriding the WGSL `SPECIALIZED_TYPE` constant).
-    pub shader_module: wgpu::ShaderModule,
-    pub render_pipeline_layout: wgpu::PipelineLayout,
+    pub(crate) shader_module: wgpu::ShaderModule,
+    pub(crate) render_pipeline_layout: wgpu::PipelineLayout,
     /// ENH-004 Stage 2: lazily-compiled specialized 3D pipelines keyed by the
     /// fractal type's GPU index (`FractalType as u32`). A miss returns the
     /// generic `pipeline_3d` for that frame while the specialized variant
     /// compiles. Populated by `ensure_specialized_3d_pipeline`.
-    pub pipeline_3d_cache: HashMap<u32, wgpu::RenderPipeline>,
-    pub vertex_buffer: wgpu::Buffer,
-    pub uniform_buffer: wgpu::Buffer,
-    pub uniform_bind_group: wgpu::BindGroup,
+    pub(crate) pipeline_3d_cache: HashMap<u32, wgpu::RenderPipeline>,
+    pub(crate) vertex_buffer: wgpu::Buffer,
+    pub(crate) uniform_buffer: wgpu::Buffer,
+    pub(crate) uniform_bind_group: wgpu::BindGroup,
     /// ENH-001 Phase A step 3: storage buffer for the perturbation reference
     /// orbit. Bound at `@group(0) @binding(1)` so it shares group 0 with
     /// the uniforms. Step 5 (CPU driver) uploads a real orbit here; before
     /// the first deep-zoom view it holds a one-entry placeholder so the bind
     /// group validates.
-    pub orbit_buffer: OrbitBuffer,
+    pub(crate) orbit_buffer: OrbitBuffer,
     /// ENH-001 Phase A step 5: metadata of the currently-uploaded orbit, or
     /// `None` when perturbation is off (no orbit yet, the gate isn't met, or
     /// the view dropped below the gate). The buffer contents may still be
     /// present; this field is the live/not-live switch that
     /// `Renderer::update` reads to populate `perturbation_enabled`.
-    pub active_orbit: Option<ActiveOrbit>,
+    pub(crate) active_orbit: Option<ActiveOrbit>,
     uniforms: Uniforms,
-    pub start_time: web_time::Instant,
+    pub(crate) start_time: web_time::Instant,
 
     // Multi-pass post-processing
-    pub scene_texture: wgpu::Texture,
-    pub scene_view: wgpu::TextureView,
-    pub bright_texture: wgpu::Texture,
-    pub bright_view: wgpu::TextureView,
-    pub blur_temp_texture: wgpu::Texture,
-    pub blur_temp_view: wgpu::TextureView,
-    pub bloom_texture: wgpu::Texture,
-    pub bloom_view: wgpu::TextureView,
-    pub composite_texture: wgpu::Texture,
-    pub composite_view: wgpu::TextureView,
+    pub(crate) scene_texture: wgpu::Texture,
+    pub(crate) scene_view: wgpu::TextureView,
+    pub(crate) bright_texture: wgpu::Texture,
+    pub(crate) bright_view: wgpu::TextureView,
+    pub(crate) blur_temp_texture: wgpu::Texture,
+    pub(crate) blur_temp_view: wgpu::TextureView,
+    pub(crate) bloom_texture: wgpu::Texture,
+    pub(crate) bloom_view: wgpu::TextureView,
+    pub(crate) composite_texture: wgpu::Texture,
+    pub(crate) composite_view: wgpu::TextureView,
 
-    pub sampler: wgpu::Sampler,
-    pub postprocess_vertex_buffer: wgpu::Buffer,
+    pub(crate) sampler: wgpu::Sampler,
+    pub(crate) postprocess_vertex_buffer: wgpu::Buffer,
 
     // Post-processing pipelines
-    pub bloom_extract_pipeline: wgpu::RenderPipeline,
-    pub blur_pipeline: wgpu::RenderPipeline,
-    pub composite_pipeline: wgpu::RenderPipeline,
-    pub fxaa_pipeline: wgpu::RenderPipeline,
-    pub copy_pipeline: wgpu::RenderPipeline,
+    pub(crate) bloom_extract_pipeline: wgpu::RenderPipeline,
+    pub(crate) blur_pipeline: wgpu::RenderPipeline,
+    pub(crate) composite_pipeline: wgpu::RenderPipeline,
+    pub(crate) fxaa_pipeline: wgpu::RenderPipeline,
+    pub(crate) copy_pipeline: wgpu::RenderPipeline,
 
     // Post-processing uniforms
-    pub bloom_uniform_buffer: wgpu::Buffer,
+    pub(crate) bloom_uniform_buffer: wgpu::Buffer,
     // ARC-022: the blur direction buffers are not Renderer fields — each
     // bind group keeps its own (1,0)/(0,1) buffer alive from init.
-    pub composite_uniform_buffer: wgpu::Buffer,
+    pub(crate) composite_uniform_buffer: wgpu::Buffer,
 
     // Bind groups
-    pub scene_bind_group: wgpu::BindGroup,
-    pub bright_bind_group: wgpu::BindGroup,
-    pub blur_temp_bind_group: wgpu::BindGroup,
-    pub composite_bind_group: wgpu::BindGroup,
-    pub composite_final_bind_group: wgpu::BindGroup, // For final pass (FXAA or copy)
-    pub bloom_params_bind_group: wgpu::BindGroup,
-    pub blur_h_params_bind_group: wgpu::BindGroup,
-    pub blur_v_params_bind_group: wgpu::BindGroup,
-    pub composite_params_bind_group: wgpu::BindGroup,
+    pub(crate) scene_bind_group: wgpu::BindGroup,
+    pub(crate) bright_bind_group: wgpu::BindGroup,
+    pub(crate) blur_temp_bind_group: wgpu::BindGroup,
+    pub(crate) composite_bind_group: wgpu::BindGroup,
+    pub(crate) composite_final_bind_group: wgpu::BindGroup, // For final pass (FXAA or copy)
+    pub(crate) bloom_params_bind_group: wgpu::BindGroup,
+    pub(crate) blur_h_params_bind_group: wgpu::BindGroup,
+    pub(crate) blur_v_params_bind_group: wgpu::BindGroup,
+    pub(crate) composite_params_bind_group: wgpu::BindGroup,
 
     // Compute shader infrastructure for accumulation-based fractals
-    pub attractor_compute: Option<AttractorComputePipeline>,
-    pub buddhabrot_compute: Option<BuddhabrotComputePipeline>,
-    pub accumulation_texture: Option<AccumulationTexture>,
+    pub(crate) attractor_compute: Option<AttractorComputePipeline>,
+    pub(crate) buddhabrot_compute: Option<BuddhabrotComputePipeline>,
+    pub(crate) accumulation_texture: Option<AccumulationTexture>,
     /// Atomic storage buffer for Buddhabrot accumulation (separate from texture-based attractors)
-    pub buddhabrot_accumulation_buffer: Option<BuddhabrotAccumulationBuffer>,
+    pub(crate) buddhabrot_accumulation_buffer: Option<BuddhabrotAccumulationBuffer>,
     /// Compute pipeline to copy from Buddhabrot buffer to texture for display
-    pub buddhabrot_copy_pipeline: Option<wgpu::ComputePipeline>,
-    pub buddhabrot_copy_bind_group: Option<wgpu::BindGroup>,
-    pub accumulation_display_pipeline: wgpu::RenderPipeline, // Uses fs_accumulation_display
-    pub accumulation_display_bind_group: Option<wgpu::BindGroup>,
-    pub accumulation_display_uniform_buffer: wgpu::Buffer,
-    pub accumulation_display_uniform_bind_group: wgpu::BindGroup,
+    pub(crate) buddhabrot_copy_pipeline: Option<wgpu::ComputePipeline>,
+    pub(crate) buddhabrot_copy_bind_group: Option<wgpu::BindGroup>,
+    pub(crate) accumulation_display_pipeline: wgpu::RenderPipeline, // Uses fs_accumulation_display
+    pub(crate) accumulation_display_bind_group: Option<wgpu::BindGroup>,
+    pub(crate) accumulation_display_uniform_buffer: wgpu::Buffer,
+    pub(crate) accumulation_display_uniform_bind_group: wgpu::BindGroup,
 
     /// ARC-012: true when the device supports `Features::CLEAR_TEXTURE`, letting
     /// `AccumulationTexture::clear` use `CommandEncoder::clear_texture` instead
     /// of the persistent-zero-buffer fallback. Always false on wasm (WebGPU
     /// does not expose the feature).
-    pub clear_texture_supported: bool,
+    pub(crate) clear_texture_supported: bool,
 
     /// ENH-006: GPU frame profiler. Owns the timestamp `QuerySet` (or `None`
     /// when the device lacks `Features::TIMESTAMP_QUERY`), the resolve buffer,
     /// and the 3-deep staging ring. Public so `App::render` can call
     /// `pass_writes` / `end_frame` / `poll_results` directly each frame; read
     /// `timings_ms` for the HUD (Task 2) and CLI dump (Task 3).
-    pub profiler: GpuProfiler,
+    pub(crate) profiler: GpuProfiler,
 
     /// ARC-017: cached `BloomUniforms` from the last upload; the buffer write
     /// is skipped when the value hasn't changed. `None` until first upload.
@@ -171,7 +173,7 @@ pub struct Renderer {
     /// `scene_texture` and the post chain upsamples. Driven by LOD's active
     /// `QualityLevel.render_scale` (so it tracks motion automatically), forced
     /// to 1.0 for accumulation display and high-resolution capture.
-    pub scene_render_scale: f32,
+    pub(crate) scene_render_scale: f32,
     /// ENH-003: when `Some`, forces `scene_render_scale` regardless of LOD —
     /// used by high-resolution capture / video paths so a capture taken mid-motion
     /// (LOD at reduced scale) still renders at full quality. `None` in normal use.
@@ -181,5 +183,5 @@ pub struct Renderer {
     /// cover the full `scene_texture`, and the post chain must read it at full
     /// resolution — a sub-rect viewport would conflict with the per-tile
     /// scissor).
-    pub refining: bool,
+    pub(crate) refining: bool,
 }

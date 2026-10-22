@@ -40,7 +40,7 @@ impl Renderer {
     /// `textureDimensions` of the (now half-size) bound texture, so no texel-
     /// size uniform needs updating. Halved dims clamped to ≥1 keep odd/tiny
     /// window sizes valid as GPU texture dimensions.
-    pub(super) fn bloom_size(width: u32, height: u32) -> (u32, u32) {
+    pub(crate) fn bloom_size(width: u32, height: u32) -> (u32, u32) {
         ((width / 2).max(1), (height / 2).max(1))
     }
 

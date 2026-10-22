@@ -1,5 +1,6 @@
 use super::App;
 use crate::fractal::FractalParams;
+use crate::renderer::PostOptions;
 use crate::renderer::compute::{
     AccumulationDisplayUniforms, AttractorComputeUniforms, BuddhabrotComputeUniforms,
 };
@@ -632,210 +633,34 @@ impl App {
         }
     }
 
-    /// Encode the post-processing chain: bloom extract + horizontal blur +
-    /// vertical blur (gated on `bloom_enabled` per ARC-005; with a one-shot
-    /// clear of the bloom target on enabled→disabled transitions so the
-    /// composite pass never samples stale memory), the composite pass
-    /// (skipped in accumulation mode), and the final pass to the frame's
-    /// `view` (FXAA when enabled, else a direct copy).
-    ///
-    /// Extracted verbatim from the original `App::render`; behavior unchanged.
+    /// Encode the post-processing chain (bloom → composite → FXAA/copy).
+    /// ARC-023: the pass sequence lives in `Renderer::encode_post_chain` and
+    /// is shared with the capture paths; this wrapper only supplies the
+    /// surface-sized targets and the interactive toggles.
     fn run_post_chain(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
         view: &wgpu::TextureView,
         use_accumulation: bool,
     ) {
-        // Pass 2-4: Bloom pipeline.
-        // ARC-005: the three full-res Rgba16Float passes are pure waste when
-        // bloom is disabled (the default) or when accumulation mode skips the
-        // composite pass entirely. Gate them on `bloom_enabled && !use_accumulation`.
-        let bloom_active = self.fractal_params.settings.bloom_enabled && !use_accumulation;
-        if bloom_active {
-            // Pass 2: Extract bright pixels
-            {
-                let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: Some("Bloom Extract Pass"),
-                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: &self.renderer.bright_view,
-                        depth_slice: None,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                            store: wgpu::StoreOp::Store,
-                        },
-                    })],
-                    depth_stencil_attachment: None,
-                    occlusion_query_set: None,
-                    timestamp_writes: self.renderer.profiler.pass_writes("bloom_extract"),
-                    multiview_mask: None,
-                });
+        let targets = self.renderer.surface_post_targets();
+        let opts = PostOptions {
+            bloom_enabled: self.fractal_params.settings.bloom_enabled,
+            fxaa_enabled: self.fractal_params.settings.fxaa_enabled,
+            use_accumulation,
+            bloom_already_cleared: self.bloom_texture_cleared,
+        };
+        self.renderer
+            .encode_post_chain(encoder, &targets, view, &opts);
 
-                let mut render_pass = render_pass.forget_lifetime();
-
-                render_pass.set_pipeline(&self.renderer.bloom_extract_pipeline);
-                render_pass.set_bind_group(0, &self.renderer.scene_bind_group, &[]);
-                render_pass.set_bind_group(1, &self.renderer.bloom_params_bind_group, &[]);
-                render_pass.set_vertex_buffer(0, self.renderer.postprocess_vertex_buffer.slice(..));
-                render_pass.draw(0..4, 0..1);
-            }
-
-            // Pass 3: Horizontal blur
-            {
-                let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: Some("Blur Horizontal Pass"),
-                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: &self.renderer.blur_temp_view,
-                        depth_slice: None,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                            store: wgpu::StoreOp::Store,
-                        },
-                    })],
-                    depth_stencil_attachment: None,
-                    occlusion_query_set: None,
-                    timestamp_writes: self.renderer.profiler.pass_writes("bloom_h"),
-                    multiview_mask: None,
-                });
-
-                let mut render_pass = render_pass.forget_lifetime();
-
-                render_pass.set_pipeline(&self.renderer.blur_pipeline);
-                render_pass.set_bind_group(0, &self.renderer.bright_bind_group, &[]);
-                render_pass.set_bind_group(1, &self.renderer.blur_h_params_bind_group, &[]);
-                render_pass.set_vertex_buffer(0, self.renderer.postprocess_vertex_buffer.slice(..));
-                render_pass.draw(0..4, 0..1);
-            }
-
-            // Pass 4: Vertical blur (ARC-022: its bind group already carries
-            // the (0,1) direction buffer — no per-frame write_buffer flips)
-            {
-                let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: Some("Blur Vertical Pass"),
-                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: &self.renderer.bloom_view,
-                        depth_slice: None,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                            store: wgpu::StoreOp::Store,
-                        },
-                    })],
-                    depth_stencil_attachment: None,
-                    occlusion_query_set: None,
-                    timestamp_writes: self.renderer.profiler.pass_writes("bloom_v"),
-                    multiview_mask: None,
-                });
-
-                let mut render_pass = render_pass.forget_lifetime();
-
-                render_pass.set_pipeline(&self.renderer.blur_pipeline);
-                render_pass.set_bind_group(0, &self.renderer.blur_temp_bind_group, &[]);
-                render_pass.set_bind_group(1, &self.renderer.blur_v_params_bind_group, &[]);
-                render_pass.set_vertex_buffer(0, self.renderer.postprocess_vertex_buffer.slice(..));
-                render_pass.draw(0..4, 0..1);
-            }
-
-            // The three passes overwrote `bloom_view` with valid (possibly-black)
-            // contents; the next clean-frame skip can rely on that.
-            self.bloom_texture_cleared = false;
-        } else if !use_accumulation && !self.bloom_texture_cleared {
-            // Composite samples `bloom_view` regardless of `bloom_enabled` (the
-            // shader-side toggle multiplies the contribution but still reads the
-            // texture). After an enabled→disabled transition — or before the
-            // first bloom frame — the texture would otherwise hold stale or
-            // undefined memory on some backends, leaking garbage pixels into
-            // the composite. Record ONE cheap clear with no draw, then mark the
-            // texture as cleared so we don't repeat this on every idle frame.
-            // (Accumulation mode skips composite entirely, so it never samples
-            // `bloom_view`; we still mark it cleared so the first post-accum
-            // composite frame doesn't sample uninitialized memory.)
-            let _ = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Bloom Output One-Shot Clear"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &self.renderer.bloom_view,
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                occlusion_query_set: None,
-                timestamp_writes: None,
-                multiview_mask: None,
-            });
+        // Mirror the encoder's bloom-output bookkeeping for the clean-frame
+        // skip: bloom ran (texture now valid) or the one-shot clear ran.
+        if use_accumulation {
+            // Composite never samples bloom_view in accumulation mode; mark
+            // cleared so the first post-accum composite frame is clean.
             self.bloom_texture_cleared = true;
-        }
-
-        // Pass 5: Composite (scene + bloom + color grading + vignette)
-        // For accumulation mode (attractors/Buddhabrot), skip composite since bloom wasn't rendered
-        if !use_accumulation {
-            let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Composite Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &self.renderer.composite_view,
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                occlusion_query_set: None,
-                timestamp_writes: self.renderer.profiler.pass_writes("composite"),
-                multiview_mask: None,
-            });
-
-            let mut render_pass = render_pass.forget_lifetime();
-
-            render_pass.set_pipeline(&self.renderer.composite_pipeline);
-            render_pass.set_bind_group(0, &self.renderer.composite_bind_group, &[]);
-            render_pass.set_bind_group(1, &self.renderer.composite_params_bind_group, &[]);
-            render_pass.set_vertex_buffer(0, self.renderer.postprocess_vertex_buffer.slice(..));
-            render_pass.draw(0..4, 0..1);
-        }
-
-        // Pass 6: Final output to screen
-        {
-            let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Final Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view,
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                occlusion_query_set: None,
-                timestamp_writes: self.renderer.profiler.pass_writes("fxaa"),
-                multiview_mask: None,
-            });
-
-            let mut render_pass = render_pass.forget_lifetime();
-
-            if use_accumulation {
-                // For accumulation mode, copy directly from scene to screen (skip composite/bloom)
-                render_pass.set_pipeline(&self.renderer.copy_pipeline);
-                render_pass.set_bind_group(0, &self.renderer.scene_bind_group, &[]);
-            } else if self.fractal_params.settings.fxaa_enabled {
-                // Apply FXAA anti-aliasing to composite texture
-                render_pass.set_pipeline(&self.renderer.fxaa_pipeline);
-                render_pass.set_bind_group(0, &self.renderer.composite_final_bind_group, &[]);
-            } else {
-                // Direct copy from composite to screen
-                render_pass.set_pipeline(&self.renderer.copy_pipeline);
-                render_pass.set_bind_group(0, &self.renderer.composite_final_bind_group, &[]);
-            }
-
-            render_pass.set_vertex_buffer(0, self.renderer.postprocess_vertex_buffer.slice(..));
-            render_pass.draw(0..4, 0..1);
+        } else {
+            self.bloom_texture_cleared = !opts.bloom_enabled;
         }
     }
 
