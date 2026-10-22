@@ -249,42 +249,11 @@ impl FractalParams {
         let palette_index = settings.palette_index.min(ColorPalette::ALL.len() - 1);
         let palette = ColorPalette::ALL[palette_index];
 
-        let render_mode = match settings.fractal_type {
-            FractalType::Mandelbrot2D
-            | FractalType::Julia2D
-            | FractalType::Sierpinski2D
-            | FractalType::SierpinskiTriangle2D
-            | FractalType::BurningShip2D
-            | FractalType::Tricorn2D
-            | FractalType::Phoenix2D
-            | FractalType::Celtic2D
-            | FractalType::Newton2D
-            | FractalType::Lyapunov2D
-            | FractalType::Nova2D
-            | FractalType::Magnet2D
-            | FractalType::Collatz2D
-            | FractalType::Hopalong2D
-            | FractalType::Martin2D
-            | FractalType::Gingerbreadman2D
-            | FractalType::Chip2D
-            | FractalType::Quadruptwo2D
-            | FractalType::Threeply2D
-            | FractalType::Buddhabrot2D => RenderMode::TwoD,
-            FractalType::Mandelbulb3D
-            | FractalType::MengerSponge3D
-            | FractalType::SierpinskiPyramid3D
-            | FractalType::JuliaSet3D
-            | FractalType::Mandelbox3D
-            | FractalType::OctahedralIFS3D
-            | FractalType::IcosahedralIFS3D
-            | FractalType::ApollonianGasket3D
-            | FractalType::Kleinian3D
-            | FractalType::HybridMandelbulbJulia3D
-            | FractalType::QuaternionCubic3D
-            | FractalType::SierpinskiGasket3D
-            | FractalType::Pickover3D
-            | FractalType::Lorenz3D
-            | FractalType::Rossler3D => RenderMode::ThreeD,
+        // QA-034: derived from the FractalInfo table instead of a 35-arm match.
+        let render_mode = if settings.fractal_type.is_3d() {
+            RenderMode::ThreeD
+        } else {
+            RenderMode::TwoD
         };
 
         // SEC-001: Trust-boundary clamps. Clamp every resource-driving field to a
@@ -590,42 +559,11 @@ impl FractalParams {
     /// touching any other parameter.
     pub fn switch_fractal(&mut self, fractal_type: FractalType) {
         self.settings.fractal_type = fractal_type;
-        self.settings.render_mode = match fractal_type {
-            FractalType::Mandelbrot2D
-            | FractalType::Julia2D
-            | FractalType::Sierpinski2D
-            | FractalType::SierpinskiTriangle2D
-            | FractalType::BurningShip2D
-            | FractalType::Tricorn2D
-            | FractalType::Phoenix2D
-            | FractalType::Celtic2D
-            | FractalType::Newton2D
-            | FractalType::Lyapunov2D
-            | FractalType::Nova2D
-            | FractalType::Magnet2D
-            | FractalType::Collatz2D
-            | FractalType::Hopalong2D
-            | FractalType::Martin2D
-            | FractalType::Gingerbreadman2D
-            | FractalType::Chip2D
-            | FractalType::Quadruptwo2D
-            | FractalType::Threeply2D
-            | FractalType::Buddhabrot2D => RenderMode::TwoD,
-            FractalType::Mandelbulb3D
-            | FractalType::MengerSponge3D
-            | FractalType::SierpinskiPyramid3D
-            | FractalType::JuliaSet3D
-            | FractalType::Mandelbox3D
-            | FractalType::OctahedralIFS3D
-            | FractalType::IcosahedralIFS3D
-            | FractalType::ApollonianGasket3D
-            | FractalType::Kleinian3D
-            | FractalType::HybridMandelbulbJulia3D
-            | FractalType::QuaternionCubic3D
-            | FractalType::SierpinskiGasket3D
-            | FractalType::Pickover3D
-            | FractalType::Lorenz3D
-            | FractalType::Rossler3D => RenderMode::ThreeD,
+        // QA-034: derived from the FractalInfo table instead of a 35-arm match.
+        self.settings.render_mode = if fractal_type.is_3d() {
+            RenderMode::ThreeD
+        } else {
+            RenderMode::TwoD
         };
 
         // Set fractal-specific defaults

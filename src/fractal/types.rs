@@ -67,7 +67,398 @@ pub enum FractalType {
     Rossler3D = 37,
 }
 
+/// Static per-variant metadata (QA-034).
+///
+/// One table entry per variant, written once in [`FractalType::info`]; the
+/// accessor methods (`is_3d`, `filename_safe_name`, `default_camera_distance`,
+/// `uses_accumulation`, `attractor_index`) delegate here so a new variant
+/// fills in one row instead of one match arm per accessor.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FractalInfo {
+    /// Human-readable name (help overlay, UI lists).
+    pub label: &'static str,
+    /// Filename-safe identifier (screenshots, exports).
+    pub filename: &'static str,
+    /// True for the 3D ray-marched pipeline, false for 2D.
+    pub is_3d: bool,
+    /// Default 3D camera framing distance (ignored for 2D types).
+    pub camera_distance: f32,
+    /// Keyboard shortcut from `app/input.rs` (`"1"`..`"0"`, `"F1"`..`"F10"`),
+    /// or `None` for types without a hotkey (UI-only selection).
+    pub hotkey: Option<&'static str>,
+    /// Renders via the accumulation (compute) path: 2D attractors + Buddhabrot.
+    pub uses_accumulation: bool,
+    /// 2D-attractor index for the compute shader (0 for non-attractors).
+    pub attractor_index: u32,
+}
+
 impl FractalType {
+    /// Every fractal variant, in discriminant order (QA-034).
+    ///
+    /// The single enumeration consumers iterate — help overlay, tests, metadata —
+    /// so adding a variant updates ONE list here instead of a match arm per call
+    /// site.
+    pub const ALL: &[FractalType] = &[
+        FractalType::Mandelbrot2D,
+        FractalType::Julia2D,
+        FractalType::Sierpinski2D,
+        FractalType::SierpinskiTriangle2D,
+        FractalType::BurningShip2D,
+        FractalType::Tricorn2D,
+        FractalType::Phoenix2D,
+        FractalType::Celtic2D,
+        FractalType::Newton2D,
+        FractalType::Lyapunov2D,
+        FractalType::Nova2D,
+        FractalType::Magnet2D,
+        FractalType::Collatz2D,
+        FractalType::Mandelbulb3D,
+        FractalType::MengerSponge3D,
+        FractalType::SierpinskiPyramid3D,
+        FractalType::JuliaSet3D,
+        FractalType::Mandelbox3D,
+        FractalType::OctahedralIFS3D,
+        FractalType::IcosahedralIFS3D,
+        FractalType::ApollonianGasket3D,
+        FractalType::Kleinian3D,
+        FractalType::HybridMandelbulbJulia3D,
+        FractalType::QuaternionCubic3D,
+        FractalType::SierpinskiGasket3D,
+        FractalType::Buddhabrot2D,
+        FractalType::Hopalong2D,
+        FractalType::Martin2D,
+        FractalType::Gingerbreadman2D,
+        FractalType::Chip2D,
+        FractalType::Quadruptwo2D,
+        FractalType::Threeply2D,
+        FractalType::Pickover3D,
+        FractalType::Lorenz3D,
+        FractalType::Rossler3D,
+    ];
+
+    /// Per-variant metadata. Single source for the accessors below; add new
+    /// variants here (and to [`ALL`]) rather than editing each accessor.
+    pub fn info(self) -> FractalInfo {
+        use FractalType::*;
+        match self {
+            Mandelbrot2D => FractalInfo {
+                label: "Mandelbrot",
+                filename: "mandelbrot",
+                is_3d: false,
+                camera_distance: 5.0,
+                hotkey: Some("1"),
+                uses_accumulation: false,
+                attractor_index: 0,
+            },
+            Julia2D => FractalInfo {
+                label: "Julia",
+                filename: "julia",
+                is_3d: false,
+                camera_distance: 5.0,
+                hotkey: Some("2"),
+                uses_accumulation: false,
+                attractor_index: 0,
+            },
+            Sierpinski2D => FractalInfo {
+                label: "Sierpinski",
+                filename: "sierpinski",
+                is_3d: false,
+                camera_distance: 5.0,
+                hotkey: Some("3"),
+                uses_accumulation: false,
+                attractor_index: 0,
+            },
+            SierpinskiTriangle2D => FractalInfo {
+                label: "Sierpinski Triangle",
+                filename: "sierpinski_triangle",
+                is_3d: false,
+                camera_distance: 5.0,
+                hotkey: None,
+                uses_accumulation: false,
+                attractor_index: 0,
+            },
+            BurningShip2D => FractalInfo {
+                label: "Burning Ship",
+                filename: "burning_ship",
+                is_3d: false,
+                camera_distance: 5.0,
+                hotkey: Some("4"),
+                uses_accumulation: false,
+                attractor_index: 0,
+            },
+            Tricorn2D => FractalInfo {
+                label: "Tricorn",
+                filename: "tricorn",
+                is_3d: false,
+                camera_distance: 5.0,
+                hotkey: Some("5"),
+                uses_accumulation: false,
+                attractor_index: 0,
+            },
+            Phoenix2D => FractalInfo {
+                label: "Phoenix",
+                filename: "phoenix",
+                is_3d: false,
+                camera_distance: 5.0,
+                hotkey: Some("6"),
+                uses_accumulation: false,
+                attractor_index: 0,
+            },
+            Celtic2D => FractalInfo {
+                label: "Celtic",
+                filename: "celtic",
+                is_3d: false,
+                camera_distance: 5.0,
+                hotkey: Some("7"),
+                uses_accumulation: false,
+                attractor_index: 0,
+            },
+            Newton2D => FractalInfo {
+                label: "Newton",
+                filename: "newton",
+                is_3d: false,
+                camera_distance: 5.0,
+                hotkey: Some("8"),
+                uses_accumulation: false,
+                attractor_index: 0,
+            },
+            Lyapunov2D => FractalInfo {
+                label: "Lyapunov",
+                filename: "lyapunov",
+                is_3d: false,
+                camera_distance: 5.0,
+                hotkey: Some("9"),
+                uses_accumulation: false,
+                attractor_index: 0,
+            },
+            Nova2D => FractalInfo {
+                label: "Nova",
+                filename: "nova",
+                is_3d: false,
+                camera_distance: 5.0,
+                hotkey: Some("0"),
+                uses_accumulation: false,
+                attractor_index: 0,
+            },
+            Magnet2D => FractalInfo {
+                label: "Magnet",
+                filename: "magnet",
+                is_3d: false,
+                camera_distance: 5.0,
+                hotkey: None,
+                uses_accumulation: false,
+                attractor_index: 0,
+            },
+            Collatz2D => FractalInfo {
+                label: "Collatz",
+                filename: "collatz",
+                is_3d: false,
+                camera_distance: 5.0,
+                hotkey: None,
+                uses_accumulation: false,
+                attractor_index: 0,
+            },
+            Mandelbulb3D => FractalInfo {
+                label: "Mandelbulb",
+                filename: "mandelbulb",
+                is_3d: true,
+                camera_distance: 5.0,
+                hotkey: Some("F1"),
+                uses_accumulation: false,
+                attractor_index: 0,
+            },
+            MengerSponge3D => FractalInfo {
+                label: "Menger Sponge",
+                filename: "menger_sponge",
+                is_3d: true,
+                camera_distance: 5.0,
+                hotkey: Some("F2"),
+                uses_accumulation: false,
+                attractor_index: 0,
+            },
+            SierpinskiPyramid3D => FractalInfo {
+                label: "Sierpinski Pyramid",
+                filename: "sierpinski_pyramid",
+                is_3d: true,
+                camera_distance: 5.0,
+                hotkey: Some("F3"),
+                uses_accumulation: false,
+                attractor_index: 0,
+            },
+            JuliaSet3D => FractalInfo {
+                label: "Julia Set 3D",
+                filename: "julia_3d",
+                is_3d: true,
+                camera_distance: 5.0,
+                hotkey: Some("F4"),
+                uses_accumulation: false,
+                attractor_index: 0,
+            },
+            Mandelbox3D => FractalInfo {
+                label: "Mandelbox",
+                filename: "mandelbox",
+                is_3d: true,
+                camera_distance: 5.0,
+                hotkey: Some("F5"),
+                uses_accumulation: false,
+                attractor_index: 0,
+            },
+            OctahedralIFS3D => FractalInfo {
+                label: "Octahedral IFS",
+                filename: "octahedral_ifs",
+                is_3d: true,
+                camera_distance: 9.0,
+                hotkey: Some("F6"),
+                uses_accumulation: false,
+                attractor_index: 0,
+            },
+            IcosahedralIFS3D => FractalInfo {
+                label: "Icosahedral IFS",
+                filename: "icosahedral_ifs",
+                is_3d: true,
+                camera_distance: 9.0,
+                hotkey: Some("F7"),
+                uses_accumulation: false,
+                attractor_index: 0,
+            },
+            ApollonianGasket3D => FractalInfo {
+                label: "Apollonian Gasket",
+                filename: "apollonian",
+                is_3d: true,
+                camera_distance: 8.0,
+                hotkey: Some("F8"),
+                uses_accumulation: false,
+                attractor_index: 0,
+            },
+            Kleinian3D => FractalInfo {
+                label: "Kleinian",
+                filename: "kleinian",
+                is_3d: true,
+                camera_distance: 5.0,
+                hotkey: Some("F9"),
+                uses_accumulation: false,
+                attractor_index: 0,
+            },
+            HybridMandelbulbJulia3D => FractalInfo {
+                label: "Hybrid Bulb-Julia",
+                filename: "hybrid_bulb_julia",
+                is_3d: true,
+                camera_distance: 5.0,
+                hotkey: Some("F10"),
+                uses_accumulation: false,
+                attractor_index: 0,
+            },
+            QuaternionCubic3D => FractalInfo {
+                label: "Quaternion Cubic",
+                filename: "quaternion_cubic",
+                is_3d: true,
+                camera_distance: 5.0,
+                hotkey: None,
+                uses_accumulation: false,
+                attractor_index: 0,
+            },
+            SierpinskiGasket3D => FractalInfo {
+                label: "Sierpinski Gasket",
+                filename: "sierpinski_gasket",
+                is_3d: true,
+                camera_distance: 5.0,
+                hotkey: None,
+                uses_accumulation: false,
+                attractor_index: 0,
+            },
+            Buddhabrot2D => FractalInfo {
+                label: "Buddhabrot",
+                filename: "buddhabrot",
+                is_3d: false,
+                camera_distance: 5.0,
+                hotkey: None,
+                uses_accumulation: true,
+                attractor_index: 0,
+            },
+            Hopalong2D => FractalInfo {
+                label: "Hopalong",
+                filename: "hopalong",
+                is_3d: false,
+                camera_distance: 5.0,
+                hotkey: None,
+                uses_accumulation: true,
+                attractor_index: 0,
+            },
+            Martin2D => FractalInfo {
+                label: "Martin",
+                filename: "martin",
+                is_3d: false,
+                camera_distance: 5.0,
+                hotkey: None,
+                uses_accumulation: true,
+                attractor_index: 1,
+            },
+            Gingerbreadman2D => FractalInfo {
+                label: "Gingerbreadman",
+                filename: "gingerbreadman",
+                is_3d: false,
+                camera_distance: 5.0,
+                hotkey: None,
+                uses_accumulation: true,
+                attractor_index: 2,
+            },
+            Chip2D => FractalInfo {
+                label: "Chip",
+                filename: "chip",
+                is_3d: false,
+                camera_distance: 5.0,
+                hotkey: None,
+                uses_accumulation: true,
+                attractor_index: 3,
+            },
+            Quadruptwo2D => FractalInfo {
+                label: "Quadruptwo",
+                filename: "quadruptwo",
+                is_3d: false,
+                camera_distance: 5.0,
+                hotkey: None,
+                uses_accumulation: true,
+                attractor_index: 4,
+            },
+            Threeply2D => FractalInfo {
+                label: "Threeply",
+                filename: "threeply",
+                is_3d: false,
+                camera_distance: 5.0,
+                hotkey: None,
+                uses_accumulation: true,
+                attractor_index: 5,
+            },
+            Pickover3D => FractalInfo {
+                label: "Pickover",
+                filename: "pickover",
+                is_3d: true,
+                camera_distance: 3.0,
+                hotkey: None,
+                uses_accumulation: false,
+                attractor_index: 0,
+            },
+            Lorenz3D => FractalInfo {
+                label: "Lorenz",
+                filename: "lorenz",
+                is_3d: true,
+                camera_distance: 5.0,
+                hotkey: None,
+                uses_accumulation: false,
+                attractor_index: 0,
+            },
+            Rossler3D => FractalInfo {
+                label: "Rössler",
+                filename: "rossler",
+                is_3d: true,
+                camera_distance: 5.0,
+                hotkey: None,
+                uses_accumulation: false,
+                attractor_index: 0,
+            },
+        }
+    }
+
     /// Returns true if this is a 2D strange attractor type
     pub fn is_2d_attractor(&self) -> bool {
         matches!(
@@ -94,25 +485,8 @@ impl FractalType {
     /// the `render_mode` uniform written by `Uniforms::update` (3D types set it
     /// to `1`) so pipeline selection and shader dispatch agree.
     pub fn is_3d(&self) -> bool {
-        matches!(
-            self,
-            FractalType::Mandelbulb3D
-                | FractalType::MengerSponge3D
-                | FractalType::SierpinskiPyramid3D
-                | FractalType::JuliaSet3D
-                | FractalType::Mandelbox3D
-                | FractalType::OctahedralIFS3D
-                | FractalType::IcosahedralIFS3D
-                | FractalType::ApollonianGasket3D
-                | FractalType::Kleinian3D
-                | FractalType::HybridMandelbulbJulia3D
-                | FractalType::QuaternionCubic3D
-                | FractalType::SierpinskiGasket3D
-                // 3D strange attractors
-                | FractalType::Pickover3D
-                | FractalType::Lorenz3D
-                | FractalType::Rossler3D
-        )
+        // QA-034: delegated to the FractalInfo table (single source of truth).
+        self.info().is_3d
     }
 
     /// Distance along +Z at which the default camera frames this fractal,
@@ -127,79 +501,23 @@ impl FractalType {
     /// Meaningless for 2D types (which ignore the camera); they get the
     /// baseline so the value is always well defined.
     pub fn default_camera_distance(&self) -> f32 {
-        match self {
-            FractalType::OctahedralIFS3D => 9.0,
-            FractalType::IcosahedralIFS3D => 9.0,
-            FractalType::ApollonianGasket3D => 8.0,
-            // The 3D attractors are small in world space (Pickover spans a
-            // radius of ~0.7 at its default scale), so the shared distance
-            // leaves them as a speck.
-            FractalType::Pickover3D => 3.0,
-            _ => 5.0,
-        }
+        self.info().camera_distance
     }
 
     /// Returns true if this fractal type uses accumulation rendering
     pub fn uses_accumulation(&self) -> bool {
-        self.is_2d_attractor() || self.is_buddhabrot()
+        self.info().uses_accumulation
     }
 
     /// Returns the index of the 2D attractor type for the compute shader.
     /// Returns 0 if not a 2D attractor.
     pub fn attractor_index(&self) -> u32 {
-        match self {
-            FractalType::Hopalong2D => 0,
-            FractalType::Martin2D => 1,
-            FractalType::Gingerbreadman2D => 2,
-            FractalType::Chip2D => 3,
-            FractalType::Quadruptwo2D => 4,
-            FractalType::Threeply2D => 5,
-            _ => 0,
-        }
+        self.info().attractor_index
     }
 
     /// Returns a filename-safe name for this fractal type
     pub fn filename_safe_name(&self) -> &'static str {
-        match self {
-            FractalType::Mandelbrot2D => "mandelbrot",
-            FractalType::Julia2D => "julia",
-            FractalType::Sierpinski2D => "sierpinski",
-            FractalType::SierpinskiTriangle2D => "sierpinski_triangle",
-            FractalType::BurningShip2D => "burning_ship",
-            FractalType::Tricorn2D => "tricorn",
-            FractalType::Phoenix2D => "phoenix",
-            FractalType::Celtic2D => "celtic",
-            FractalType::Newton2D => "newton",
-            FractalType::Lyapunov2D => "lyapunov",
-            FractalType::Nova2D => "nova",
-            FractalType::Magnet2D => "magnet",
-            FractalType::Collatz2D => "collatz",
-            FractalType::Mandelbulb3D => "mandelbulb",
-            FractalType::MengerSponge3D => "menger_sponge",
-            FractalType::SierpinskiPyramid3D => "sierpinski_pyramid",
-            FractalType::JuliaSet3D => "julia_3d",
-            FractalType::Mandelbox3D => "mandelbox",
-            FractalType::OctahedralIFS3D => "octahedral_ifs",
-            FractalType::IcosahedralIFS3D => "icosahedral_ifs",
-            FractalType::ApollonianGasket3D => "apollonian",
-            FractalType::Kleinian3D => "kleinian",
-            FractalType::HybridMandelbulbJulia3D => "hybrid_bulb_julia",
-            FractalType::QuaternionCubic3D => "quaternion_cubic",
-            FractalType::SierpinskiGasket3D => "sierpinski_gasket",
-            // Density/Accumulation based
-            FractalType::Buddhabrot2D => "buddhabrot",
-            // Strange Attractors 2D
-            FractalType::Hopalong2D => "hopalong",
-            FractalType::Martin2D => "martin",
-            FractalType::Gingerbreadman2D => "gingerbreadman",
-            FractalType::Chip2D => "chip",
-            FractalType::Quadruptwo2D => "quadruptwo",
-            FractalType::Threeply2D => "threeply",
-            // Strange Attractors 3D
-            FractalType::Pickover3D => "pickover",
-            FractalType::Lorenz3D => "lorenz",
-            FractalType::Rossler3D => "rossler",
-        }
+        self.info().filename
     }
 }
 
@@ -493,6 +811,77 @@ mod tests {
                     "preview switch still references {retired}, which is not a FractalType"
                 );
             }
+        }
+    }
+
+    /// QA-034: `ALL` iterates every variant exactly once.
+    #[test]
+    fn all_iterates_every_variant() {
+        assert_eq!(FractalType::ALL.len(), 35);
+        // Strictly increasing discriminant order (the enum has gaps at the
+        // block boundaries — 25, 26..=31, 35..=37 — so equality is wrong).
+        let mut prev = -1i32;
+        for t in FractalType::ALL {
+            let d = *t as u32 as i32;
+            assert!(d > prev, "ALL not in discriminant order at {t:?}");
+            prev = d;
+        }
+        for (i, t) in FractalType::ALL.iter().enumerate() {
+            for other in &FractalType::ALL[i + 1..] {
+                assert_ne!(t, other, "duplicate variant in ALL");
+            }
+        }
+    }
+
+    /// QA-034: the info table is complete and collision-free — filenames and
+    /// hotkeys are unique, and the hotkeys the help overlay prints match
+    /// app/input.rs (F6 = Octahedral IFS, F10 = Hybrid — the pair the old
+    /// hand-written help got wrong).
+    #[test]
+    fn info_table_is_complete_and_consistent() {
+        let mut filenames = std::collections::HashSet::new();
+        let mut hotkeys = std::collections::HashSet::new();
+        for t in FractalType::ALL {
+            let info = t.info();
+            assert!(!info.label.is_empty());
+            assert!(!info.filename.is_empty());
+            assert!(
+                filenames.insert(info.filename),
+                "duplicate filename {info:?}"
+            );
+            if let Some(key) = info.hotkey {
+                assert!(hotkeys.insert(key), "duplicate hotkey {key}");
+            }
+            assert_eq!(info.is_3d, t.is_3d());
+            assert_eq!(info.uses_accumulation, t.uses_accumulation());
+            assert_eq!(info.camera_distance, t.default_camera_distance());
+        }
+        assert_eq!(
+            FractalType::OctahedralIFS3D.info().hotkey,
+            Some("F6"),
+            "help/input drift the audit caught"
+        );
+        assert_eq!(
+            FractalType::HybridMandelbulbJulia3D.info().hotkey,
+            Some("F10")
+        );
+    }
+
+    /// QA-034: render_mode derives from `is_3d()` for every variant — adding
+    /// a variant requires no new match arm in `from_settings`/`switch_fractal`.
+    #[test]
+    fn render_mode_derives_from_is_3d_for_all_types() {
+        for t in FractalType::ALL {
+            let mut settings = crate::FractalParams::default().to_settings();
+            settings.fractal_type = *t;
+            let params = crate::FractalParams::from_settings(settings);
+            let expected = if t.is_3d() {
+                RenderMode::ThreeD
+            } else {
+                RenderMode::TwoD
+            };
+            assert_eq!(params.settings.render_mode, expected, "{t:?}");
+            assert_eq!(params.settings.fractal_type, *t);
         }
     }
 }

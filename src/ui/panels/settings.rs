@@ -24,32 +24,29 @@ impl UI {
                 ui.label("• P: Next color palette");
                 ui.separator();
 
+                // QA-034: driven by the FractalInfo table so this list can
+                // never drift from app/input.rs again.
                 ui.label("2D Fractals (Number Keys):");
-                ui.label("• 1: Mandelbrot");
-                ui.label("• 2: Julia");
-                ui.label("• 3: Sierpinski Carpet");
-                ui.label("• 4: Burning Ship");
-                ui.label("• 5: Tricorn");
-                ui.label("• 6: Phoenix");
-                ui.label("• 7: Celtic");
-                ui.label("• 8: Newton");
-                ui.label("• 9: Lyapunov");
-                ui.label("• 0: Nova");
+                for t in crate::fractal::FractalType::ALL {
+                    let info = t.info();
+                    if !info.is_3d
+                        && let Some(key) = info.hotkey
+                    {
+                        ui.label(format!("• {key}: {}", info.label));
+                    }
+                }
                 ui.label("• (Magnet, Collatz: use UI buttons)");
                 ui.separator();
 
                 ui.label("3D Fractals (Function Keys):");
-                ui.label("• F1: Mandelbulb");
-                ui.label("• F2: Menger Sponge");
-                ui.label("• F3: Sierpinski Pyramid");
-                ui.label("• F4: Julia Set 3D");
-                ui.label("• F5: Mandelbox");
-                ui.label("• F6: Tglad Formula");
-                ui.label("• F7: Octahedral IFS");
-                ui.label("• F8: Icosahedral IFS");
-                ui.label("• F9: Apollonian Gasket");
-                ui.label("• F10: Kleinian");
-                ui.label("• F11: Hybrid Bulb-Julia");
+                for t in crate::fractal::FractalType::ALL {
+                    let info = t.info();
+                    if info.is_3d
+                        && let Some(key) = info.hotkey
+                    {
+                        ui.label(format!("• {key}: {}", info.label));
+                    }
+                }
                 ui.label("• (Others: use UI buttons)");
                 ui.separator();
 
