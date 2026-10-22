@@ -62,11 +62,12 @@ fn bounding_radius_for_type(fractal_type: u32, fractal_scale: f32) -> f32 {
         case 22u: { r = 2.0; }                       // HybridMandelbulbJulia3D
         case 23u: { r = 2.0; }                       // QuaternionCubic3D (|q|<2 bailout)
         case 24u: { r = 2.0; }                       // SierpinskiGasket3D
-        // 3D strange attractors (types 35..=37): point-cloud extents.
-        // pickover/rossler ~20 raw, lorenz ~30 raw (centred at z≈25); each is
-        // multiplied by fractal_scale in its DE, so apply max(scale,1) below.
+        // 3D strange attractors (types 35..=37): point-cloud extents, each
+        // centred on the origin by its DE (Lorenz z-23.5 shift, Rossler
+        // envelope-midpoint shift); multiplied by fractal_scale in the DE, so
+        // apply max(scale,1) below.
         case 35u: { r = 30.0; }                      // Pickover3D
-        case 36u: { r = 60.0; }                      // Lorenz3D (wingspan ~30 around z=25)
+        case 36u: { r = 60.0; }                      // Lorenz3D (wingspan ~43)
         case 37u: { r = 30.0; }                      // Rossler3D
         default: { r = 2.5; }                        // 2D types / unknown — safe fallback
     }

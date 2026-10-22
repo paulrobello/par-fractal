@@ -55,8 +55,8 @@ fn scene_de_with_material(pos: vec3<f32>, conservative: bool) -> SceneResult {
         case 24u: { fractal_dist = sierpinski_gasket_de(pos); }
         // 3D Strange Attractors (types 35-37)
         case 35u: { fractal_dist = pickover_attractor_de(pos, conservative); }
-        case 36u: { fractal_dist = lorenz_attractor_de(pos); }
-        case 37u: { fractal_dist = rossler_attractor_de(pos); }
+        case 36u: { fractal_dist = lorenz_attractor_de(pos, conservative); }
+        case 37u: { fractal_dist = rossler_attractor_de(pos, conservative); }
         default: { fractal_dist = 1000.0; }
     }
 

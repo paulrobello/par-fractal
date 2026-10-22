@@ -15,10 +15,12 @@ fn sd_box(p: vec3<f32>, half: vec3<f32>) -> f32 {
 // instead of its exact (very expensive) value — see `pickover_attractor_de`.
 // Callers use this to decide whether a two-tier evaluation is worth it; for
 // every other type the bound *is* the exact value, so the second tier would
-// only duplicate work.
+// only duplicate work. All three 3D strange attractors (35 Pickover,
+// 36 Lorenz, 37 Rossler) simulate a point cloud per evaluation and share the
+// bounding-box early-out.
 fn has_conservative_bound() -> bool {
     let ty = select(uniforms.fractal_type, SPECIALIZED_TYPE, SPECIALIZED_TYPE != 0xFFFFu);
-    return ty == 35u;
+    return ty == 35u || ty == 36u || ty == 37u;
 }
 
 fn pickover_attractor_de(pos: vec3<f32>, conservative: bool) -> f32 {
