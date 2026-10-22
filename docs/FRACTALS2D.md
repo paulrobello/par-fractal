@@ -78,23 +78,44 @@ Complete guide to all 20 2D fractals available in Par Fractal, including mathema
 - Zoom centers on cursor position
 - Double-click to center the clicked point and zoom in one step (Ctrl/Cmd+Z undoes it)
 
-## High-Precision Zoom Mode
+## Deep Zoom
 
-Par Fractal implements emulated double-precision arithmetic on the GPU to enable extremely deep zooms beyond the limits of standard 32-bit float precision.
+Par Fractal renders deep zooms through TWO cooperating paths (DOC-005):
 
-**Supported Fractals:**
-- Mandelbrot (fractal_type 0)
-- Julia (fractal_type 1)
-- Sierpinski Carpet (fractal_type 2)
-- Sierpinski Triangle (fractal_type 3)
-- Burning Ship (fractal_type 4)
-- Tricorn (fractal_type 5)
+**1. Perturbation (the headline path — Mandelbrot, Julia, Burning Ship, Tricorn).**
+One reference orbit is iterated in arbitrary-precision arithmetic on the CPU
+(`dashu-float`, `src/deep_zoom/`), uploaded as a storage buffer, and every pixel
+iterates only its small *delta* from that orbit in plain f32 on the GPU. Pixel
+precision then does not depend on zoom at all, so the practical zoom ceiling is
+gone (verified deterministic at 1e8; the old double-float ceiling of ~1e11 no
+longer applies to these types).
 
-**How It Works:**
-- Each coordinate is stored as a pair of floats (hi, lo) representing value = hi + lo
-- Provides approximately 14 decimal digits of precision vs 7 for standard f32
-- Uses double-float arithmetic operations for addition, multiplication, and squaring
-- Automatically enabled when zoom exceeds 1e4 (named HP_ZOOM_THRESHOLD in src/renderer/uniforms.rs)
+- Engages automatically when `log2(zoom) > 13.3` (zoom ≳ 1e4;
+  `PERTURBATION_LOG2_GATE` in `src/deep_zoom/driver.rs`). Below the gate the
+  plain f32 path renders cleanly on its own.
+- The orbit recomputes on a worker thread whenever the view changes; the
+  "computing…" toast tracks it.
+- **Precise center:** paste a decimal-string center in the 2D panel's
+  Center X/Y fields — the reference orbit parses it at arbitrary precision
+  (`parse_center_decimal`), so the view center stays exact far past f64's
+  ~15-digit limit. A reset (R) clears it.
+
+**2. High precision / double-float (all other 2D escape-time types).**
+Each coordinate is stored as a pair of floats (hi, lo) with value = hi + lo,
+giving ~14 significant digits vs 7 for plain f32, with
+`max_iterations + log2(zoom) × 15` iteration auto-scaling. Auto-enabled when
+zoom exceeds 1e4 (`HP_ZOOM_THRESHOLD`, mirrored by the CPU reference in
+`src/reference.rs`). Practical ceiling ~1e11 (set by the f32 zoom uniform; the
+center itself remains accurate beyond it).
+
+**How the two paths relate:** for the four perturbation-eligible types the
+perturbation path SUPERSEDES double-float above the gate (the shader checks
+perturbation first); double-float remains the deep-zoom path for every other
+2D type.
+
+**Iteration auto-scaling** (both paths): the iteration count rises as
+`max_iterations + log2(zoom) × 15` — do not raise iterations manually while
+zooming, that double-counts.
 
 **Iteration Auto-Scaling:**
 High-precision and deep-zoom rendering automatically raises the iteration count as `max_iterations + log2(zoom) × 15`, so you do not need to increase iterations manually as you zoom — doing both double-counts.
@@ -142,8 +163,8 @@ High-precision mode is more computationally intensive than standard mode, but th
 
 **Common to All 2D Fractals:**
 - **Max Iterations** - Maximum iteration count before considering a point in the set (range: 50-2000, default: 80)
-- **Center X/Y** - Complex plane coordinates (high precision for deep zooms)
-- **Zoom** - Magnification level (practical ceiling ~1e11 in high-precision mode, set by the f32 GPU zoom uniform)
+- **Center X/Y** - Complex plane coordinates (accepts arbitrary-precision decimal strings; parsed exactly for perturbation deep zooms)
+- **Zoom** - Magnification level (perturbation types: no practical ceiling; double-float types: ~1e11, set by the f32 GPU zoom uniform)
 - **Color Palette** - Choose from 48 built-in static palettes or load custom palettes
 - **Palette Offset** - Animate or shift color mapping (0.0-1.0, wraps around)
 - **Orbit Trap Scale** - Scale factor for orbit trap coloring modes
@@ -259,7 +280,7 @@ Where c is the complex coordinate of the pixel.
 **UI Parameters:**
 - **Max Iterations:** 80 (default), 200-1000 (deep zooms), 1000-2000 (extreme zooms)
 - **Zoom:** Unlimited with high-precision mode (tested to 10¹⁴)
-- **High-Precision Mode:** Automatically enabled for Mandelbrot
+- **Deep Zoom:** Perturbation auto-engages for Mandelbrot past zoom ~1e4
 
 **Tips:**
 - Zoom into edges of the main set

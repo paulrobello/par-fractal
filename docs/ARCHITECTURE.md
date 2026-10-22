@@ -721,6 +721,52 @@ drift into a failing test instead of a rendering artifact.
 - Depth of Field (DoF) - Focal plane simulation
 - Fog - Distance-based atmospheric effect
 
+## Deep Zoom (Perturbation + Double-Float)
+
+Two cooperating paths render 2D zooms past f32 precision (see
+`docs/FRACTALS2D.md → Deep Zoom` for the user-facing view):
+
+**Perturbation** (`src/deep_zoom/`, ENH-001): a CPU reference orbit in
+arbitrary-precision arithmetic (`dashu-float`) is computed off-thread and
+uploaded as a storage buffer; the GPU iterates only per-pixel f32 *deltas*
+from it. Engages at `log2(zoom) > 13.3` (`PERTURBATION_LOG2_GATE`) for
+Mandelbrot, Julia, Burning Ship, and Tricorn; supersedes the double-float
+path for those types past the gate.
+
+**Double-float (HP)** (`renderer/uniforms.rs` + the `*_hp` shader paths):
+coordinates as (hi, lo) f32 pairs, ~14 significant digits, for the remaining
+2D escape-time types above `HP_ZOOM_THRESHOLD` (1e4); ceiling ~1e11.
+
+```mermaid
+flowchart LR
+    subgraph CPU["CPU (src/deep_zoom)"]
+        V["View change\n(note_view / maybe_spawn)"] --> W["Worker thread\ncompute_reference_orbit_best"]
+        W --> O["ReferenceOrbit\nZ_0..Z_k as f32 pairs"]
+    end
+    subgraph GPU["GPU (fractal.wgsl)"]
+        O --> U["Storage buffer upload\nset_reference_orbit"]
+        U --> P["Per-pixel loop\ndelta recurrence (f32)\nvs orbit[z]"]
+    end
+    DC["center_2d_precise\nparse_center_decimal\n(dashu, arbitrary precision)"] --> W
+
+    style CPU fill:#1E1E1E,stroke:#2196F3,color:#E6E6E6
+    style GPU fill:#1E1E1E,stroke:#4CAF50,color:#E6E6E6
+    style O fill:#1E1E1E,stroke:#FFC107,color:#E6E6E6
+    style DC fill:#1E1E1E,stroke:#FFC107,color:#E6E6E6
+```
+
+Invariants that keep the paths correct:
+
+- `perturbation_max_iterations` (deterministic: user iterations + zoom bonus,
+  no LOD scaling) is BOTH the reference-orbit budget and the cap on
+  `effective_2d_max_iterations`, so the shader loop can never read past the
+  uploaded orbit (SEC-011).
+- A stale `center_2d_precise` is dropped by every reset and by `center_at` /
+  `zoom_at` when the center moves (QA-033 / ENH-002).
+- Hostile decimal strings cannot reach the parser: `parse_center_decimal`
+  lexically caps length (4096) and exponent width (≤4 significant digits) and
+  rejects magnitudes above 1e15 (SEC-010).
+
 ## Performance Optimizations
 
 ### Level of Detail (LOD)
