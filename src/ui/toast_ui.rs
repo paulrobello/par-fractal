@@ -33,7 +33,7 @@ impl UI {
             let file_path = toast.file_path.clone();
 
             let area_response =
-                egui::Area::new(egui::Id::new(format!("toast_{:?}", toast.created_at)))
+                egui::Area::new(egui::Id::unique(format!("toast_{:?}", toast.created_at)))
                     .anchor(egui::Align2::CENTER_TOP, egui::vec2(0.0, 40.0 + y_offset))
                     .order(egui::Order::Foreground)
                     .show(ctx, |ui| {
@@ -69,7 +69,7 @@ impl UI {
                         // Make the entire frame clickable by interacting with its rect
                         ui.interact(
                             frame_response.response.rect,
-                            egui::Id::new(format!("toast_click_{:?}", toast.created_at)),
+                            egui::Id::unique(format!("toast_click_{:?}", toast.created_at)),
                             egui::Sense::click(),
                         )
                     });

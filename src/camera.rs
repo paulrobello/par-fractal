@@ -1,3 +1,4 @@
+use glam::camera::rh::{proj, view};
 use glam::{Mat4, Vec3};
 use winit::event::*;
 use winit::keyboard::{KeyCode, PhysicalKey};
@@ -57,9 +58,10 @@ impl Camera {
     ///
     /// `fovy` is taken in degrees (converted internally via `to_radians()`).
     pub fn build_view_projection_matrix(&self) -> Mat4 {
-        let view = Mat4::look_at_rh(self.position, self.target, self.up);
-        let proj = Mat4::perspective_rh(self.fovy.to_radians(), self.aspect, self.znear, self.zfar);
-        proj * view
+        let view_mat = view::look_at_mat4(self.position, self.target, self.up);
+        let proj_mat =
+            proj::opengl::perspective(self.fovy.to_radians(), self.aspect, self.znear, self.zfar);
+        proj_mat * view_mat
     }
 
     /// Recompute `aspect` from the new window `width` and `height`.

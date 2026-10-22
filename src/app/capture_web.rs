@@ -91,7 +91,11 @@ pub fn capture_screenshot_web(
         match result {
             Some(Ok(())) => {
                 let buffer_slice = buffer_for_async.slice(..);
-                let data = buffer_slice.get_mapped_range();
+                let Ok(data) = buffer_slice.get_mapped_range() else {
+                    log::error!("Failed to map screenshot readback view");
+                    show_toast_for_async("❌ Screenshot failed: buffer mapping error".to_string());
+                    return;
+                };
                 let image_data =
                     super::capture_common::strip_row_padding(&data, width, height, bytes_per_row);
 
@@ -568,7 +572,11 @@ pub fn render_high_resolution_web(
         match result {
             Some(Ok(())) => {
                 let buffer_slice = buffer_for_async.slice(..);
-                let data = buffer_slice.get_mapped_range();
+                let Ok(data) = buffer_slice.get_mapped_range() else {
+                    log::error!("Failed to map high-res readback view");
+                    show_toast_for_async("❌ Screenshot failed: buffer mapping errors".to_string());
+                    return;
+                };
                 let mut image_data =
                     super::capture_common::strip_row_padding(&data, width, height, bytes_per_row);
                 drop(data);

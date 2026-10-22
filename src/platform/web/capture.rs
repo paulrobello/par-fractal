@@ -62,7 +62,7 @@ impl Capture for WebCapture {
         blob_parts.push(&array);
 
         let mut options = web_sys::BlobPropertyBag::new();
-        options.type_("image/png");
+        options.set_type("image/png");
 
         let blob = web_sys::Blob::new_with_u8_array_sequence_and_options(&blob_parts, &options)
             .map_err(|_| PlatformError::IoError("Failed to create blob".into()))?;

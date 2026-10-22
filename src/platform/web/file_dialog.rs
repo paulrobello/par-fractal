@@ -30,7 +30,7 @@ impl WebFileDialog {
 
         // Create blob with MIME type
         let mut options = web_sys::BlobPropertyBag::new();
-        options.type_(mime_type);
+        options.set_type(mime_type);
 
         let blob = web_sys::Blob::new_with_u8_array_sequence_and_options(&blob_parts, &options)
             .map_err(|_| PlatformError::IoError("Failed to create blob".into()))?;

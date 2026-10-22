@@ -362,10 +362,14 @@ impl GpuProfiler {
                 let period = self.period;
                 let scopes = &self.ring_scopes[slot];
                 if let Some(buf) = staging_ref {
-                    let view = buf.slice(..).get_mapped_range();
-                    process_bytes(&mut self.timings_ms, scopes, scope_count, period, &view);
-                    drop(view);
-                    buf.unmap();
+                    if let Ok(view) = buf.slice(..).get_mapped_range() {
+                        process_bytes(&mut self.timings_ms, scopes, scope_count, period, &view);
+                        drop(view);
+                        buf.unmap();
+                    } else {
+                        log::warn!("GpuProfiler: failed to map slot {}", pending.slot);
+                        buf.unmap();
+                    }
                 }
                 self.slot_mapped[slot] = false;
             }

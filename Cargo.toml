@@ -2,7 +2,7 @@
 name = "par-fractal"
 version = "0.10.0"
 edition = "2024"
-rust-version = "1.98"
+rust-version = "1.99"
 authors = ["Paul Robello <probello@gmail.com>"]
 description = "Cross-platform GPU-accelerated fractal renderer with 2D and 3D support"
 readme = "README.md"
@@ -70,36 +70,36 @@ required-features = ["native"]
 
 [dependencies]
 # Core graphics
-wgpu = "29.0.4"  # Requires egui-wgpu 0.34+
+wgpu = "30.0.1"  # egui-wgpu 0.37 pairs with wgpu 30
 winit = "0.30.13"
 
 # Math
-# `encase` feature: provides encase::ShaderType impls for glam vector/matrix
+# `encase-013` feature: provides encase 0.13 ShaderType impls for glam vector/matrix
 # types so GPU uniform structs derive WGSL-correct layout automatically
 # (ENH-008). dep direction is glam→encase, not encase→glam.
-glam = { version = "0.32.1", features = ["encase"] }
+glam = { version = "0.34.1", features = ["encase-013"] }
 
 # UI
-egui = { version = "0.35.0", default-features = false, features = ["default_fonts"] }
-egui-wgpu = "0.35.0"
-egui-winit = { version = "0.35.0", default-features = false, features = ["links"] }
+egui = { version = "0.37.0", default-features = false, features = ["default_fonts"] }
+egui-wgpu = "0.37.0"
+egui-winit = { version = "0.37.0", default-features = false, features = ["links"] }
 
 # Utilities
 bytemuck = { version = "1.25.0", features = ["derive"] }
 # ENH-008: derives WGSL-correct uniform/storage layout so the Rust uniform
 # structs stop hand-mirroring WGSL alignment with manual padding fields.
-encase = "0.12"
+encase = "0.13"
 log = "0.4.33"
 rand = "0.10.2"
 image = { version = "0.25.10", default-features = false, features = ["png"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_yaml = "0.9.34"
 serde_json = "1.0.150"
-base64 = "0.22.1"
+base64 = "0.23.1"
 web-time = "1.1.0"  # Cross-platform time for native and WASM
 
 # Native-only dependencies (optional, enabled by "native" feature)
-pollster = { version = "0.4.0", optional = true }
+pollster = { version = "1.0.1", optional = true }
 directories = { version = "6.0.0", optional = true }
 rfd = { version = "0.17.2", optional = true }
 open = { version = "5.3.6", optional = true }
@@ -115,7 +115,7 @@ console_log = { version = "1.0.0", optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 gloo-timers = { version = "0.4.0", optional = true, features = ["futures"] }
 getrandom = { version = "0.4.3", optional = true, features = ["wasm_js"] }
-dashu-float = "0.5.0"
+dashu-float = "0.6.2"
 
 [dependencies.web-sys]
 version = "0.3.103"

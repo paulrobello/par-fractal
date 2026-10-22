@@ -90,6 +90,7 @@ impl Renderer {
                         power_preference: wgpu::PowerPreference::HighPerformance,
                         compatible_surface: Some(&surface),
                         force_fallback_adapter: false,
+                        apply_limit_buckets: false,
                     })
                     .await
                     .unwrap()
@@ -101,6 +102,7 @@ impl Renderer {
                     power_preference: wgpu::PowerPreference::HighPerformance,
                     compatible_surface: Some(&surface),
                     force_fallback_adapter: false,
+                    apply_limit_buckets: false,
                 })
                 .await
                 .unwrap()
@@ -127,6 +129,7 @@ impl Renderer {
                 power_preference: wgpu::PowerPreference::HighPerformance,
                 compatible_surface: Some(&surface),
                 force_fallback_adapter: false,
+                apply_limit_buckets: false,
             })
             .await
             .expect("Failed to find an appropriate adapter");
@@ -201,6 +204,7 @@ impl Renderer {
             height: size.height,
             present_mode: wgpu::PresentMode::Fifo,
             alpha_mode: surface_caps.alpha_modes[0],
+            color_space: wgpu::SurfaceColorSpace::Auto,
             view_formats: vec![],
             desired_maximum_frame_latency: 2,
         };
@@ -304,11 +308,11 @@ impl Renderer {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
-                buffers: &[wgpu::VertexBufferLayout {
+                buffers: &[Some(wgpu::VertexBufferLayout {
                     array_stride: std::mem::size_of::<[f32; 2]>() as wgpu::BufferAddress,
                     step_mode: wgpu::VertexStepMode::Vertex,
                     attributes: &wgpu::vertex_attr_array![0 => Float32x2],
-                }],
+                })],
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -346,11 +350,11 @@ impl Renderer {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
-                buffers: &[wgpu::VertexBufferLayout {
+                buffers: &[Some(wgpu::VertexBufferLayout {
                     array_stride: std::mem::size_of::<[f32; 2]>() as wgpu::BufferAddress,
                     step_mode: wgpu::VertexStepMode::Vertex,
                     attributes: &wgpu::vertex_attr_array![0 => Float32x2],
-                }],
+                })],
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -572,6 +576,7 @@ impl Renderer {
                 1 => Float32x2,  // tex_coords (u, v)
             ],
         };
+        let vertex_buffers = [Some(vertex_buffer_layout)];
 
         // Bloom extract pipeline
         let bloom_extract_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -588,7 +593,7 @@ impl Renderer {
                 vertex: wgpu::VertexState {
                     module: &postprocess_shader,
                     entry_point: Some("vs_main"),
-                    buffers: std::slice::from_ref(&vertex_buffer_layout),
+                    buffers: &vertex_buffers,
                     compilation_options: Default::default(),
                 },
                 fragment: Some(wgpu::FragmentState {
@@ -624,7 +629,7 @@ impl Renderer {
             vertex: wgpu::VertexState {
                 module: &postprocess_shader,
                 entry_point: Some("vs_main"),
-                buffers: std::slice::from_ref(&vertex_buffer_layout),
+                buffers: &vertex_buffers,
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -660,7 +665,7 @@ impl Renderer {
             vertex: wgpu::VertexState {
                 module: &postprocess_shader,
                 entry_point: Some("vs_main"),
-                buffers: std::slice::from_ref(&vertex_buffer_layout),
+                buffers: &vertex_buffers,
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -696,7 +701,7 @@ impl Renderer {
             vertex: wgpu::VertexState {
                 module: &postprocess_shader,
                 entry_point: Some("vs_main"),
-                buffers: std::slice::from_ref(&vertex_buffer_layout),
+                buffers: &vertex_buffers,
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -732,7 +737,7 @@ impl Renderer {
             vertex: wgpu::VertexState {
                 module: &postprocess_shader,
                 entry_point: Some("vs_main"),
-                buffers: std::slice::from_ref(&vertex_buffer_layout),
+                buffers: &vertex_buffers,
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -825,7 +830,7 @@ impl Renderer {
                 vertex: wgpu::VertexState {
                     module: &postprocess_shader,
                     entry_point: Some("vs_main"),
-                    buffers: std::slice::from_ref(&vertex_buffer_layout),
+                    buffers: &vertex_buffers,
                     compilation_options: Default::default(),
                 },
                 fragment: Some(wgpu::FragmentState {
@@ -1436,11 +1441,11 @@ impl Renderer {
                 vertex: wgpu::VertexState {
                     module: &self.shader_module,
                     entry_point: Some("vs_main"),
-                    buffers: &[wgpu::VertexBufferLayout {
+                    buffers: &[Some(wgpu::VertexBufferLayout {
                         array_stride: std::mem::size_of::<[f32; 2]>() as wgpu::BufferAddress,
                         step_mode: wgpu::VertexStepMode::Vertex,
                         attributes: &wgpu::vertex_attr_array![0 => Float32x2],
-                    }],
+                    })],
                     compilation_options: Default::default(),
                 },
                 fragment: Some(wgpu::FragmentState {

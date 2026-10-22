@@ -48,7 +48,10 @@ impl App {
             return;
         };
         if recv_result.is_ok() {
-            let data = buffer_slice.get_mapped_range();
+            let Ok(data) = buffer_slice.get_mapped_range() else {
+                log::error!("Failed to map screenshot readback buffer");
+                return;
+            };
             let mut image_data =
                 super::capture_common::strip_row_padding(&data, width, height, bytes_per_row);
             drop(data);
@@ -166,7 +169,10 @@ impl App {
             return;
         };
         if recv_result.is_ok() {
-            let data = buffer_slice.get_mapped_range();
+            let Ok(data) = buffer_slice.get_mapped_range() else {
+                log::error!("Failed to map video frame buffer");
+                return;
+            };
             let mut frame_data =
                 super::capture_common::strip_row_padding(&data, width, height, bytes_per_row);
             drop(data);
@@ -623,7 +629,9 @@ impl App {
         log::info!("GPU readback poll took {:?}", poll_start.elapsed());
 
         if receiver.recv()?.is_ok() {
-            let data = buffer_slice.get_mapped_range();
+            let Ok(data) = buffer_slice.get_mapped_range() else {
+                return Err("Failed to map high-res screenshot buffer".into());
+            };
             let mut image_data =
                 super::capture_common::strip_row_padding(&data, width, height, bytes_per_row);
             drop(data);

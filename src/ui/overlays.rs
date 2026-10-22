@@ -11,7 +11,7 @@ impl UI {
             return;
         }
 
-        egui::Area::new(egui::Id::new("fps_counter"))
+        egui::Area::new(egui::Id::unique("fps_counter"))
             .anchor(egui::Align2::RIGHT_TOP, egui::vec2(-10.0, 10.0))
             .show(ctx, |ui| {
                 egui::Frame::NONE
@@ -42,7 +42,7 @@ impl UI {
 
         let direction = (camera_target - camera_pos).normalize();
 
-        egui::Area::new(egui::Id::new("camera_info"))
+        egui::Area::new(egui::Id::unique("camera_info"))
             .anchor(egui::Align2::LEFT_BOTTOM, egui::vec2(10.0, -10.0))
             .show(ctx, |ui| {
                 egui::Frame::NONE
@@ -134,7 +134,7 @@ impl UI {
             return;
         }
 
-        egui::Area::new(egui::Id::new("performance_overlay"))
+        egui::Area::new(egui::Id::unique("performance_overlay"))
             .anchor(egui::Align2::LEFT_BOTTOM, egui::vec2(10.0, -10.0))
             .show(ctx, |ui| {
                 egui::Frame::NONE
@@ -334,7 +334,7 @@ impl UI {
             return;
         }
 
-        egui::Area::new(egui::Id::new("recording_indicator"))
+        egui::Area::new(egui::Id::unique("recording_indicator"))
             .anchor(egui::Align2::CENTER_TOP, egui::vec2(0.0, 10.0))
             .show(ctx, |ui| {
                 egui::Frame::NONE
@@ -375,7 +375,7 @@ impl UI {
             return;
         }
 
-        egui::Area::new(egui::Id::new("lod_debug_overlay"))
+        egui::Area::new(egui::Id::unique("lod_debug_overlay"))
             .anchor(egui::Align2::RIGHT_TOP, egui::vec2(-10.0, 10.0))
             .show(ctx, |ui| {
                 ui.set_max_width(220.0);
@@ -634,7 +634,7 @@ impl UI {
         // performance overlay already reads this same vec.
         let cpu_frame_ms = self.frame_times.last().copied();
 
-        egui::Area::new(egui::Id::new("gpu_profile_overlay"))
+        egui::Area::new(egui::Id::unique("gpu_profile_overlay"))
             .anchor(egui::Align2::RIGHT_TOP, egui::vec2(-10.0, 10.0))
             .show(ctx, |ui| {
                 ui.set_max_width(260.0);

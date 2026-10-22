@@ -261,7 +261,7 @@ impl App {
         // queue.submit above already fired ready callbacks.
         self.renderer.profiler.poll_results(&self.renderer.device);
 
-        output.present();
+        self.renderer.queue.present(output);
 
         // ARC-006: we just rendered a frame. Clear the dirty flag unless a
         // continuous animation source (auto-orbit, palette animation, camera
@@ -868,7 +868,7 @@ impl App {
         // — `egui_ctx()` holds an immutable borrow on `self.egui_state`).
         let mut ui_mutated_scene = false;
         let mut actions = UiActions::default();
-        let full_output = self.egui_state.egui_ctx().run_ui(raw_input, |ctx| {
+        let mut full_output = self.egui_state.egui_ctx().run_ui(raw_input, |ctx| {
             #[cfg(not(target_arch = "wasm32"))]
             let is_rec = self.video_recorder.is_recording();
             #[cfg(target_arch = "wasm32")]
@@ -963,13 +963,16 @@ impl App {
             .egui_ctx()
             .tessellate(full_output.shapes, full_output.pixels_per_point);
 
-        for (id, image_delta) in &full_output.textures_delta.set {
-            self.egui_renderer.update_texture(
-                &self.renderer.device,
-                &self.renderer.queue,
-                *id,
-                image_delta,
-            );
+        for (id, image_deltas) in &full_output.textures_delta.set {
+            // egui 0.37 groups each texture's deltas in a SmallVec.
+            for image_delta in image_deltas {
+                self.egui_renderer.update_texture(
+                    &self.renderer.device,
+                    &self.renderer.queue,
+                    *id,
+                    image_delta,
+                );
+            }
         }
 
         let screen_descriptor = egui_wgpu::ScreenDescriptor {
@@ -1013,6 +1016,9 @@ impl App {
         for id in &full_output.textures_delta.free {
             self.egui_renderer.free_texture(id);
         }
+        // epaint 0.37 asserts on drop that deltas were consumed; applying the
+        // set and freeing textures empties them semantically, clear() records it.
+        full_output.textures_delta.clear();
 
         (actions, ui_mutated_scene)
     }
