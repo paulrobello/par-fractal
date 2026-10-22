@@ -206,7 +206,7 @@ User Input → UI → FractalParams → Uniforms → GPU → Rendered Frame
 ```
 
 **Critical Synchronization:**
-- Rust `FractalUniforms` ↔ WGSL `Uniforms`
+- Rust `Uniforms` (encase-derived layout) ↔ WGSL `Uniforms`
 - Both must maintain identical memory layout
 - Currently 864 bytes (compile-asserted and offset-tested in src/renderer/uniforms.rs)
 

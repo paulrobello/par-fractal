@@ -1,7 +1,7 @@
 //! GPU wire-format enums shared between Rust and the WGSL shaders.
 //!
 //! Each `#[repr(u32)]` enum below has discriminants that are written verbatim
-//! into `FractalUniforms` and read back by the shaders in
+//! into `Uniforms` (renderer/uniforms.rs) and read back by the shaders in
 //! `src/shaders/fractal.wgsl`. Renumbering any variant is a wire-protocol
 //! change — the shader's `switch` arms and the `gpu_discriminant_roundtrip`
 //! test at the bottom of this file must move with it.

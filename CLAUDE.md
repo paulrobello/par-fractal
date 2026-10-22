@@ -124,7 +124,7 @@ par-fractal --help                        # Show help (-h)
 
 **Uniform Buffer Synchronization:**
 
-The `FractalUniforms` struct in `renderer/uniforms.rs` MUST exactly match the `Uniforms` struct in `shaders/fractal.wgsl`. Any mismatch will cause rendering errors or crashes.
+The `Uniforms` struct in `renderer/uniforms.rs` MUST exactly match the `Uniforms` struct in `shaders/fractal.wgsl`. Any mismatch will cause rendering errors or crashes.
 
 **When modifying uniforms:**
 1. Add the field to the `Uniforms` struct in `renderer/uniforms.rs`. vec/mat fields use glam types (`Vec2`/`Vec3`/`Vec4`/`Mat4`) so encase maps them to WGSL `vecN`/`mat4x4` — a raw `[f32; N]` would lay out as a WGSL `array<f32, N>` (16-byte stride), which is wrong for a vector.
@@ -136,7 +136,7 @@ The `FractalUniforms` struct in `renderer/uniforms.rs` MUST exactly match the `U
 
 **Render Pipeline:**
 ```
-User Input → UI/Controls → FractalParams → to_uniforms() → Uniforms →
+User Input → UI/Controls → FractalParams → Uniforms::update() → Uniforms →
 GPU Buffer Upload → WGSL Shader → Fractal Computation → Frame Output
 ```
 
@@ -188,9 +188,10 @@ Total: 35 fractal types.
 **Common Test Patterns:**
 ```rust
 #[test]
-fn test_fractal_params_conversion() {
+fn test_uniform_update_matches_params() {
     let params = FractalParams::default();
-    let uniforms = params.to_uniforms(/* ... */);
+    let mut uniforms = Uniforms::new(/* ... */);
+    uniforms.update(&params /*, ... */);
     // Verify uniform values match expected params
 }
 ```

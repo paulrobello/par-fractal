@@ -377,7 +377,7 @@ pub struct App {
 - GPU enumeration and selection
 
 **`renderer/uniforms.rs`** - Uniform Buffer Management
-- `Uniforms` struct (864 bytes, matching WGSL exactly)
+- `Uniforms` struct (encase-derived WGSL layout via `#[derive(encase::ShaderType)]`; the byte layout is pinned by the `uniforms_byte_layout` test in `layout_tests`)
 - Fractal type mapping from enum to GPU indices (includes gaps: 25 reserved, 32-34 reserved)
 - `BloomUniforms`, `BlurUniforms`, `PostProcessUniforms`
 - Conversion from `FractalParams` to GPU format via `update()` method
@@ -567,7 +567,7 @@ graph LR
     UserInput[User Input] --> UI[UI Controls]
     UI --> Callback[Parameter Callback]
     Callback --> Params[FractalParams State]
-    Params --> Uniforms[to_uniforms]
+    Params --> Uniforms[Uniforms::update]
     Uniforms --> Buffer[GPU Uniform Buffer]
     Buffer --> Shader[WGSL Shader]
 
@@ -585,7 +585,7 @@ graph LR
 
 The `Uniforms` struct in `renderer/uniforms.rs` must exactly match the `Uniforms` struct in `shaders/fractal.wgsl` for proper GPU data transfer.
 
-**Current Size:** 864 bytes (54 × 16-byte alignment)
+**Layout:** derived by `encase` from the field types (`#[derive(encase::ShaderType)]`, glam `Vec2`/`Vec3`/`Vec4`/`Mat4` fields) — no manual padding fields and no hand-maintained byte count. The `uniforms_byte_layout` test pins a spread of encase-computed offsets plus the total size, so any accidental Rust↔WGSL drift fails `make checkall`.
 
 **Key Fields:**
 - Camera matrices (view-projection, inverse view-projection for 3D ray generation)
@@ -642,107 +642,39 @@ for each pixel:
 
 ## Uniform Buffer Synchronization
 
-**Critical Requirement:** The Rust `FractalUniforms` struct and WGSL `Uniforms` struct must maintain identical memory layouts.
+**Critical Requirement:** the Rust `Uniforms` struct in `renderer/uniforms.rs` and the `Uniforms`
+struct in `shaders/fractal.wgsl` must stay field-for-field identical (same names, types, and
+order). Since ENH-008 the layout itself is NOT hand-maintained: the Rust struct derives
+`encase::ShaderType`, which computes the WGSL-correct alignment, field offsets, and trailing
+padding automatically. There are no `_padding_*` fields and no `#[repr(C)]`/`bytemuck` casts.
 
 ### Synchronization Checklist
 
 When modifying uniforms:
 
-1. **Update Rust struct** in `renderer/uniforms.rs`
-   - Modify `Uniforms` struct fields
-   - Update `Uniforms::update()` method to populate new fields
-   - Verify field ordering matches WGSL exactly
-   - Ensure proper 16-byte alignment with padding fields
+1. **Add the field to the Rust struct** in `renderer/uniforms.rs`
+   - Use glam vector/matrix types (`Vec2`, `Vec3`, `Vec4`, `Mat4`) so encase maps them to WGSL
+     `vecN`/`mat4x4` — a raw `[f32; N]` would lay out as a WGSL `array<f32, N>` (16-byte
+     stride), which is wrong for a vector.
+   - Set it in `Uniforms::new()` (and in `update()` if it tracks parameters).
 
-2. **Update WGSL struct** in `shaders/fractal.wgsl`
-   - Modify `Uniforms` struct at top of shader
-   - Match field names and types exactly
-   - Maintain 16-byte alignment (WGSL has strict alignment rules)
-   - vec3 fields require special padding attention
+2. **Add the matching field to the WGSL struct** in `shaders/fractal.wgsl`
+   - Same name, same type, same position in the struct.
 
-3. **Verify byte sizes**
-   - Both must have identical total size
-   - Rust compile-time assertion: `assert!(std::mem::size_of::<Uniforms>() == 864)`
-   - Add explicit padding fields as needed
-   - Account for WGSL's implicit padding around vec3 fields
+3. **Update the layout test**
+   - The `uniforms_byte_layout` test in `layout_tests` fails until its expected total size and
+     sentinel offsets match the new encase-computed values. Run the test and read the `left:`
+     value it reports.
 
-4. **Test thoroughly**
-   - Run `make checkall` to ensure tests pass
-   - Render each fractal type (2D and 3D)
-   - Verify all parameters work correctly
-   - Check for visual artifacts or rendering glitches
-   - Test parameter changes via UI
-   - Verify LOD system if affected
+4. **Test all fractal types**
+   - `make checkall`, then render across 2D and 3D types to catch visual drift.
 
-### Memory Layout Example
+### Why encase
 
-```rust
-// renderer/uniforms.rs
-#[repr(C)]
-#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub(super) struct Uniforms {
-    // Camera (3D mode) - 64 bytes (view_proj) + 64 bytes (inv_view_proj) + 16 bytes (camera_pos + padding)
-    view_proj: [[f32; 4]; 4],
-    inv_view_proj: [[f32; 4]; 4],
-    camera_pos: [f32; 3],
-    _padding1: f32,
-
-    // 2D parameters - 16 bytes
-    center: [f32; 2],
-    zoom: f32,
-    max_iterations: u32,
-
-    // Julia + fractal type - 16 bytes
-    julia_c: [f32; 2],
-    fractal_type: u32,
-    render_mode: u32,
-
-    // 3D parameters - 32 bytes
-    power: f32,
-    max_steps: u32,
-    min_distance: f32,
-    fractal_scale: f32,
-    fractal_fold: f32,
-    fractal_min_radius: f32,
-    _padding2: [f32; 2],
-
-    // ... more fields with explicit padding ...
-}
-
-// Compile-time size check
-const _: () = assert!(
-    std::mem::size_of::<Uniforms>() == 864,
-    "Uniforms struct must be exactly 864 bytes"
-);
-```
-
-```wgsl
-// shaders/fractal.wgsl
-struct Uniforms {
-    view_proj: mat4x4<f32>,      // 64 bytes
-    inv_view_proj: mat4x4<f32>,  // 64 bytes
-    camera_pos: vec3<f32>,       // 12 bytes
-    _padding1: f32,              // 4 bytes (align to 16)
-
-    center: vec2<f32>,           // 8 bytes
-    zoom: f32,                   // 4 bytes
-    max_iterations: u32,         // 4 bytes
-
-    julia_c: vec2<f32>,          // 8 bytes
-    fractal_type: u32,           // 4 bytes
-    render_mode: u32,            // 4 bytes
-
-    power: f32,                  // 4 bytes
-    max_steps: u32,              // 4 bytes
-    min_distance: f32,           // 4 bytes
-    fractal_scale: f32,          // 4 bytes
-    fractal_fold: f32,           // 4 bytes
-    fractal_min_radius: f32,     // 4 bytes
-    _padding2: vec2<f32>,        // 8 bytes
-
-    // ... more fields matching Rust exactly ...
-};
-```
+Hand-written `#[repr(C)]` + `bytemuck::Pod` layouts silently misaligned WGSL `vec3` fields
+(16-byte alignment rules) and produced the padding-bug class ENH-008 removed. encase derives
+the exact WGSL standard layout from the field types, and the pinned byte-pattern test turns any
+drift into a failing test instead of a rendering artifact.
 
 ## Rendering Modes
 
@@ -965,14 +897,17 @@ When enabled, LOD zones are visualized in 3D space as colored distance rings aro
 ### Modifying Uniforms
 
 1. **Update Rust struct** in `renderer/uniforms.rs`
-   - Add new field to `Uniforms` struct with proper alignment
-   - Update `Uniforms::new()` with default value
+   - Add the field to the `Uniforms` struct using a glam type for vectors/matrices (encase maps
+     them to the WGSL-correct layout; see "Uniform Buffer Synchronization")
+   - Update `Uniforms::new()` with a default value
    - Update `Uniforms::update()` to populate from `FractalParams`
 
 2. **Update WGSL struct** in `shaders/fractal.wgsl`
-   - Add matching field to `Uniforms` struct at the beginning of the shader file
-   - Ensure exact type and alignment match (WGSL has strict alignment rules)
-   - Account for WGSL's implicit padding around vec3 fields (aligned to 16-byte boundaries)
+   - Add the matching field (same name, type, and position) to the `Uniforms` struct at the
+     beginning of the shader file
+
+3. **Update the `uniforms_byte_layout` test** in `layout_tests`
+   - Run it and read the reported encase-computed values for the new size and sentinel offsets
 
 3. **Add to FractalParams** in `fractal/mod.rs` (if user-configurable)
    - Add field to `FractalParams` struct
@@ -1027,7 +962,7 @@ When enabled, LOD zones are visualized in 3D space as colored distance rings aro
 5. Test with default parameters / built-in presets
 
 **Visual Artifacts:**
-1. Check for uniform alignment issues (vec3 padding)
+1. Check whether the `uniforms_byte_layout` test pins a Rust/WGSL layout drift (run `make checkall`)
 2. Verify distance estimator correctness
 3. Check ray marching parameters (max_steps, min_distance)
 4. Test with different quality settings
@@ -1042,11 +977,10 @@ When enabled, LOD zones are visualized in 3D space as colored distance rings aro
 6. Profile with GPU debugging tools
 
 **Uniform Buffer Mismatch:**
-1. Check compile-time assertion error message
-2. Calculate expected size: fields + padding for 16-byte alignment
-3. Add explicit padding fields in Rust
-4. Account for WGSL implicit vec3 padding
-5. Verify both structs have identical byte size (864 bytes)
+1. Run `make checkall` — the `uniforms_byte_layout` test reports the encase-computed values
+2. Update the test's expected size and sentinel offsets to the reported values ONLY after
+   verifying the Rust and WGSL structs are field-for-field identical (same names, types, order)
+3. Never add manual padding fields — encase derives them
 
 ### Visual Regression Harness (ENH-007)
 
