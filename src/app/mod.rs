@@ -930,6 +930,22 @@ impl App {
         }
     }
 
+    /// ARC-025: snapshot the authored settings BEFORE a hotkey mutation, for
+    /// the matching [`Self::commit_change`] call.
+    pub(crate) fn begin_change(&self) -> crate::fractal::RenderSettings {
+        self.fractal_params.settings.clone()
+    }
+
+    /// ARC-025: the ONE commit path for input-driven parameter changes —
+    /// history entry (undo), scene dirty, and autosave scheduling — mirroring
+    /// what the UI panel path does for widget edits.
+    pub(crate) fn commit_change(&mut self, pre: crate::fractal::RenderSettings) {
+        self.ui.record_change(&pre, &self.fractal_params);
+        self.mark_scene_dirty();
+        self.settings_last_changed = web_time::Instant::now();
+        self.settings_need_save = true;
+    }
+
     /// ENH-002: keyboard undo (Ctrl/Cmd+Z). Applies the history snapshot to
     /// the authored settings WITHOUT pushing a new history entry — the same
     /// from_history semantics the UI buttons use.

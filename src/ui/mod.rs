@@ -51,6 +51,10 @@ pub struct UiActions {
     pub gpu_scan_requested: bool,
     /// User clicked the video-record start button.
     pub start_recording: bool,
+    /// ARC-025: user clicked "Save Settings" — App persists via
+    /// save_all_settings (settings/settings.yaml, real camera), not the
+    /// legacy FractalParams::save_to_file path.
+    pub save_requested: bool,
     /// User clicked the video-record stop button.
     pub stop_recording: bool,
 }

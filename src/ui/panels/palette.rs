@@ -569,9 +569,17 @@ impl UI {
                                                                 .on_hover_text("Click to load this custom palette")
                                                                 .clicked()
                                                                 && let Ok(custom_palette) = CustomPaletteGallery::load_palette(palette_name) {
-                                                                    // Apply the custom palette to the current params
+                                                                    // Apply the custom palette to the current params.
+                                                                    // ARC-025: also snapshot the colors into the
+                                                                    // persisted custom-palette fields so the
+                                                                    // customization survives reload (previously
+                                                                    // only the in-memory palette slot was mutated
+                                                                    // and from_settings rebuilt the built-in).
                                                                     let (_name, colors) = custom_palette.to_color_palette();
                                                                     params.settings.palette.colors = colors;
+                                                                    params.settings.custom_palette =
+                                                                        Some(colors.map(|c| c.to_array()));
+                                                                    params.settings.custom_palette_active = true;
                                                                     actions.changed = true;
                                                                 }
                                                             if ui.small_button("🗑")

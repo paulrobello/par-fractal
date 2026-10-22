@@ -250,6 +250,7 @@ impl App {
                 }
                 // QuaternionCubic3D: accessible via UI only (no F12 - reserved for screenshot)
                 KeyCode::KeyP => {
+                    let pre = self.begin_change();
                     if self.shift_pressed {
                         // Shift+P: Cycle procedural palette
                         use crate::fractal::ProceduralPalette;
@@ -275,7 +276,7 @@ impl App {
                             self.fractal_params.settings.palette.name
                         ));
                     }
-                    self.mark_scene_dirty();
+                    self.commit_change(pre);
                     return true;
                 }
                 KeyCode::F12 => {
@@ -285,9 +286,10 @@ impl App {
                     return true;
                 }
                 KeyCode::KeyO => {
+                    let pre = self.begin_change();
                     self.fractal_params.settings.auto_orbit =
                         !self.fractal_params.settings.auto_orbit;
-                    self.mark_scene_dirty();
+                    self.commit_change(pre);
                     log::info!(
                         "Auto-orbit: {}",
                         if self.fractal_params.settings.auto_orbit {
@@ -299,9 +301,10 @@ impl App {
                     return true;
                 }
                 KeyCode::BracketLeft => {
+                    let pre = self.begin_change();
                     self.fractal_params.settings.orbit_speed =
                         (self.fractal_params.settings.orbit_speed - 0.1).max(0.1);
-                    self.mark_scene_dirty();
+                    self.commit_change(pre);
                     log::info!(
                         "Orbit speed: {:.2}",
                         self.fractal_params.settings.orbit_speed
@@ -309,9 +312,10 @@ impl App {
                     return true;
                 }
                 KeyCode::BracketRight => {
+                    let pre = self.begin_change();
                     self.fractal_params.settings.orbit_speed =
                         (self.fractal_params.settings.orbit_speed + 0.1).min(5.0);
-                    self.mark_scene_dirty();
+                    self.commit_change(pre);
                     log::info!(
                         "Orbit speed: {:.2}",
                         self.fractal_params.settings.orbit_speed
@@ -319,6 +323,7 @@ impl App {
                     return true;
                 }
                 KeyCode::Minus => {
+                    let pre = self.begin_change();
                     match self.fractal_params.settings.render_mode {
                         RenderMode::TwoD => {
                             self.fractal_params.settings.max_iterations = self
@@ -342,10 +347,11 @@ impl App {
                             log::info!("Max steps: {}", self.fractal_params.settings.max_steps);
                         }
                     }
-                    self.mark_scene_dirty();
+                    self.commit_change(pre);
                     return true;
                 }
                 KeyCode::Equal => {
+                    let pre = self.begin_change();
                     match self.fractal_params.settings.render_mode {
                         RenderMode::TwoD => {
                             self.fractal_params.settings.max_iterations =
@@ -361,27 +367,30 @@ impl App {
                             log::info!("Max steps: {}", self.fractal_params.settings.max_steps);
                         }
                     }
-                    self.mark_scene_dirty();
+                    self.commit_change(pre);
                     return true;
                 }
                 KeyCode::Comma => {
+                    let pre = self.begin_change();
                     self.fractal_params.settings.power =
                         (self.fractal_params.settings.power - 0.5).max(2.0);
-                    self.mark_scene_dirty();
+                    self.commit_change(pre);
                     log::info!("Power: {:.1}", self.fractal_params.settings.power);
                     return true;
                 }
                 KeyCode::Period => {
+                    let pre = self.begin_change();
                     self.fractal_params.settings.power =
                         (self.fractal_params.settings.power + 0.5).min(16.0);
-                    self.mark_scene_dirty();
+                    self.commit_change(pre);
                     log::info!("Power: {:.1}", self.fractal_params.settings.power);
                     return true;
                 }
                 KeyCode::KeyL => {
+                    let pre = self.begin_change();
                     self.fractal_params.settings.ambient_occlusion =
                         !self.fractal_params.settings.ambient_occlusion;
-                    self.mark_scene_dirty();
+                    self.commit_change(pre);
                     log::info!(
                         "Ambient Occlusion: {}",
                         if self.fractal_params.settings.ambient_occlusion {
@@ -393,9 +402,10 @@ impl App {
                     return true;
                 }
                 KeyCode::KeyT => {
+                    let pre = self.begin_change();
                     self.fractal_params.settings.depth_of_field =
                         !self.fractal_params.settings.depth_of_field;
-                    self.mark_scene_dirty();
+                    self.commit_change(pre);
                     log::info!(
                         "Depth of Field: {}",
                         if self.fractal_params.settings.depth_of_field {
@@ -407,6 +417,7 @@ impl App {
                     return true;
                 }
                 KeyCode::KeyG => {
+                    let pre = self.begin_change();
                     if self.shift_pressed {
                         // Shift+G: toggle ENH-006 GPU profile HUD overlay
                         // (mirrors the Shift+D LOD-debug-visualization pattern).
@@ -424,7 +435,7 @@ impl App {
                     }
                     self.fractal_params.settings.show_floor =
                         !self.fractal_params.settings.show_floor;
-                    self.mark_scene_dirty();
+                    self.commit_change(pre);
                     log::info!(
                         "Floor: {}",
                         if self.fractal_params.settings.show_floor {
@@ -436,6 +447,7 @@ impl App {
                     return true;
                 }
                 KeyCode::KeyB => {
+                    let pre = self.begin_change();
                     // Cycle shadow mode: 0 -> 1 -> 2 -> 0
                     self.fractal_params.settings.shadow_mode =
                         (self.fractal_params.settings.shadow_mode + 1) % 3;
@@ -444,7 +456,7 @@ impl App {
                         1 => "HARD",
                         _ => "SOFT",
                     };
-                    self.mark_scene_dirty();
+                    self.commit_change(pre);
                     log::info!("Shadow Mode: {}", mode_name);
                     return true;
                 }

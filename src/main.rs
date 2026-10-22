@@ -302,7 +302,14 @@ impl ApplicationHandler for AppHandler {
         }
         if !app.input(&event) {
             match event {
-                WindowEvent::CloseRequested => event_loop.exit(),
+                WindowEvent::CloseRequested => {
+                    // ARC-025: persist state on window close so the next
+                    // launch resumes exactly here.
+                    if let Some(app) = &mut self.app {
+                        app.save_all_settings();
+                    }
+                    event_loop.exit()
+                }
                 WindowEvent::Resized(physical_size) => {
                     app.resize(physical_size);
                 }

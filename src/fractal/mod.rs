@@ -234,6 +234,8 @@ impl FractalParams {
             attractor_accumulation_enabled: self.settings.attractor_accumulation_enabled,
             attractor_iterations_per_frame: self.settings.attractor_iterations_per_frame,
             attractor_log_scale: self.settings.attractor_log_scale,
+            custom_palette: self.settings.custom_palette,
+            custom_palette_active: self.settings.custom_palette_active,
         }
     }
 
@@ -368,6 +370,20 @@ impl FractalParams {
             clamp_finite_f32(settings.fog_color[2], 0.0, 1e6, 0.0),
         ]);
 
+        // ARC-025: re-apply a persisted custom palette over the selected
+        // slot (from_settings rebuilds the palette from the built-in table).
+        let palette = if settings.custom_palette_active {
+            if let Some(colors) = settings.custom_palette {
+                let mut p = palette;
+                p.colors = colors.map(glam::Vec3::from_array);
+                p
+            } else {
+                palette
+            }
+        } else {
+            palette
+        };
+
         Self {
             settings: RenderSettings {
                 fractal_type: settings.fractal_type,
@@ -449,6 +465,10 @@ impl FractalParams {
                 attractor_accumulation_enabled: settings.attractor_accumulation_enabled,
                 attractor_iterations_per_frame,
                 attractor_log_scale,
+                // ARC-025: restore an applied custom palette over the
+                // selected slot so the customization survives reload.
+                custom_palette: settings.custom_palette,
+                custom_palette_active: settings.custom_palette_active,
             },
             lod: LodRuntime {
                 // SEC-011: clamp every quality preset at the trust boundary —
@@ -738,6 +758,8 @@ impl FractalParams {
     pub fn next_palette(&mut self) {
         self.settings.palette_index = (self.settings.palette_index + 1) % ColorPalette::ALL.len();
         self.settings.palette = ColorPalette::ALL[self.settings.palette_index];
+        // ARC-025: switching to a built-in palette deactivates the custom one.
+        self.settings.custom_palette_active = false;
     }
 
     /// Go to the previous color palette, wrapping around at the start.
@@ -748,6 +770,8 @@ impl FractalParams {
             self.settings.palette_index -= 1;
         }
         self.settings.palette = ColorPalette::ALL[self.settings.palette_index];
+        // ARC-025: switching to a built-in palette deactivates the custom one.
+        self.settings.custom_palette_active = false;
     }
 
     /// Randomize fractal parameters for creative exploration

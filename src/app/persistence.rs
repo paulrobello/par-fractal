@@ -31,7 +31,7 @@ pub fn clear_settings_files(
 
 /// Settings persistence methods
 impl App {
-    pub(super) fn save_all_settings(&self) {
+    pub fn save_all_settings(&self) {
         let mut settings = self.fractal_params.to_settings();
         settings.camera_position = self.camera.position.to_array();
         settings.camera_target = self.camera.target.to_array();

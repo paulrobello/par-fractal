@@ -92,7 +92,7 @@ impl UI {
     pub fn render_settings_panel(
         &mut self,
         ui: &mut egui::Ui,
-        params: &mut FractalParams,
+        _params: &mut FractalParams,
         actions: &mut UiActions,
     ) {
         let response = egui::CollapsingHeader::new("Settings")
@@ -102,9 +102,16 @@ impl UI {
                                     if ui.button("💾 Save Settings")
                                         .on_hover_text("Manually save current settings to disk")
                                         .clicked()
-                                        && let Err(e) = params.save_to_file() {
-                                            log::error!("Failed to save settings: {}", e);
-                                        }
+                                    {
+                                        // ARC-025: persist through the App's
+                                        // save_all_settings (writes the
+                                        // settings/settings.yaml the loader
+                                        // reads first, with the real camera) —
+                                        // the old params.save_to_file wrote the
+                                        // legacy settings.yaml with placeholder
+                                        // camera fields.
+                                        actions.save_requested = true;
+                                    }
                                     if ui.button("🔄 Reset to Defaults")
                                         .on_hover_text("Reset all settings to default values")
                                         .clicked() {

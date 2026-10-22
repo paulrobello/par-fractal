@@ -182,6 +182,10 @@ pub struct RenderSettings {
     pub attractor_iterations_per_frame: u32,
     /// Log scale factor for density display
     pub attractor_log_scale: f32,
+    /// ARC-025: custom palette applied over the selected slot (persisted).
+    pub custom_palette: Option<[[f32; 3]; 8]>,
+    /// ARC-025: whether the custom palette is currently active.
+    pub custom_palette_active: bool,
 }
 
 impl Default for RenderSettings {
@@ -285,6 +289,9 @@ impl Default for RenderSettings {
             attractor_accumulation_enabled: false,
             attractor_iterations_per_frame: 10_000,
             attractor_log_scale: 4.0,
+            // ARC-025: custom-palette persistence
+            custom_palette: None,
+            custom_palette_active: false,
         }
     }
 }

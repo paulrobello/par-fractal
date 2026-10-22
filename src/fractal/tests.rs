@@ -797,3 +797,34 @@ fn center_at_centers_clicked_point_and_zooms() {
     // Re-centering drops the precise override (same rule as zoom_at).
     assert_eq!(params.settings.center_2d_precise, None);
 }
+
+/// ARC-025: an applied custom palette survives the settings roundtrip —
+/// `from_settings` re-applies the persisted colors over the selected slot,
+/// and switching to a built-in palette deactivates the customization.
+#[test]
+fn custom_palette_survives_settings_roundtrip() {
+    let mut params = FractalParams::default();
+    let custom: [[f32; 3]; 8] = core::array::from_fn(|i| [0.1 * i as f32, 0.2, 0.3]);
+    params.settings.palette.colors = custom.map(glam::Vec3::from_array);
+    params.settings.custom_palette = Some(custom);
+    params.settings.custom_palette_active = true;
+
+    let settings = params.to_settings();
+    let rebuilt = FractalParams::from_settings(settings);
+
+    assert!(rebuilt.settings.custom_palette_active);
+    for (i, want) in custom.iter().enumerate() {
+        let got = rebuilt.settings.palette.colors[i];
+        assert!(
+            (got.x - want[0]).abs() < 1e-6
+                && (got.y - want[1]).abs() < 1e-6
+                && (got.z - want[2]).abs() < 1e-6,
+            "custom color {i} lost on reload: {got:?} vs {want:?}"
+        );
+    }
+
+    // A built-in palette switch deactivates the custom palette.
+    let mut params = rebuilt;
+    params.next_palette();
+    assert!(!params.settings.custom_palette_active);
+}

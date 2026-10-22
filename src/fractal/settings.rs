@@ -171,6 +171,15 @@ pub struct Settings {
     // LOD system
     #[serde(default)]
     pub lod_config: LODConfig,
+    /// ARC-025: colors applied over the selected palette slot from a custom
+    /// palette, persisted so the customization survives reload. `None` when
+    /// untouched. Linear 0..=1 triples (same storage as `CustomPalette`).
+    #[serde(default)]
+    pub custom_palette: Option<[[f32; 3]; 8]>,
+    /// ARC-025: whether `custom_palette` is the ACTIVE palette (a later
+    /// built-in palette switch clears it).
+    #[serde(default)]
+    pub custom_palette_active: bool,
 
     // Strange attractor accumulation mode
     #[serde(default)]

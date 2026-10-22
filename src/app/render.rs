@@ -716,6 +716,7 @@ impl App {
                 gpu_scan_requested,
                 start_recording,
                 stop_recording,
+                save_requested: _,
             } = &actions;
             ui_mutated_scene = *changed
                 || preset_to_load.is_some()
@@ -872,6 +873,7 @@ impl App {
             gpu_scan_requested,
             start_recording,
             stop_recording,
+            save_requested,
         } = actions;
 
         // Handle GPU scan request / Monitor scan request
@@ -982,6 +984,13 @@ impl App {
         // App paths the panel buttons use instead of mutating params
         // directly (its old ResetView hard-coded [0,0]/1.0 and left a stale
         // precise center behind).
+        // ARC-025: the Save Settings button persists via the App path.
+        if save_requested {
+            self.save_all_settings();
+            self.ui.show_toast("Settings saved".to_string());
+            log::info!("Settings saved manually");
+        }
+
         if self.ui.pending_reset_view {
             self.ui.pending_reset_view = false;
             self.reset_view();
