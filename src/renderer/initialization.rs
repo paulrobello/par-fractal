@@ -216,7 +216,7 @@ impl Renderer {
         // Load shader
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/fractal.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(crate::fractal_sourced::SHADER.into()),
         });
 
         // Create uniform buffer

@@ -50,6 +50,9 @@ pub mod deep_zoom;
 /// Fractal parameter model (`FractalParams`), fractal types, color palettes,
 /// presets, and serializable settings.
 pub mod fractal;
+/// Compile-time assembly of the fractal shader's domain and family fragments.
+#[path = "shaders/fractal_sourced.rs"]
+pub mod fractal_sourced;
 /// Launch-parameter parsing shared by the CLI and the web entry.
 pub mod launch_params;
 /// Adaptive Level-of-Detail system that trades quality for performance based

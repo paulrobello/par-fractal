@@ -2,7 +2,7 @@
 //! step 3 — plumbing only; perturbation stays OFF here, step 5 will populate).
 //!
 //! Backs the `@group(0) @binding(1) var<storage, read> ref_orbit:
-//! array<vec2<f32>>;` declaration in [`shaders/fractal.wgsl`]. The buffer is
+//! array<vec2<f32>>;` declaration in [`shaders/fractal/uniforms.wgsl`]. The buffer is
 //! `STORAGE | COPY_DST`: the CPU writes the orbit's `Z_n` f32 pairs via
 //! [`wgpu::Queue::write_buffer`]; the fragment shader reads them per pixel as
 //! the reference orbit for delta iteration
@@ -14,7 +14,7 @@
 //! [`crate::renderer::compute::BuddhabrotAccumulationBuffer`] (read-only here
 //! vs. read-write there).
 //!
-//! [`shaders/fractal.wgsl`]: ../../shaders/fractal.wgsl
+//! [`shaders/fractal/uniforms.wgsl`]: ../../shaders/fractal/uniforms.wgsl
 
 /// Metadata for the currently-active reference orbit, held on the
 /// [`Renderer`] alongside the [`OrbitBuffer`] that stores the `Z_n` values.

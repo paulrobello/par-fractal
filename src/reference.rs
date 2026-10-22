@@ -1,7 +1,7 @@
 //! CPU reference renderer for the deep-zoom visual-regression harness (ENH-007).
 //!
 //! A pure-Rust, GPU-free reimplementation of the 2D escape-time math in
-//! `shaders/fractal.wgsl`. It exists for two reasons:
+//! `shaders/fractal/` fragments. It exists for two reasons:
 //!
 //! 1. **Ground truth.** An f64 escape-time renderer is the reference the GPU
 //!    pipeline is compared against. f64 has ~16 decimal digits; the GPU's
@@ -32,7 +32,7 @@
 pub const HP_ZOOM_THRESHOLD: f64 = 1e4;
 
 /// Which 2D escape-time map to render. Matches the shader's per-`fractal_type`
-/// dispatch (`fs_main_2d`, fractal.wgsl:2998–3049).
+/// dispatch (`fs_main_2d`, main_2d.wgsl).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FractalKind {
     Mandelbrot,
@@ -41,7 +41,7 @@ pub enum FractalKind {
 }
 
 // ============================================================================
-// Coordinate mapping — mirrors `fs_main_2d` (fractal.wgsl:2971–3021)
+// Coordinate mapping — mirrors `fs_main_2d` (main_2d.wgsl)
 // ============================================================================
 
 /// Map a pixel (with `py = 0` at the **top**, matching the framebuffer the
@@ -68,7 +68,7 @@ pub fn pixel_to_c(px: u32, py: u32, size: (u32, u32), center: (f64, f64), zoom: 
 }
 
 // ============================================================================
-// Smooth iteration count — mirrors `smooth_iteration_count` (fractal.wgsl:457)
+// Smooth iteration count — mirrors `smooth_iteration_count` (common/smooth_iteration.wgsl)
 // ============================================================================
 
 /// `(iteration + 1 - nu) / max_iterations`, where `nu` is the fractional
@@ -112,7 +112,7 @@ pub fn smooth_f32(
 type Escape = Option<(u32, f64)>;
 
 /// Escape-radius the *standard-precision* shader path derives from `power`
-/// (`mandelbrot`, fractal.wgsl:589): `select(4.0, 2^(2/|n|), |n| < 2)`. For the
+/// (`mandelbrot`, estimators_2d/escape.wgsl): `select(4.0, 2^(2/|n|), |n| < 2)`. For the
 /// default `power = 2` this is `4.0`, i.e. bailout `|z|^2 > 16`.
 fn std_escape_radius(power: f32) -> f32 {
     if power.abs() < 2.0 {
@@ -122,7 +122,7 @@ fn std_escape_radius(power: f32) -> f32 {
     }
 }
 
-/// `complex_pow(z, n)` (fractal.wgsl:573): polar-form `z^n`, with the shader's
+/// `complex_pow(z, n)` (estimators_2d/escape.wgsl): polar-form `z^n`, with the shader's
 /// `r < 1e-7` short-circuit at the origin.
 fn complex_pow_f64(zr: f64, zi: f64, n: f64) -> (f64, f64) {
     let r = (zr * zr + zi * zi).sqrt();
@@ -135,7 +135,7 @@ fn complex_pow_f64(zr: f64, zi: f64, n: f64) -> (f64, f64) {
     (r_n * n_theta.cos(), r_n * n_theta.sin())
 }
 
-/// Standard-precision Mandelbrot walk (`mandelbrot`, fractal.wgsl:585): the
+/// Standard-precision Mandelbrot walk (`mandelbrot`, estimators_2d/escape.wgsl): the
 /// escape test sits at the *top* of the loop and `iteration = i` is recorded
 /// after the `z` update, so on escape `iteration` is one behind the `z` whose
 /// magnitude tripped the test — mirrored exactly here.
@@ -160,7 +160,7 @@ fn mandelbrot_std_f64(c: (f64, f64), max_iter: u32, power: f32) -> Escape {
     finalize_std(zr, zi, iteration, max_iter, bail)
 }
 
-/// High-precision Mandelbrot walk (`mandelbrot_hp`, fractal.wgsl:464): direct
+/// High-precision Mandelbrot walk (`mandelbrot_hp`, estimators_2d/high_precision.wgsl): direct
 /// `z = z^2 + c`, bailout `|z|^2 > 4`. (`mandelbrot_hp` ignores `power` and
 /// always squares.)
 fn mandelbrot_hp_f64(c: (f64, f64), max_iter: u32) -> Escape {
@@ -181,7 +181,7 @@ fn mandelbrot_hp_f64(c: (f64, f64), max_iter: u32) -> Escape {
     finalize_hp(zr, zi, iteration, max_iter)
 }
 
-/// High-precision Burning Ship (`burning_ship_hp`, fractal.wgsl:513):
+/// High-precision Burning Ship (`burning_ship_hp`, estimators_2d/high_precision.wgsl):
 /// `z = (|Re| + i|Im|)^2 + c`, bailout `|z|^2 > 4`.
 fn burning_ship_hp_f64(c: (f64, f64), max_iter: u32) -> Escape {
     let mut zr: f64 = 0.0;
@@ -203,7 +203,7 @@ fn burning_ship_hp_f64(c: (f64, f64), max_iter: u32) -> Escape {
     finalize_hp(zr, zi, iteration, max_iter)
 }
 
-/// High-precision Tricorn (`tricorn_hp`, fractal.wgsl:542): `z = conj(z)^2 + c`
+/// High-precision Tricorn (`tricorn_hp`, estimators_2d/high_precision.wgsl): `z = conj(z)^2 + c`
 /// where `conj(z) = (re, -im)`, bailout `|z|^2 > 4`.
 fn tricorn_hp_f64(c: (f64, f64), max_iter: u32) -> Escape {
     let mut zr = 0.0;
@@ -330,7 +330,7 @@ pub fn smooth_to_grayscale_rgba(smooth: &[f32], size: (u32, u32)) -> Vec<u8> {
 }
 
 // ============================================================================
-// Double-float primitives — byte-for-byte mirror of fractal.wgsl:359–399
+// Double-float primitives — byte-for-byte mirror of common/double_float.wgsl
 // ============================================================================
 //
 // `two_prod` is Dekker's split product (NOT hardware FMA): naga/backends may
@@ -348,7 +348,7 @@ pub fn split_f64(v: f64) -> (f32, f32) {
     (hi, lo)
 }
 
-/// Error-free transform of `a + b` (fractal.wgsl:359).
+/// Error-free transform of `a + b` (common/double_float.wgsl).
 fn two_sum(a: f32, b: f32) -> (f32, f32) {
     let s = a + b;
     let v = s - a;
@@ -356,7 +356,7 @@ fn two_sum(a: f32, b: f32) -> (f32, f32) {
     (s, e)
 }
 
-/// Dekker two-product without FMA (fractal.wgsl:381).
+/// Dekker two-product without FMA (common/double_float.wgsl).
 fn two_prod(a: f32, b: f32) -> (f32, f32) {
     let p = a * b;
     const SPLIT: f32 = 4097.0; // 2^12 + 1 for f32 (24-bit mantissa)
@@ -370,7 +370,7 @@ fn two_prod(a: f32, b: f32) -> (f32, f32) {
     (p, e)
 }
 
-/// Double-float add with full error propagation (fractal.wgsl:369).
+/// Double-float add with full error propagation (common/double_float.wgsl).
 fn df_add_full(a_hi: f32, a_lo: f32, b_hi: f32, b_lo: f32) -> (f32, f32) {
     let s1 = two_sum(a_hi, b_hi);
     let s2 = two_sum(a_lo, b_lo);
@@ -378,14 +378,14 @@ fn df_add_full(a_hi: f32, a_lo: f32, b_hi: f32, b_lo: f32) -> (f32, f32) {
     (s3.0, s3.1 + s2.1)
 }
 
-/// Double-float multiply (fractal.wgsl:395).
+/// Double-float multiply (common/double_float.wgsl).
 fn df_mul(a_hi: f32, a_lo: f32, b_hi: f32, b_lo: f32) -> (f32, f32) {
     let p = two_prod(a_hi, b_hi);
     let e = a_hi * b_lo + a_lo * b_hi;
     two_sum(p.0, p.1 + e)
 }
 
-/// Double-float subtract (fractal.wgsl:402).
+/// Double-float subtract (common/double_float.wgsl).
 fn df_sub(a_hi: f32, a_lo: f32, b_hi: f32, b_lo: f32) -> (f32, f32) {
     df_add_full(a_hi, a_lo, -b_hi, -b_lo)
 }
@@ -405,13 +405,13 @@ impl Df2 {
         }
     }
 
-    /// `|z|^2` from the high words only (fractal.wgsl:443) — f32 precision is
+    /// `|z|^2` from the high words only (common/double_float.wgsl) — f32 precision is
     /// ample for the escape test.
     fn mag_sq(self) -> f32 {
         self.re.0 * self.re.0 + self.im.0 * self.im.0
     }
 
-    /// `z^2` (fractal.wgsl:430).
+    /// `z^2` (common/double_float.wgsl).
     fn square(self) -> Df2 {
         let a2 = df_mul(self.re.0, self.re.1, self.re.0, self.re.1);
         let b2 = df_mul(self.im.0, self.im.1, self.im.0, self.im.1);
@@ -421,7 +421,7 @@ impl Df2 {
         Df2 { re: real, im: imag }
     }
 
-    /// `a + b` (fractal.wgsl:407).
+    /// `a + b` (common/double_float.wgsl).
     fn add(self, b: Df2) -> Df2 {
         let r = df_add_full(self.re.0, self.re.1, b.re.0, b.re.1);
         let i = df_add_full(self.im.0, self.im.1, b.im.0, b.im.1);
@@ -431,7 +431,7 @@ impl Df2 {
 
 // ============================================================================
 // Double-float renderers — mirror `mandelbrot_hp` / `burning_ship_hp` /
-// `tricorn_hp` (fractal.wgsl:464 / 513 / 542) exactly, including the DF abs
+// `tricorn_hp` (estimators_2d/high_precision.wgsl) exactly, including the DF abs
 // fix (QA-002: when a component's hi word is negative, BOTH words negate).
 // ============================================================================
 
@@ -490,7 +490,7 @@ fn tricorn_df(c: Df2, max_iter: u32) -> f32 {
         if z.mag_sq() > 4.0 {
             break;
         }
-        // conj(z) = (re, -im), both words of im negated (fractal.wgsl:554).
+        // conj(z) = (re, -im), both words of im negated (common/double_float.wgsl).
         let z_conj = Df2 {
             re: z.re,
             im: (-z.im.0, -z.im.1),
@@ -574,7 +574,7 @@ mod tests {
 
     /// Error-free-transform property of `two_sum`: `hi + lo == a + b` *exactly*
     /// in f64. This is the defining correctness condition — if it ever fails,
-    /// the DF algebra drifted from the shader's (fractal.wgsl:359).
+    /// the DF algebra drifted from the shader's (common/double_float.wgsl).
     #[test]
     fn two_sum_is_error_free() {
         let cases = [
@@ -594,7 +594,7 @@ mod tests {
     }
 
     /// Error-free-transform property of `two_prod`: `hi + lo == a * b`
-    /// *exactly* in f64. The FMA-free Dekker split (fractal.wgsl:381) must hold
+    /// *exactly* in f64. The FMA-free Dekker split (common/double_float.wgsl) must hold
     /// this exactly — a backend that lowered it to `a*b + 0` would collapse `lo`
     /// to 0 and fail here. (QA-005.)
     #[test]

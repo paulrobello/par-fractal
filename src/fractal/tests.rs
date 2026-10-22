@@ -468,7 +468,7 @@ fn test_mandelbox_preset_carries_its_own_power() {
 /// must produce the same fractal regardless of what you were looking at before.
 ///
 /// Each entry lists the uniforms that type's distance estimator in
-/// `shaders/fractal.wgsl` actually reads; only those are compared, since an
+/// `shaders/fractal/estimators_2d/` and `estimators_3d/` actually reads; only those are compared, since an
 /// unread field may legitimately carry over. Threeply2D and MengerSponge3D are
 /// the adversarial predecessors — between them they leave extreme values in
 /// every shared shape field.

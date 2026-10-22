@@ -197,7 +197,7 @@ cargo run --release
 **Component Hierarchy:**
 ```
 main.rs → app.rs → {renderer.rs, fractal.rs, camera.rs, ui.rs}
-                 → GPU shaders (fractal.wgsl)
+                 → GPU shaders (fractal/)
 ```
 
 **Data Flow:**

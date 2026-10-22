@@ -594,9 +594,9 @@ web-check:
 		echo "web-check: wasm32-unknown-unknown target not installed — skipping."; \
 	else \
 		echo "web-check: checking root lib (web feature)…"; \
-		cargo check --quiet --lib --target wasm32-unknown-unknown --no-default-features --features web; \
+		cargo check --quiet --lib --target wasm32-unknown-unknown --no-default-features --features web || exit $$?; \
 		echo "web-check: checking par-fractal-web member…"; \
-		cargo check --quiet -p par-fractal-web --target wasm32-unknown-unknown; \
+		cargo check --quiet -p par-fractal-web --target wasm32-unknown-unknown || exit $$?; \
 		echo "web-check: wasm targets compile clean."; \
 	fi
 

@@ -8,7 +8,7 @@
 //!
 //! The recurrence is the plain Mandelbrot map `Z_{n+1} = Z_n² + C` with
 //! bailout `|Z|² > 4`, matching the shader's `mandelbrot_hp`
-//! (`shaders/fractal.wgsl`) and the f64 mirror `reference::mandelbrot_hp_f64`.
+//! (`shaders/fractal/estimators_2d/high_precision.wgsl`) and the f64 mirror `reference::mandelbrot_hp_f64`.
 //! The tests pin the orbit to a direct f64 iteration so a regression in the
 //! BigFloat walk is caught without a GPU.
 
@@ -20,7 +20,7 @@ use dashu_float::ops::Abs;
 
 /// Which 2D escape-time map the reference orbit iterates (ENH-001 Phase B
 /// step 7). Each kind has its own per-pixel delta recurrence in
-/// `shaders/fractal.wgsl`; the CPU orbit just iterates the underlying map
+/// `shaders/fractal/estimators_2d/` perturb fragments; the CPU orbit just iterates the underlying map
 /// (`mandelbrot_hp` / `julia_hp` / `burning_ship_hp` / `tricorn_hp`) in
 /// arbitrary precision, starting from the kind-appropriate initial condition:
 ///
@@ -45,7 +45,7 @@ pub enum FractalKind {
 impl FractalKind {
     /// Map a [`FractalType`] to its perturbation kind, or `None` if the type
     /// doesn't use the 2D perturbation path (handled by other renderers).
-    /// The discriminants match `src/shaders/fractal.wgsl`'s
+    /// The discriminants match `src/shaders/fractal/main_2d.wgsl`'s
     /// `fs_main_2d` perturbation gate (`0, 1, 4, 5`).
     pub fn from_fractal_type(t: FractalType) -> Option<Self> {
         match t {

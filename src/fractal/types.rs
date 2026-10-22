@@ -2,7 +2,7 @@
 //!
 //! Each `#[repr(u32)]` enum below has discriminants that are written verbatim
 //! into `Uniforms` (renderer/uniforms.rs) and read back by the shaders in
-//! `src/shaders/fractal.wgsl`. Renumbering any variant is a wire-protocol
+//! `src/shaders/fractal/` fragments. Renumbering any variant is a wire-protocol
 //! change — the shader's `switch` arms and the `gpu_discriminant_roundtrip`
 //! test at the bottom of this file must move with it.
 
@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 /// Discriminant contract: the integer IDs here are the wire format the WGSL
 /// shaders read from `uniforms.fractal_type`. They MUST match the
-/// `switch fractal_type` arms in `src/shaders/fractal.wgsl` exactly. The
+/// `switch fractal_type` arms in `src/shaders/fractal/` exactly. The
 /// `gpu_discriminant_roundtrip` test in this file pins representative values;
 /// update both the shader and that test together if you renumber.
 ///
@@ -540,7 +540,7 @@ pub enum ShadingModel {
 
 /// GPU wire format: the discriminant is the value read by the shader from
 /// `uniforms.color_mode`. Sequential 0..=15 — keep in lockstep with the
-/// `switch color_mode` arms in `fractal.wgsl`.
+/// `color_mode` arms in `render_ray.wgsl`.
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum ColorMode {
@@ -565,7 +565,7 @@ pub enum ColorMode {
 
 /// GPU wire format: the discriminant is the value written to
 /// `uniforms.channel_r/g/b`. Sequential 0..=7 — keep in lockstep with the
-/// channel-source switch in `fractal.wgsl`.
+/// channel-source arms in `render_ray.wgsl`.
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum ChannelSource {
@@ -594,8 +594,8 @@ pub enum FogMode {
 ///
 /// GPU wire format: the discriminant (matching the deprecated `shader_index()`
 /// return values) is written to `uniforms.procedural_palette_type`. Sequential
-/// 0..=12 — keep in lockstep with the `switch procedural_palette_type` arms in
-/// `fractal.wgsl`.
+/// 0..=12 — keep in lockstep with the `procedural_palette_type` arms in
+/// `coloring.wgsl`.
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum ProceduralPalette {
@@ -744,7 +744,7 @@ mod tests {
         assert_eq!(ProceduralPalette::None.shader_index(), 0);
     }
 
-    /// QA-031: the 2D-attractor preview switch in `fractal.wgsl` must map
+    /// QA-031: the 2D-attractor preview switch in `main_2d.wgsl` must map
     /// each 2D-attractor enum discriminant to the attractor function of the
     /// same name. The dispatch drifted once (Rust sent 26..=31, the shader
     /// mapped 27..=34 to henon/latoocarfian/icon among others), so five of
@@ -752,10 +752,10 @@ mod tests {
     /// was off. Parsing the shader here pins the wire format for both sides.
     #[test]
     fn wgsl_attractor_dispatch_matches_enum_discriminants() {
-        let src = include_str!("../shaders/fractal.wgsl");
+        let src = crate::fractal_sourced::SHADER;
 
         // (variant, discriminant, WGSL function name). Keep in sync with the
-        // preview switch at the bottom of `fractal.wgsl`.
+        // preview switch at the bottom of `main_2d.wgsl`.
         let cases: &[(&str, u32, &str)] = &[
             (
                 stringify!(Hopalong2D),
@@ -793,7 +793,7 @@ mod tests {
             assert!(
                 src.contains(&arm),
                 "{variant} (discriminant {discriminant}) has no matching preview-switch arm in \
-                 fractal.wgsl; update the shader switch and this test together"
+                 main_2d.wgsl; update the shader switch and this test together"
             );
         }
 

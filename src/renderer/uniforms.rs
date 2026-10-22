@@ -123,7 +123,7 @@ where
 /// ENH-008: derives `encase::ShaderType` — WGSL-correct uniform layout is
 /// computed by encase from the field types + declaration order, so the ~14
 /// hand-maintained `_padding_*` fields are gone (from both this struct and the
-/// `Uniforms` declaration in `shaders/fractal.wgsl`). vec/mat fields use glam
+/// `Uniforms` declaration in `shaders/fractal/uniforms.wgsl`). vec/mat fields use glam
 /// types (glam's `encase` feature provides the `ShaderType` impls). Field
 /// ORDER must stay identical to the WGSL struct: encase and WGSL derive the
 /// same offsets from the same order, so both sides agree. Add new fields at

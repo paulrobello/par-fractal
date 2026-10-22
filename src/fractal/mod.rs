@@ -544,12 +544,9 @@ impl FractalParams {
             }
             RenderMode::ThreeD => {
                 let next = if delta >= 0 {
-                    (self.settings.max_steps + delta as u32 / 10 * 10).min(500)
+                    self.settings.max_steps.saturating_add(10).min(500)
                 } else {
-                    self.settings
-                        .max_steps
-                        .saturating_sub(delta.unsigned_abs() / 10 * 10)
-                        .max(30)
+                    self.settings.max_steps.saturating_sub(10).max(30)
                 };
                 self.settings.max_steps = next;
                 next

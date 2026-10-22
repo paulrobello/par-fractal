@@ -18,7 +18,7 @@
 //!
 //! GPU plumbing (storage buffer + uniforms) lives in
 //! [`crate::renderer::orbit_buffer`] and [`crate::renderer::uniforms`]; the
-//! delta shader is `mandelbrot_perturb` in `shaders/fractal.wgsl`.
+//! delta shader is `mandelbrot_perturb` in `shaders/fractal/estimators_2d/perturb_mandelbrot.wgsl`.
 
 pub mod driver;
 pub mod orbit;

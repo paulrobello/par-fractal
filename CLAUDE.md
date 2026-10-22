@@ -105,7 +105,7 @@ Complete flag reference: [docs/FEATURES.md → CLI Options](docs/FEATURES.md#cli
   - `renderer/initialization.rs` - GPU device/surface setup
   - `renderer/uniforms.rs` - Uniform buffer definitions
   - `renderer/update.rs` - Render pipeline execution
-- `shaders/fractal.wgsl` - Main fractal computation shader
+- `shaders/fractal/` - Fractal domain/family WGSL fragments, assembled by `shaders/fractal_sourced.rs` (`fractal_sourced::SHADER`)
 - `shaders/postprocess.wgsl` - Post-processing effects (bloom, blur, FXAA)
 - `shaders/attractor_compute.wgsl`, `shaders/attractor_display.wgsl` - Strange-attractor GPU compute + display
 - `shaders/buddhabrot_compute.wgsl`, `shaders/buddhabrot_copy.wgsl` - Buddhabrot accumulation compute + copy
@@ -121,11 +121,11 @@ Complete flag reference: [docs/FEATURES.md → CLI Options](docs/FEATURES.md#cli
 
 **Uniform Buffer Synchronization:**
 
-The `Uniforms` struct in `renderer/uniforms.rs` MUST exactly match the `Uniforms` struct in `shaders/fractal.wgsl`. Any mismatch will cause rendering errors or crashes.
+The `Uniforms` struct in `renderer/uniforms.rs` MUST exactly match the `Uniforms` struct in `shaders/fractal/uniforms.wgsl`. Any mismatch will cause rendering errors or crashes.
 
 **When modifying uniforms:**
 1. Add the field to the `Uniforms` struct in `renderer/uniforms.rs`. vec/mat fields use glam types (`Vec2`/`Vec3`/`Vec4`/`Mat4`) so encase maps them to WGSL `vecN`/`mat4x4` — a raw `[f32; N]` would lay out as a WGSL `array<f32, N>` (16-byte stride), which is wrong for a vector.
-2. Add the same field (same type, same position) to the `Uniforms` struct in `shaders/fractal.wgsl`.
+2. Add the same field (same type, same position) to the `Uniforms` struct in `shaders/fractal/uniforms.wgsl`.
 3. Initialize the field in `Uniforms::new()` (and in `update()` if it tracks params).
 4. encase derives the WGSL-correct layout (alignment + trailing padding) automatically — there are no manual `_padding` fields and no 16-byte alignment math to do (ENH-008).
 5. The `uniforms_byte_layout` byte-pattern test in `layout_tests` will fail until its size and sentinel offsets are updated; update them to the encase-computed values (run the test and read the `left:` value it reports).
@@ -197,7 +197,7 @@ fn test_uniform_update_matches_params() {
 
 **WGSL Guidelines:**
 - All shaders in `src/shaders/`
-- Main fractal shader: `fractal.wgsl`
+- Main fractal shader: `fractal/` fragments assembled with `concat!(include_str!(...))` in `fractal_sourced.rs`. Preserve assembly order and boundary whitespace. Fragments share symbols and are validated as one module.
 - Post-processing: `postprocess.wgsl`
 - Use WGSL syntax (similar to Rust)
 - All uniforms must be 16-byte aligned
@@ -264,7 +264,7 @@ Note: `preferred_gpu_index` lives in `preferences.yaml`, not `settings.yaml`.
 
 **Adding a New Fractal:**
 1. Add fractal type to `FractalType` enum in `fractal/types.rs`
-2. Implement distance estimator in `shaders/fractal.wgsl`
+2. Implement distance estimator in `shaders/fractal/estimators_3d/` (or `estimators_2d/`) and add its fragment to `shaders/fractal_sourced.rs`
 3. Add UI controls in `ui/mod.rs` if needed
 4. Create preset in `fractal/presets.rs`
 5. Test rendering and parameter adjustments
@@ -272,7 +272,7 @@ Note: `preferred_gpu_index` lives in `preferences.yaml`, not `settings.yaml`.
 
 **Modifying Uniforms:**
 1. Add the field to the `Uniforms` struct in `renderer/uniforms.rs` (glam vec/mat types; see "Uniform Buffer Synchronization" above).
-2. Add the matching field to the `Uniforms` struct in `shaders/fractal.wgsl` (same type + position).
+2. Add the matching field to the `Uniforms` struct in `shaders/fractal/uniforms.wgsl` (same type + position).
 3. Set it in `Uniforms::new()` / `update()` in `renderer/uniforms.rs` (the GPU uniform is built there — there is no separate `to_uniforms()`).
 4. encase derives the layout — update the `uniforms_byte_layout` test's size and sentinel offsets to match.
 5. Test all fractal types

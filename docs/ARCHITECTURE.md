@@ -86,7 +86,7 @@ graph TD
     end
 
     subgraph "GPU Computation"
-        Shader[fractal.wgsl<br/>Fractal Computation]
+        Shader[fractal_sourced::SHADER<br/>Fractal Computation]
         PostProc[postprocess.wgsl<br/>Post Effects]
     end
 
@@ -579,7 +579,7 @@ graph LR
 
 ### Uniform Buffer Structure
 
-The `Uniforms` struct in `renderer/uniforms.rs` must exactly match the `Uniforms` struct in `shaders/fractal.wgsl` for proper GPU data transfer.
+The `Uniforms` struct in `renderer/uniforms.rs` must exactly match the `Uniforms` struct in `shaders/fractal/uniforms.wgsl` for proper GPU data transfer.
 
 **Layout:** derived by `encase` from the field types (`#[derive(encase::ShaderType)]`, glam `Vec2`/`Vec3`/`Vec4`/`Mat4` fields) — no manual padding fields and no hand-maintained byte count. The `uniforms_byte_layout` test pins a spread of encase-computed offsets plus the total size, so any accidental Rust↔WGSL drift fails `make checkall`.
 
@@ -603,7 +603,12 @@ The `Uniforms` struct in `renderer/uniforms.rs` must exactly match the `Uniforms
 
 ### Shader Execution
 
-**File:** `shaders/fractal.wgsl`
+**Source:** `src/shaders/fractal/` contains domain/family WGSL fragments. The public
+`fractal_sourced::SHADER` constant in `src/shaders/fractal_sourced.rs` assembles them
+at compile time using `concat!(include_str!(...), ...)`. GPU initialization and the
+dispatch contract test consume this same constant. Fragments share declarations and
+are validated together, not as independent modules. Assembly preserves the original
+source order and boundary whitespace, including the legacy post-processing helpers.
 
 **Vertex Shader:**
 - Generates full-screen quad
@@ -639,7 +644,7 @@ for each pixel:
 ## Uniform Buffer Synchronization
 
 **Critical Requirement:** the Rust `Uniforms` struct in `renderer/uniforms.rs` and the `Uniforms`
-struct in `shaders/fractal.wgsl` must stay field-for-field identical (same names, types, and
+struct in `shaders/fractal/uniforms.wgsl` must stay field-for-field identical (same names, types, and
 order). Since ENH-008 the layout itself is NOT hand-maintained: the Rust struct derives
 `encase::ShaderType`, which computes the WGSL-correct alignment, field offsets, and trailing
 padding automatically. There are no `_padding_*` fields and no `#[repr(C)]`/`bytemuck` casts.
@@ -654,7 +659,7 @@ When modifying uniforms:
      stride), which is wrong for a vector.
    - Set it in `Uniforms::new()` (and in `update()` if it tracks parameters).
 
-2. **Add the matching field to the WGSL struct** in `shaders/fractal.wgsl`
+2. **Add the matching field to the WGSL struct** in `shaders/fractal/uniforms.wgsl`
    - Same name, same type, same position in the struct.
 
 3. **Update the layout test**
@@ -743,7 +748,7 @@ flowchart LR
         V["View change\n(note_view / maybe_spawn)"] --> W["Worker thread\ncompute_reference_orbit_best"]
         W --> O["ReferenceOrbit\nZ_0..Z_k as f32 pairs"]
     end
-    subgraph GPU["GPU (fractal.wgsl)"]
+    subgraph GPU["GPU (fractal_sourced::SHADER)"]
         O --> U["Storage buffer upload\nset_reference_orbit"]
         U --> P["Per-pixel loop\ndelta recurrence (f32)\nvs orbit[z]"]
     end
@@ -906,7 +911,7 @@ When enabled, LOD zones are visualized in 3D space as colored distance rings aro
    };
    ```
 
-4. **Implement shader logic** in `shaders/fractal.wgsl`
+4. **Implement shader logic** in `shaders/fractal/estimators_3d/` or `estimators_2d/` and include new fragments in `shaders/fractal_sourced.rs`
    - For 2D fractals: Add case to 2D fractal switch statement in fragment shader
    - For 3D fractals: Add distance estimator function and call from `map()` function
    ```wgsl
@@ -944,7 +949,7 @@ When enabled, LOD zones are visualized in 3D space as colored distance rings aro
    - Update `Uniforms::new()` with a default value
    - Update `Uniforms::update()` to populate from `FractalParams`
 
-2. **Update WGSL struct** in `shaders/fractal.wgsl`
+2. **Update WGSL struct** in `shaders/fractal/uniforms.wgsl`
    - Add the matching field (same name, type, and position) to the `Uniforms` struct at the
      beginning of the shader file
 
