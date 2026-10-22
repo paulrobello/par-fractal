@@ -425,4 +425,74 @@ mod tests {
         }
         assert_eq!(ProceduralPalette::None.shader_index(), 0);
     }
+
+    /// QA-031: the 2D-attractor preview switch in `fractal.wgsl` must map
+    /// each 2D-attractor enum discriminant to the attractor function of the
+    /// same name. The dispatch drifted once (Rust sent 26..=31, the shader
+    /// mapped 27..=34 to henon/latoocarfian/icon among others), so five of
+    /// six attractor types rendered the wrong fractal whenever accumulation
+    /// was off. Parsing the shader here pins the wire format for both sides.
+    #[test]
+    fn wgsl_attractor_dispatch_matches_enum_discriminants() {
+        let src = include_str!("../shaders/fractal.wgsl");
+
+        // (variant, discriminant, WGSL function name). Keep in sync with the
+        // preview switch at the bottom of `fractal.wgsl`.
+        let cases: &[(&str, u32, &str)] = &[
+            (
+                stringify!(Hopalong2D),
+                FractalType::Hopalong2D as u32,
+                "hopalong_attractor",
+            ),
+            (
+                stringify!(Martin2D),
+                FractalType::Martin2D as u32,
+                "martin_attractor",
+            ),
+            (
+                stringify!(Gingerbreadman2D),
+                FractalType::Gingerbreadman2D as u32,
+                "gingerbreadman_attractor",
+            ),
+            (
+                stringify!(Chip2D),
+                FractalType::Chip2D as u32,
+                "chip_attractor",
+            ),
+            (
+                stringify!(Quadruptwo2D),
+                FractalType::Quadruptwo2D as u32,
+                "quadruptwo_attractor",
+            ),
+            (
+                stringify!(Threeply2D),
+                FractalType::Threeply2D as u32,
+                "threeply_attractor",
+            ),
+        ];
+        for (variant, discriminant, fn_name) in cases {
+            let arm = format!("case {discriminant}u: {{ t = {fn_name}(coord); }}");
+            assert!(
+                src.contains(&arm),
+                "{variant} (discriminant {discriminant}) has no matching preview-switch arm in \
+                 fractal.wgsl; update the shader switch and this test together"
+            );
+        }
+
+        // The retired arms (henon / latoocarfian / icon — never in the enum)
+        // must not appear in any preview-switch case line.
+        for retired in [
+            "henon_attractor",
+            "latoocarfian_attractor",
+            "icon_attractor",
+        ] {
+            for line in src.lines() {
+                let trimmed = line.trim_start();
+                assert!(
+                    !(trimmed.starts_with("case") && trimmed.contains(retired)),
+                    "preview switch still references {retired}, which is not a FractalType"
+                );
+            }
+        }
+    }
 }

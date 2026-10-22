@@ -3410,16 +3410,15 @@ fn fs_main_2d(input: VertexOutput) -> @location(0) vec4<f32> {
             case 10u: { t = nova_fractal(coord); }
             case 11u: { t = magnet_fractal(coord); }
             case 12u: { t = collatz_fractal(coord); }
-            // Strange Attractors (types 26-34, indices after 3D fractals)
+            // Strange Attractors (types 26-31; QA-031: these MUST match the
+            // FractalType discriminants — the pinned dispatch test in
+            // src/fractal/types.rs cross-checks this switch against the enum)
             case 26u: { t = hopalong_attractor(coord); }
-            case 27u: { t = henon_attractor(coord); }
-            case 28u: { t = martin_attractor(coord); }
-            case 29u: { t = gingerbreadman_attractor(coord); }
-            case 30u: { t = latoocarfian_attractor(coord); }
-            case 31u: { t = chip_attractor(coord); }
-            case 32u: { t = quadruptwo_attractor(coord); }
-            case 33u: { t = threeply_attractor(coord); }
-            case 34u: { t = icon_attractor(coord); }
+            case 27u: { t = martin_attractor(coord); }
+            case 28u: { t = gingerbreadman_attractor(coord); }
+            case 29u: { t = chip_attractor(coord); }
+            case 30u: { t = quadruptwo_attractor(coord); }
+            case 31u: { t = threeply_attractor(coord); }
             default: { t = collatz_fractal(coord); }
         }
     }

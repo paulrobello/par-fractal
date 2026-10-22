@@ -691,3 +691,34 @@ fn from_settings_drops_invalid_precise_center() {
     // None stays None.
     assert!(make(None).settings.center_2d_precise.is_none());
 }
+
+/// QA-031: `switch_fractal` must enable accumulation for every
+/// `uses_accumulation()` type — with accumulation off, a 2D attractor falls
+/// through to the per-frame preview path and never accumulates a usable
+/// image (and, before the dispatch fix, rendered the wrong attractor).
+#[test]
+fn switch_fractal_enables_accumulation_for_accumulation_types() {
+    // Non-accumulation start.
+    let mut params = FractalParams::default();
+    assert!(!params.settings.attractor_accumulation_enabled);
+    params.switch_fractal(FractalType::Mandelbrot2D);
+    assert!(!params.settings.attractor_accumulation_enabled);
+
+    // Every accumulation type lands with accumulation on.
+    for t in [
+        FractalType::Hopalong2D,
+        FractalType::Martin2D,
+        FractalType::Gingerbreadman2D,
+        FractalType::Chip2D,
+        FractalType::Quadruptwo2D,
+        FractalType::Threeply2D,
+        FractalType::Buddhabrot2D,
+    ] {
+        let mut params = FractalParams::default();
+        params.switch_fractal(t);
+        assert!(
+            params.settings.attractor_accumulation_enabled,
+            "{t:?} must enable accumulation"
+        );
+    }
+}

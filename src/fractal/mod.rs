@@ -722,6 +722,15 @@ impl FractalParams {
             }
             _ => {}
         }
+
+        // QA-031: every accumulation-rendered type must switch accumulation
+        // on when selected. The 2D attractors render progressive density via
+        // the compute path; with accumulation off they fall through to the
+        // per-frame preview switch, which (before the QA-031 dispatch fix)
+        // drew the wrong attractor and never accumulates a usable image.
+        if fractal_type.uses_accumulation() {
+            self.settings.attractor_accumulation_enabled = true;
+        }
     }
 
     /// Advance to the next color palette, wrapping around at the end.
