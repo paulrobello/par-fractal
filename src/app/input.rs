@@ -257,88 +257,54 @@ impl App {
             }
             KeyCode::BracketLeft => {
                 let pre = self.begin_change();
-                self.fractal_params.settings.orbit_speed =
-                    (self.fractal_params.settings.orbit_speed - 0.1).max(0.1);
+                let value = self.fractal_params.adjust_orbit_speed(-0.1);
                 self.commit_change(pre);
-                log::info!(
-                    "Orbit speed: {:.2}",
-                    self.fractal_params.settings.orbit_speed
-                );
+                log::info!("Orbit speed: {value:.2}");
                 return Some(true);
             }
             KeyCode::BracketRight => {
                 let pre = self.begin_change();
-                self.fractal_params.settings.orbit_speed =
-                    (self.fractal_params.settings.orbit_speed + 0.1).min(5.0);
+                let value = self.fractal_params.adjust_orbit_speed(0.1);
                 self.commit_change(pre);
-                log::info!(
-                    "Orbit speed: {:.2}",
-                    self.fractal_params.settings.orbit_speed
-                );
+                log::info!("Orbit speed: {value:.2}");
                 return Some(true);
             }
             KeyCode::Minus => {
                 let pre = self.begin_change();
-                match self.fractal_params.settings.render_mode {
-                    RenderMode::TwoD => {
-                        self.fractal_params.settings.max_iterations = self
-                            .fractal_params
-                            .settings
-                            .max_iterations
-                            .saturating_sub(32)
-                            .max(32);
-                        log::info!(
-                            "Max iterations: {}",
-                            self.fractal_params.settings.max_iterations
-                        );
-                    }
-                    RenderMode::ThreeD => {
-                        self.fractal_params.settings.max_steps = self
-                            .fractal_params
-                            .settings
-                            .max_steps
-                            .saturating_sub(10)
-                            .max(30);
-                        log::info!("Max steps: {}", self.fractal_params.settings.max_steps);
-                    }
-                }
+                let value = self.fractal_params.adjust_iterations(-32);
+                let label = if self.fractal_params.settings.render_mode == RenderMode::TwoD {
+                    format!("Max iterations: {value}")
+                } else {
+                    format!("Max steps: {value}")
+                };
+                log::info!("{label}");
                 self.commit_change(pre);
                 return Some(true);
             }
             KeyCode::Equal => {
                 let pre = self.begin_change();
-                match self.fractal_params.settings.render_mode {
-                    RenderMode::TwoD => {
-                        self.fractal_params.settings.max_iterations =
-                            (self.fractal_params.settings.max_iterations + 32).min(2048);
-                        log::info!(
-                            "Max iterations: {}",
-                            self.fractal_params.settings.max_iterations
-                        );
-                    }
-                    RenderMode::ThreeD => {
-                        self.fractal_params.settings.max_steps =
-                            (self.fractal_params.settings.max_steps + 10).min(500);
-                        log::info!("Max steps: {}", self.fractal_params.settings.max_steps);
-                    }
-                }
+                let value = self.fractal_params.adjust_iterations(32);
+                let label = if self.fractal_params.settings.render_mode == RenderMode::TwoD {
+                    format!("Max iterations: {value}")
+                } else {
+                    format!("Max steps: {value}")
+                };
+                log::info!("{label}");
                 self.commit_change(pre);
                 return Some(true);
             }
             KeyCode::Comma => {
                 let pre = self.begin_change();
-                self.fractal_params.settings.power =
-                    (self.fractal_params.settings.power - 0.5).max(2.0);
+                let value = self.fractal_params.adjust_power(-0.5);
                 self.commit_change(pre);
-                log::info!("Power: {:.1}", self.fractal_params.settings.power);
+                log::info!("Power: {value:.1}");
                 return Some(true);
             }
             KeyCode::Period => {
                 let pre = self.begin_change();
-                self.fractal_params.settings.power =
-                    (self.fractal_params.settings.power + 0.5).min(16.0);
+                let value = self.fractal_params.adjust_power(0.5);
                 self.commit_change(pre);
-                log::info!("Power: {:.1}", self.fractal_params.settings.power);
+                log::info!("Power: {value:.1}");
                 return Some(true);
             }
             KeyCode::KeyL => {

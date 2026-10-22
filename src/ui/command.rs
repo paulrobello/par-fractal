@@ -167,59 +167,42 @@ impl UI {
         let action = action.clone();
         match action {
             CommandAction::IncrementIterations => {
-                use crate::fractal::RenderMode;
-                match params.settings.render_mode {
-                    RenderMode::TwoD => {
-                        params.settings.max_iterations =
-                            (params.settings.max_iterations + 32).min(2048);
-                        message = Some(format!(
-                            "Max iterations: {}",
-                            params.settings.max_iterations
-                        ));
-                    }
-                    RenderMode::ThreeD => {
-                        params.settings.max_steps = (params.settings.max_steps + 10).min(500);
-                        message = Some(format!("Max steps: {}", params.settings.max_steps));
-                    }
-                }
+                let value = params.adjust_iterations(32);
                 changed = true;
+                let label = if params.settings.render_mode == crate::fractal::RenderMode::TwoD {
+                    format!("Max iterations: {value}")
+                } else {
+                    format!("Max steps: {value}")
+                };
+                message = Some(label);
             }
             CommandAction::DecrementIterations => {
-                use crate::fractal::RenderMode;
-                match params.settings.render_mode {
-                    RenderMode::TwoD => {
-                        params.settings.max_iterations =
-                            params.settings.max_iterations.saturating_sub(32).max(32);
-                        message = Some(format!(
-                            "Max iterations: {}",
-                            params.settings.max_iterations
-                        ));
-                    }
-                    RenderMode::ThreeD => {
-                        params.settings.max_steps =
-                            params.settings.max_steps.saturating_sub(10).max(30);
-                        message = Some(format!("Max steps: {}", params.settings.max_steps));
-                    }
-                }
+                let value = params.adjust_iterations(-32);
                 changed = true;
+                let label = if params.settings.render_mode == crate::fractal::RenderMode::TwoD {
+                    format!("Max iterations: {value}")
+                } else {
+                    format!("Max steps: {value}")
+                };
+                message = Some(label);
             }
             CommandAction::IncrementPower => {
-                params.settings.power = (params.settings.power + 0.5).min(16.0);
+                let value = params.adjust_power(0.5);
                 changed = true;
-                message = Some(format!("Power: {:.1}", params.settings.power));
+                message = Some(format!("Power: {value:.1}"));
             }
             CommandAction::DecrementPower => {
-                params.settings.power = (params.settings.power - 0.5).max(2.0);
+                let value = params.adjust_power(-0.5);
                 changed = true;
-                message = Some(format!("Power: {:.1}", params.settings.power));
+                message = Some(format!("Power: {value:.1}"));
             }
             CommandAction::IncrementOrbitSpeed => {
-                params.settings.orbit_speed = (params.settings.orbit_speed + 0.1).min(5.0);
-                message = Some(format!("Orbit speed: {:.2}", params.settings.orbit_speed));
+                let value = params.adjust_orbit_speed(0.1);
+                message = Some(format!("Orbit speed: {value:.2}"));
             }
             CommandAction::DecrementOrbitSpeed => {
-                params.settings.orbit_speed = (params.settings.orbit_speed - 0.1).max(0.1);
-                message = Some(format!("Orbit speed: {:.2}", params.settings.orbit_speed));
+                let value = params.adjust_orbit_speed(-0.1);
+                message = Some(format!("Orbit speed: {value:.2}"));
             }
             CommandAction::ResetView => {
                 // QA-033: request the reset; App applies it through the same

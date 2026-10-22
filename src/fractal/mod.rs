@@ -524,6 +524,61 @@ impl FractalParams {
         Ok(())
     }
 
+    /// QA-035: the ONE iteration/steps adjuster, shared by the hotkeys
+    /// (input.rs) and the command palette — identical deltas and clamps
+    /// (2D iterations 32..=2048 in steps of 32; 3D steps 30..=500 in steps
+    /// of 10). Returns the new value.
+    pub fn adjust_iterations(&mut self, delta: i32) -> u32 {
+        match self.settings.render_mode {
+            RenderMode::TwoD => {
+                let next = if delta >= 0 {
+                    (self.settings.max_iterations + delta as u32).min(2048)
+                } else {
+                    self.settings
+                        .max_iterations
+                        .saturating_sub(delta.unsigned_abs())
+                        .max(32)
+                };
+                self.settings.max_iterations = next;
+                next
+            }
+            RenderMode::ThreeD => {
+                let next = if delta >= 0 {
+                    (self.settings.max_steps + delta as u32 / 10 * 10).min(500)
+                } else {
+                    self.settings
+                        .max_steps
+                        .saturating_sub(delta.unsigned_abs() / 10 * 10)
+                        .max(30)
+                };
+                self.settings.max_steps = next;
+                next
+            }
+        }
+    }
+
+    /// QA-035: the ONE power adjuster (delta of ±0.5, clamped 2.0..=16.0).
+    pub fn adjust_power(&mut self, delta: f32) -> f32 {
+        let next = if delta >= 0.0 {
+            (self.settings.power + delta).min(16.0)
+        } else {
+            (self.settings.power + delta).max(2.0)
+        };
+        self.settings.power = next;
+        next
+    }
+
+    /// QA-035: the ONE orbit-speed adjuster (delta of ±0.1, clamped 0.1..=5.0).
+    pub fn adjust_orbit_speed(&mut self, delta: f32) -> f32 {
+        let next = if delta >= 0.0 {
+            (self.settings.orbit_speed + delta).min(5.0)
+        } else {
+            (self.settings.orbit_speed + delta).max(0.1)
+        };
+        self.settings.orbit_speed = next;
+        next
+    }
+
     /// Per-type default 2D view: `(center, zoom)`. The types with dedicated
     /// framing in `switch_fractal`'s defaults match it exactly; every other
     /// 2D type resets to the plain `[0, 0]` / `1.0` view.
