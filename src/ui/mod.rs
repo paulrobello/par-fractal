@@ -201,6 +201,13 @@ pub struct UI {
     /// ENH-006: GPU profile HUD overlay visibility. Mirrored to
     /// `UIState::show_gpu_profile` for persistence.
     pub show_gpu_profile: bool,
+    /// QA-033: one-shot reset requests from the command palette. The palette
+    /// sets them; `App` consumes and clears them in `render()` and applies
+    /// the reset through the SAME `App::reset_view`/`reset_all` paths the
+    /// panel buttons use, so every reset entry point produces identical
+    /// state.
+    pub pending_reset_view: bool,
+    pub pending_reset_all: bool,
     pub ui_state: UIState,
     // Command palette
     pub command_palette: CommandPalette,
@@ -282,6 +289,8 @@ impl UI {
             show_camera_info: false,
             show_performance_overlay: false,
             show_gpu_profile: false,
+            pending_reset_view: false,
+            pending_reset_all: false,
             ui_state: UIState::default(),
             command_palette: CommandPalette::new(),
             frame_times: Vec::with_capacity(120),

@@ -518,6 +518,48 @@ impl FractalParams {
         Ok(())
     }
 
+    /// Per-type default 2D view: `(center, zoom)`. The types with dedicated
+    /// framing in `switch_fractal`'s defaults match it exactly; every other
+    /// 2D type resets to the plain `[0, 0]` / `1.0` view.
+    ///
+    /// QA-032/QA-033: the shared source for every view-reset path (R key,
+    /// palette, panel) so they cannot drift; a drift test pins the
+    /// accumulation types against `switch_fractal`.
+    pub fn default_2d_view(fractal_type: FractalType) -> ([f64; 2], f64) {
+        match fractal_type {
+            FractalType::Hopalong2D => ([0.5, 0.5], 0.3),
+            FractalType::Martin2D => ([0.0, 0.0], 0.05),
+            FractalType::Gingerbreadman2D => ([2.0, 2.0], 0.15),
+            FractalType::Chip2D => ([-7.9, -7.1], 0.005),
+            FractalType::Quadruptwo2D => ([16.5, 17.5], 0.032),
+            FractalType::Threeply2D => ([0.0, 0.0], 1.0),
+            FractalType::Buddhabrot2D => ([0.4, 0.0], 0.45),
+            _ => ([0.0, 0.0], 1.0),
+        }
+    }
+
+    /// QA-032: restore the per-type default 2D view — center, zoom, and a
+    /// cleared `center_2d_precise` — WITHOUT touching any other parameter
+    /// (power, iterations, julia_c are the user's). Clears accumulation
+    /// bookkeeping when accumulation is active so stale samples don't
+    /// persist into the reset view.
+    pub fn reset_2d_view(&mut self) {
+        let t = self.settings.fractal_type;
+        let (center, zoom) = Self::default_2d_view(t);
+        self.settings.center_2d = center;
+        self.settings.zoom_2d = zoom;
+        // QA-033: a stale precise center would keep deep zoom iterating the
+        // old location after the reset.
+        self.settings.center_2d_precise = None;
+        if self.settings.attractor_accumulation_enabled {
+            self.accum.pending_clear = true;
+            self.accum.total_iterations = 0;
+            self.accum.last_center = center;
+            self.accum.last_zoom = zoom;
+            self.accum.last_julia_c = self.settings.julia_c;
+        }
+    }
+
     /// Switch to a different fractal type.
     ///
     /// Sets `fractal_type`, re-derives `render_mode` (2D vs 3D) to match, and
@@ -525,6 +567,10 @@ impl FractalParams {
     /// Mandelbulb, tuned view bounds and iteration counts for strange
     /// attractors). Use this instead of assigning `fractal_type` directly so
     /// the two fields never disagree.
+    ///
+    /// QA-032: the per-type 2D *view* defaults (center/zoom) live in
+    /// [`Self::default_2d_view`]; `reset_2d_view` restores them without
+    /// touching any other parameter.
     pub fn switch_fractal(&mut self, fractal_type: FractalType) {
         self.settings.fractal_type = fractal_type;
         self.settings.render_mode = match fractal_type {

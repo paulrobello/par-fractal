@@ -925,31 +925,49 @@ impl App {
         }
     }
 
+    /// QA-032/QA-033: the single shared view reset (R key, palette, panel).
+    /// 2D: restore the per-type default center/zoom without touching any
+    /// other parameter — power, iterations, and julia_c are the user's.
+    /// 3D: pull the camera back to the per-type framing distance and record
+    /// the framing so the per-frame reframe check doesn't fight it.
     fn reset_view(&mut self) {
         match self.fractal_params.settings.render_mode {
             RenderMode::TwoD => {
-                // Re-apply fractal defaults (this sets the correct center and zoom for each fractal type)
-                let current_type = self.fractal_params.settings.fractal_type;
-                self.fractal_params.switch_fractal(current_type);
-
-                // Clear accumulation for strange attractors and sync tracking values
-                if self.fractal_params.settings.attractor_accumulation_enabled {
-                    self.fractal_params.accum.pending_clear = true;
-                    self.fractal_params.accum.total_iterations = 0;
-                    // Sync tracking to the reset values
-                    self.fractal_params.accum.last_center = self.fractal_params.settings.center_2d;
-                    self.fractal_params.accum.last_zoom = self.fractal_params.settings.zoom_2d;
-                    self.fractal_params.accum.last_julia_c = self.fractal_params.settings.julia_c;
-                }
+                self.fractal_params.reset_2d_view();
             }
             RenderMode::ThreeD => {
-                let size = self.renderer.size;
-                self.camera = Camera::new(size.width, size.height);
+                // Framed per-type reset (Octahedral/Icosahedral at 9.0,
+                // Apollonian at 8.0) instead of Camera::new's fixed z=5 that
+                // left the camera inside the larger IFS structures.
                 self.camera.fovy = self.fractal_params.settings.camera_fov;
-                self.camera_controller =
-                    CameraController::new(self.fractal_params.settings.camera_speed);
+                self.camera_controller
+                    .set_speed(self.fractal_params.settings.camera_speed);
+                self.apply_default_camera_for_fractal();
+                self.note_camera_framed();
             }
         }
+        self.mark_scene_dirty();
+    }
+
+    /// QA-033: the single shared full reset (panel button, palette Reset
+    /// All): default parameters plus the matching camera, routed through
+    /// `note_camera_framed` so the reframe check treats the fresh camera as
+    /// deliberate.
+    fn reset_all(&mut self) {
+        self.fractal_params = FractalParams::default();
+        self.camera.reset_to_default(
+            self.fractal_params
+                .settings
+                .fractal_type
+                .default_camera_distance(),
+        );
+        self.camera.fovy = self.fractal_params.settings.camera_fov;
+        self.camera_controller
+            .set_speed(self.fractal_params.settings.camera_speed);
+        self.camera_controller
+            .point_at_target(self.camera.position, self.camera.target);
+        self.note_camera_framed();
+        self.mark_scene_dirty();
     }
 }
 

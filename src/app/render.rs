@@ -1140,20 +1140,9 @@ impl App {
         }
 
         if reset_requested {
-            self.fractal_params = FractalParams::default();
-            // Reset camera to default position and settings
-            self.camera.reset_to_default(
-                self.fractal_params
-                    .settings
-                    .fractal_type
-                    .default_camera_distance(),
-            );
-            self.camera.fovy = self.fractal_params.settings.camera_fov;
-            self.camera_controller
-                .set_speed(self.fractal_params.settings.camera_speed);
-            // Sync controller with reset camera position
-            self.camera_controller
-                .point_at_target(self.camera.position, self.camera.target);
+            self.reset_all();
+            self.settings_last_changed = web_time::Instant::now();
+            self.settings_need_save = true;
             log::info!("Settings and camera reset to defaults");
         }
 
@@ -1168,7 +1157,27 @@ impl App {
             // Sync controller with reset camera position
             self.camera_controller
                 .point_at_target(self.camera.position, self.camera.target);
+            self.note_camera_framed();
             log::info!("Camera reset to default position");
+        }
+
+        // QA-033: the command palette routes resets through the same shared
+        // App paths the panel buttons use instead of mutating params
+        // directly (its old ResetView hard-coded [0,0]/1.0 and left a stale
+        // precise center behind).
+        if self.ui.pending_reset_view {
+            self.ui.pending_reset_view = false;
+            self.reset_view();
+            self.settings_last_changed = web_time::Instant::now();
+            self.settings_need_save = true;
+            log::info!("View reset via command palette");
+        }
+        if self.ui.pending_reset_all {
+            self.ui.pending_reset_all = false;
+            self.reset_all();
+            self.settings_last_changed = web_time::Instant::now();
+            self.settings_need_save = true;
+            log::info!("All settings reset via command palette");
         }
 
         if point_at_fractal_requested {

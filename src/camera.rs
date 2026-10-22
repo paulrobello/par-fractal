@@ -390,6 +390,23 @@ mod tests {
         assert_eq!(camera.zfar, 100.0);
     }
 
+    /// QA-032: the reset path frames each 3D type at its declared
+    /// `default_camera_distance`, so Octahedral/Icosahedral IFS (9.0) and
+    /// Apollonian (8.0) start OUTSIDE their structures — the old fixed-z=5
+    /// `Camera::new` reset put the camera inside them.
+    #[test]
+    fn reset_to_default_frames_octahedral_outside_structure() {
+        use crate::fractal::FractalType;
+        let mut camera = Camera::new(1280, 720);
+        camera.reset_to_default(FractalType::OctahedralIFS3D.default_camera_distance());
+        assert_eq!(
+            camera.position.z,
+            FractalType::OctahedralIFS3D.default_camera_distance()
+        );
+        assert!(camera.position.z > 5.0, "must frame past the structure");
+        assert_eq!(camera.target, Vec3::ZERO);
+    }
+
     #[test]
     fn test_camera_resize() {
         let mut camera = Camera::new(1280, 720);

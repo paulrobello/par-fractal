@@ -722,3 +722,59 @@ fn switch_fractal_enables_accumulation_for_accumulation_types() {
         );
     }
 }
+
+/// QA-032/QA-033: `reset_2d_view` restores the per-type default center/zoom,
+/// clears the stale precise center, and does NOT clobber user power or
+/// iterations.
+#[test]
+fn reset_2d_view_restores_view_only() {
+    let mut params = FractalParams::default();
+    params.switch_fractal(FractalType::Chip2D);
+    // User tweaks (must survive the reset):
+    params.settings.power = 3.5;
+    params.settings.max_iterations = 750;
+    // Drift the view + set a stale precise center:
+    params.settings.center_2d = [99.0, -3.0];
+    params.settings.zoom_2d = 1e-5;
+    params.settings.center_2d_precise = Some(["-0.75".to_string(), "0.1".to_string()]);
+
+    params.reset_2d_view();
+
+    let (center, zoom) = FractalParams::default_2d_view(FractalType::Chip2D);
+    assert_eq!(params.settings.center_2d, center);
+    assert_eq!(params.settings.zoom_2d, zoom);
+    assert_eq!(params.settings.center_2d_precise, None);
+    assert_eq!(params.settings.power, 3.5, "user power must survive");
+    assert_eq!(
+        params.settings.max_iterations, 750,
+        "user iterations must survive"
+    );
+}
+
+/// QA-032: `default_2d_view` and `switch_fractal` must agree on the view
+/// fields for every type with a dedicated framing.
+#[test]
+fn default_2d_view_matches_switch_fractal_framing() {
+    let types = [
+        FractalType::Hopalong2D,
+        FractalType::Martin2D,
+        FractalType::Gingerbreadman2D,
+        FractalType::Chip2D,
+        FractalType::Quadruptwo2D,
+        FractalType::Threeply2D,
+        FractalType::Buddhabrot2D,
+    ];
+    for t in types {
+        let mut params = FractalParams::default();
+        params.switch_fractal(t);
+        let (center, zoom) = FractalParams::default_2d_view(t);
+        assert_eq!(
+            params.settings.center_2d, center,
+            "{t:?}: switch_fractal and default_2d_view disagree on center"
+        );
+        assert_eq!(
+            params.settings.zoom_2d, zoom,
+            "{t:?}: switch_fractal and default_2d_view disagree on zoom"
+        );
+    }
+}

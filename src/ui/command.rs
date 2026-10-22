@@ -380,15 +380,17 @@ impl UI {
                 message = Some(format!("Orbit speed: {:.2}", params.settings.orbit_speed));
             }
             CommandAction::ResetView => {
-                // Reset 2D view parameters
-                params.settings.center_2d = [0.0, 0.0];
-                params.settings.zoom_2d = 1.0;
-                changed = true;
+                // QA-033: request the reset; App applies it through the same
+                // shared `App::reset_view` path the panel buttons and the R
+                // key use (per-type 2D view / framed 3D camera, stale
+                // precise center cleared).
+                self.pending_reset_view = true;
                 message = Some("View reset".to_string());
             }
             CommandAction::ResetAll => {
-                *params = FractalParams::default();
-                changed = true;
+                // QA-033: same routing as ResetView — through
+                // `App::reset_all`, not a direct params mutation here.
+                self.pending_reset_all = true;
                 message = Some("All settings reset to defaults".to_string());
             }
             CommandAction::CycleTheme => {
