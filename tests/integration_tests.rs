@@ -1,6 +1,6 @@
 use par_fractal::{
-    Camera, CameraController, ColorPalette, FractalParams, FractalType, RenderMode, RenderSettings,
-    ShadingModel, UI,
+    Camera, CameraController, ColorPalette, FractalParams, FractalType, RenderMode, ShadingModel,
+    UI,
 };
 
 #[test]
@@ -38,22 +38,22 @@ fn test_complete_fractal_workflow() {
     assert_eq!(params.settings.fractal_type, FractalType::Julia2D);
     assert_eq!(params.settings.render_mode, RenderMode::TwoD);
 
-    // Modify Julia parameters
-    params.settings.julia_c = [-0.8, 0.156];
-    assert_eq!(params.settings.julia_c, [-0.8, 0.156]);
-
-    // Switch to 3D
+    // Switching types keeps the authored settings the user set (Julia's c
+    // survives a type switch; switch_fractal only re-derives mode + view).
+    let julia_c = [-0.8, 0.156];
+    params.settings.julia_c = julia_c;
     params.switch_fractal(FractalType::Mandelbulb3D);
     assert_eq!(params.settings.render_mode, RenderMode::ThreeD);
+    assert_eq!(params.settings.julia_c, julia_c, "user julia_c clobbered");
 
-    // Enable effects
+    // Effects toggle round-trips through the settings that persist.
     params.settings.ambient_occlusion = true;
-    params.settings.shadow_mode = 2; // Soft shadows
     params.settings.depth_of_field = true;
-
-    assert!(params.settings.ambient_occlusion);
-    assert_eq!(params.settings.shadow_mode, 2); // Soft shadows enabled
-    assert!(params.settings.depth_of_field);
+    params.switch_fractal(FractalType::MengerSponge3D);
+    assert!(
+        params.settings.ambient_occlusion && params.settings.depth_of_field,
+        "effect toggles lost across a type switch"
+    );
 }
 
 #[test]
@@ -124,23 +124,28 @@ fn test_shading_model_switching() {
 }
 
 #[test]
-fn test_2d_fractal_parameters() {
-    let mut params = FractalParams {
-        settings: RenderSettings {
-            zoom_2d: 2.0,
-            ..Default::default()
-        },
-        ..Default::default()
-    };
-    assert_eq!(params.settings.zoom_2d, 2.0);
+fn test_zoom_at_keeps_clicked_point_fixed() {
+    // QA-036: behavior, not assign-then-assert. zoom_at must keep the
+    // fractal point under the cursor stationary across the zoom.
+    let mut params = FractalParams::default();
+    params.settings.center_2d = [0.0, 0.0];
+    params.settings.zoom_2d = 1.0;
 
-    // Test panning
-    params.settings.center_2d = [0.5, -0.3];
-    assert_eq!(params.settings.center_2d, [0.5, -0.3]);
+    let aspect = 1.0;
+    let cursor = (0.5, -0.25);
+    // Fractal point under the cursor BEFORE the zoom.
+    let fx = params.settings.center_2d[0] + (cursor.0 * 2.0 / params.settings.zoom_2d) * aspect;
+    let fy = params.settings.center_2d[1] + cursor.1 * 2.0 / params.settings.zoom_2d;
 
-    // Test iterations
-    params.settings.max_iterations = 512;
-    assert_eq!(params.settings.max_iterations, 512);
+    params.zoom_at(cursor, 2.0, aspect);
+
+    let fx_after =
+        params.settings.center_2d[0] + (cursor.0 * 2.0 / params.settings.zoom_2d) * aspect;
+    let fy_after = params.settings.center_2d[1] + cursor.1 * 2.0 / params.settings.zoom_2d;
+    assert!(
+        (fx - fx_after).abs() < 1e-9 && (fy - fy_after).abs() < 1e-9,
+        "clicked point moved under zoom: ({fx},{fy}) -> ({fx_after},{fy_after})"
+    );
 }
 
 #[test]
@@ -381,4 +386,35 @@ fn test_render_mode_consistency() {
 
     params.switch_fractal(FractalType::MengerSponge3D);
     assert_eq!(params.settings.render_mode, RenderMode::ThreeD);
+}
+
+/// QA-036: R-style reset behavior for every 2D type — restores the per-type
+/// default view, clears a stale precise center, and does NOT clobber user
+/// power/iterations. 3D types are covered by the camera-framing tests.
+#[test]
+fn reset_2d_view_restores_defaults_for_every_2d_type() {
+    for t in FractalType::ALL {
+        if t.info().is_3d {
+            continue;
+        }
+        let mut params = FractalParams::default();
+        params.switch_fractal(*t);
+        params.settings.power = 3.5;
+        params.settings.max_iterations = 750;
+        params.settings.center_2d = [42.0, -42.0];
+        params.settings.zoom_2d = 1e-9;
+        params.settings.center_2d_precise = Some(["-0.75".to_string(), "0.1".to_string()]);
+
+        params.reset_2d_view();
+
+        let (center, zoom) = FractalParams::default_2d_view(*t);
+        assert_eq!(params.settings.center_2d, center, "{t:?} center");
+        assert_eq!(params.settings.zoom_2d, zoom, "{t:?} zoom");
+        assert_eq!(params.settings.center_2d_precise, None, "{t:?} precise");
+        assert_eq!(params.settings.power, 3.5, "{t:?} power must survive");
+        assert_eq!(
+            params.settings.max_iterations, 750,
+            "{t:?} iterations must survive"
+        );
+    }
 }

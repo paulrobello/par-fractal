@@ -47,6 +47,8 @@ pub mod deep_zoom;
 /// Fractal parameter model (`FractalParams`), fractal types, color palettes,
 /// presets, and serializable settings.
 pub mod fractal;
+/// Launch-parameter parsing shared by the CLI and the web entry.
+pub mod launch_params;
 /// Adaptive Level-of-Detail system that trades quality for performance based
 /// on distance, motion, and measured FPS.
 pub mod lod;

@@ -4,6 +4,7 @@
 //! methods" ghost and the `#[allow(dead_code)] mod platform` silencer).
 use par_fractal::app::{self, App};
 use par_fractal::fractal;
+use par_fractal::launch_params::parse_quality_level;
 use std::env;
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
@@ -34,17 +35,6 @@ fn print_help() {
         "  --camera-pos <x,y,z>     Place the 3D camera, looking at the origin (agent testing)"
     );
     println!("  --help, -h               Show this help message");
-}
-
-/// Parse quality level string to LOD level index (0=ultra, 1=high, 2=medium, 3=low)
-fn parse_quality_level(s: &str) -> Option<usize> {
-    match s.to_lowercase().as_str() {
-        "ultra" | "u" => Some(0),
-        "high" | "h" => Some(1),
-        "medium" | "med" | "m" => Some(2),
-        "low" | "l" => Some(3),
-        _ => None,
-    }
 }
 
 fn clear_settings() {

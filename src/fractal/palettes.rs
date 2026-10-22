@@ -1060,3 +1060,38 @@ impl CustomPaletteGallery {
         Ok(Vec::new())
     }
 }
+
+#[cfg(test)]
+mod parse_pal_tests {
+    use super::*;
+
+    /// QA-036: JASC-PAL parses header/count/colors and samples 8 entries.
+    #[test]
+    fn parses_jasc_pal() {
+        let content = "JASC-PAL\n0100\n4\n255 0 0\n0 255 0\n0 0 255\n255 255 255\n";
+        let palette = CustomPalette::parse_pal_content(content, "test".into()).expect("parses");
+        assert_eq!(palette.name, "test");
+        assert_eq!(palette.colors.len(), 8); // sampled to the standard width
+    }
+
+    /// QA-036: malformed inputs error instead of panicking.
+    #[test]
+    fn rejects_malformed_pal() {
+        assert!(CustomPalette::parse_pal_content("JASC-PAL\n0100\n", "x".into()).is_err());
+        assert!(
+            CustomPalette::parse_pal_content("JASC-PAL\n0100\n1\n0 0 0\n", "x".into()).is_err()
+        );
+        assert!(
+            CustomPalette::parse_pal_content("JASC-PAL\n0100\nnonsense\n0 0 0\n", "x".into())
+                .is_err()
+        );
+    }
+
+    /// QA-036: the simple text format (one RGB per line) also parses.
+    #[test]
+    fn parses_simple_text_palette() {
+        let content = "255 0 0\n0, 255, 0\n0 0 255\n";
+        let palette = CustomPalette::parse_pal_content(content, "simple".into()).expect("parses");
+        assert_eq!(palette.colors.len(), 8);
+    }
+}
