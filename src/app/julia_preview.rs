@@ -65,13 +65,15 @@ pub fn inset_rect(size_px: (u32, u32)) -> [f32; 4] {
 }
 
 impl App {
-    /// True when the preview inset should be drawn this frame.
+    /// True when the preview inset should be drawn this frame. The inset
+    /// hides while the egui pointer is over any UI area — a window or panel
+    /// over the inset rect would otherwise show it through or clash with it.
     pub(super) fn julia_preview_visible(&self) -> bool {
         should_show(
             self.ui.ui_state.julia_preview_enabled,
             self.fractal_params.settings.fractal_type,
             self.fractal_params.settings.render_mode,
-        )
+        ) && !self.pointer_over_ui
     }
 
     /// Physical-px inset rect for the current surface. Shared by the GPU

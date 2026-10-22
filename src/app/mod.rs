@@ -57,7 +57,11 @@ pub struct App {
     mouse_pressed: bool,
     last_mouse_pos: Option<(f32, f32)>,
     cursor_pos: (f32, f32), // Current cursor position for zoom-at-cursor
-    shift_pressed: bool,    // Track shift key for continuous zoom
+    /// Issue #1: true when the egui pointer is over any UI area/window —
+    /// the preview inset hides while the cursor is over UI (last frame's
+    /// state, set in `render_ui`).
+    pointer_over_ui: bool,
+    shift_pressed: bool, // Track shift key for continuous zoom
     // ENH-002: manual double-click detection (winit 0.30 has no click_count)
     last_click_at: Option<web_time::Instant>,
     last_click_pos: Option<(f32, f32)>,
@@ -523,6 +527,7 @@ impl App {
             mouse_pressed: false,
             last_mouse_pos: None,
             cursor_pos: (0.0, 0.0),
+            pointer_over_ui: false,
             shift_pressed: false,
             last_click_at: None,
             last_click_pos: None,

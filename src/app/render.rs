@@ -689,6 +689,10 @@ impl App {
         // returns (we can't call `self.mark_scene_dirty()` inside the closure
         // — `egui_ctx()` holds an immutable borrow on `self.egui_state`).
         let mut ui_mutated_scene = false;
+        // Issue #1: last-frame "pointer over any egui area" — the preview
+        // inset hides while the cursor is over UI (a window or panel over
+        // the inset rect would otherwise show it through / clash with it).
+        let mut pointer_over_ui = false;
         let mut actions = UiActions::default();
         // Issue #1: snapshot the inset's frame data BEFORE the UI closure
         // (the closure borrows pieces of `self`). Same rect + mapping as the
@@ -723,10 +727,14 @@ impl App {
 
             // Issue #1: inset border + live c label, painted above the wgpu
             // inset. `julia_preview_frame` was snapshotted before this
-            // closure from the same rect helper the GPU pass uses.
+            // closure from the same rect helper the GPU pass uses. Painted
+            // on the background layer: above the wgpu surface, below every
+            // egui window/panel, so an open window covering the inset rect
+            // simply covers it instead of mixing with a top-layer border.
+            pointer_over_ui = ctx.is_pointer_over_egui();
             if let Some(([x, y, w, h], c)) = julia_preview_frame {
                 let rect = egui::Rect::from_min_size(egui::pos2(x, y), egui::vec2(w, h));
-                let painter = ctx.debug_painter();
+                let painter = ctx.layer_painter(egui::LayerId::background());
                 painter.rect_stroke(
                     rect,
                     0.0,
@@ -822,6 +830,10 @@ impl App {
             self.ui
                 .render_gpu_profile_overlay(ctx, &self.renderer.profiler);
         });
+
+        // Issue #1: publish this frame's pointer-over-UI state for the next
+        // frame's inset visibility (the GPU pass runs before egui).
+        self.pointer_over_ui = pointer_over_ui;
 
         self.egui_state
             .handle_platform_output(self.window.as_ref(), full_output.platform_output);
