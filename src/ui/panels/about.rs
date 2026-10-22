@@ -56,18 +56,32 @@ impl UI {
                 ui.separator();
                 ui.add_space(4.0);
 
-                ui.collapsing("What's New in v0.10.0", |ui| {
+                // DOC-006: What's New mirrors CHANGELOG.md (the source of
+                // truth). Keep the two in sync — one bullet per CHANGELOG
+                // section headline. 0.9.0/0.10.0 are staged but NOT tagged or
+                // published (see the CHANGELOG Unreleased note).
+                ui.collapsing("What's New (unreleased — 0.10.0 staging)", |ui| {
                     ui.label("• Perturbation deep-zoom: effectively infinite zoom (1e8+) on the Mandelbrot family");
                     ui.label("• Precise decimal center + 10ⁿ zoom readout in the 2D panel");
-                    ui.label("• Dynamic render scaling + half-resolution bloom for smoother interaction");
-                    ui.label("• Built-in GPU frame profiler (Shift+G)");
-                    ui.label("• Per-fractal pipeline specialization and encase-driven uniform layout");
+                    ui.label("• Half-resolution bloom pipeline (~4× bloom bandwidth cut)");
+                    ui.label("• Built-in GPU frame profiler (Shift+G) + --profile-dump");
+                    ui.label("• --switch-after CLI flag for scripted fractal-type transitions");
+                    ui.label("• Uniform layout automation via encase (padding-field bug class eliminated)");
                 });
 
-                ui.collapsing("What's New in v0.9.0", |ui| {
-                    ui.label("• Upgraded egui 0.34 → 0.35");
+                ui.collapsing("What's New (unreleased — 0.9.0 staging)", |ui| {
+                    ui.label("• Security: untrusted preset/settings values clamped at the trust boundary");
+                    ui.label("• Render-on-demand: static scenes sleep instead of re-rendering at 60 Hz");
+                    ui.label("• Deep-zoom correctness: HP auto-enables at zoom > 1e4, DF math fixes");
+                    ui.label("• FractalParams split into RenderSettings / LodRuntime / AccumulationState");
+                    ui.label("• Migrated to winit 0.30 ApplicationHandler; UI split into per-panel modules");
+                    ui.label("• 2D LOD iteration lever + split 2D/3D fragment shaders");
+                });
+
+                ui.collapsing("What's New in v0.8.3", |ui| {
+                    ui.label("• Upgraded egui ecosystem to 0.35");
                     ui.label("• Migrated to Rust edition 2024");
-                    ui.label("• Updated all dependencies to latest versions");
+                    ui.label("• Updated all dependencies; wgpu held at 29.0.4");
                 });
 
                 ui.collapsing("What's New in v0.8.2", |ui| {
@@ -75,6 +89,10 @@ impl UI {
                     ui.label("• Upgraded egui 0.33 → 0.34");
                     ui.label("• Upgraded glam 0.31 → 0.32, rand 0.9 → 0.10");
                     ui.label("• Updated all web/wasm dependencies");
+                });
+
+                ui.collapsing("What's New in v0.8.1", |ui| {
+                    ui.label("• Fixed --quality/-q and ?quality= not actually applying at startup");
                 });
 
                 ui.collapsing("What's New in v0.8.0", |ui| {
