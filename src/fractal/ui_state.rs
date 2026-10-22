@@ -49,10 +49,6 @@ pub(super) fn default_one() -> f32 {
     1.0
 }
 
-pub(super) fn default_true() -> bool {
-    true
-}
-
 pub(super) fn default_reflection_strength() -> f32 {
     0.5
 }
@@ -62,7 +58,7 @@ pub(super) fn default_light_azimuth() -> f32 {
 }
 
 pub(super) fn default_light_elevation() -> f32 {
-    60.0 // degrees
+    35.0 // degrees — ARC-026: must match RenderSettings::default (state.rs)
 }
 
 pub(super) fn default_vignette_intensity() -> f32 {

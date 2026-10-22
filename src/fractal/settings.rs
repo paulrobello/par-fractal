@@ -109,7 +109,8 @@ pub struct Settings {
     pub floor_height: f32,
     pub floor_color1: [f32; 3],
     pub floor_color2: [f32; 3],
-    #[serde(default = "default_true")]
+    // ARC-026: plain `default` (false) matches RenderSettings::default.
+    #[serde(default)]
     pub floor_reflections: bool,
     #[serde(default = "default_reflection_strength")]
     pub floor_reflection_strength: f32,
@@ -180,12 +181,15 @@ pub struct Settings {
     pub attractor_log_scale: f32,
 }
 
+// ARC-026: these MUST match RenderSettings::default (state.rs) — a settings
+// file missing the keys must load identically to a fresh start. The
+// serde_defaults_match_code_defaults test below enforces it.
 fn default_attractor_iterations_per_frame() -> u32 {
-    100_000
+    10_000
 }
 
 fn default_attractor_log_scale() -> f32 {
-    1.0
+    4.0
 }
 
 fn default_procedural_brightness() -> [f32; 3] {
@@ -205,3 +209,44 @@ fn default_procedural_phase() -> [f32; 3] {
 }
 
 // Preset categories for organization
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::FractalParams;
+
+    /// ARC-026: every serde default must equal the code default
+    /// (`FractalParams::default().to_settings()`), so a settings file missing
+    /// keys loads identically to a fresh start. Add every new
+    /// `#[serde(default = ...)]` field here.
+    #[test]
+    fn serde_defaults_match_code_defaults() {
+        let d = FractalParams::default().to_settings();
+        assert_eq!(
+            default_attractor_iterations_per_frame(),
+            d.attractor_iterations_per_frame
+        );
+        assert_eq!(default_attractor_log_scale(), d.attractor_log_scale);
+        assert_eq!(default_dof_samples(), d.dof_samples);
+        assert_eq!(default_shadow_mode(), d.shadow_mode);
+        assert_eq!(default_light_azimuth(), d.light_azimuth);
+        assert_eq!(default_light_elevation(), d.light_elevation);
+        assert!(!d.floor_reflections); // `#[serde(default)]` bool
+        assert_eq!(default_reflection_strength(), d.floor_reflection_strength);
+        assert_eq!(default_orbit_speed(), d.orbit_speed);
+        assert_eq!(default_one(), d.brightness);
+        assert_eq!(default_one(), d.contrast);
+        assert_eq!(default_one(), d.saturation);
+        assert_eq!(default_vignette_intensity(), d.vignette_intensity);
+        assert_eq!(default_vignette_radius(), d.vignette_radius);
+        assert_eq!(default_bloom_threshold(), d.bloom_threshold);
+        assert_eq!(default_bloom_intensity(), d.bloom_intensity);
+        assert_eq!(default_bloom_radius(), d.bloom_radius);
+        assert_eq!(default_custom_width(), d.custom_width);
+        assert_eq!(default_custom_height(), d.custom_height);
+        assert_eq!(default_procedural_brightness(), d.procedural_brightness);
+        assert_eq!(default_procedural_contrast(), d.procedural_contrast);
+        assert_eq!(default_procedural_frequency(), d.procedural_frequency);
+        assert_eq!(default_procedural_phase(), d.procedural_phase);
+    }
+}
