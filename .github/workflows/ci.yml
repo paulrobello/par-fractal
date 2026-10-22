@@ -113,6 +113,7 @@ jobs:
 
     - name: Build WASM
       run: trunk build --release
+      working-directory: web
 
   audit:
     name: Security audit (cargo audit)

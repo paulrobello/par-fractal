@@ -2122,6 +2122,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "par-fractal-web"
+version = "0.10.0"
+dependencies = [
+ "console_error_panic_hook",
+ "console_log",
+ "log",
+ "par-fractal",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+ "winit",
+]
+
+[[package]]
 name = "parking_lot"
 version = "0.12.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"

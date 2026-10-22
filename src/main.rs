@@ -1,25 +1,9 @@
-mod app;
-mod camera;
-mod command_palette;
-/// ENH-001 perturbation-theory deep-zoom subsystem: arbitrary-precision
-/// reference orbit (CPU foundation) + the off-render-thread driver that
-/// recomputes it on view change.
-mod deep_zoom;
-mod fractal;
-mod lod;
-// `platform` is dormant infrastructure being incrementally wired up via the
-// `platform::` traits (ARC-014 constructor dedup uses `PlatformContext` +
-// `Storage`; the `FileDialog` / `Capture` traits and the unused `category`
-// constants await the larger `capture.rs` / `capture_web.rs` dedup noted in
-// AUDIT ARC-014). QA-020 audit: silenced with a reason, not deleted, because
-// the platform-abstraction layering is intentional infrastructure.
-#[allow(dead_code)]
-mod platform;
-mod renderer;
-mod ui;
-mod video_recorder;
-
-use app::App;
+//! ARC-024: the binary is a thin shim over the `par_fractal` library — the
+//! whole module tree compiles ONCE (in the rlib); declaring `mod` here would
+//! duplicate it into the binary (the source of the parsight "dead App
+//! methods" ghost and the `#[allow(dead_code)] mod platform` silencer).
+use par_fractal::app::{self, App};
+use par_fractal::fractal;
 use std::env;
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;

@@ -1,3 +1,7 @@
+//! Par Fractal web/WASM entry point (ARC-024): the cdylib trunk builds.
+//! Lives in its own workspace member so the root library stays a plain
+//! rlib — a native `cargo build` no longer produces a dylib.
+
 //! Web/WASM entry point for Par Fractal
 
 use std::cell::RefCell;
@@ -10,7 +14,7 @@ use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::platform::web::{EventLoopExtWebSys, WindowAttributesExtWebSys};
 use winit::window::{Window, WindowId};
 
-use crate::app::App;
+use par_fractal::app::App;
 
 /// Parse quality level string to LOD level index (0=ultra, 1=high, 2=medium, 3=low)
 fn parse_quality_level(s: &str) -> Option<usize> {

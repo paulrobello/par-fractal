@@ -1,0 +1,21 @@
+[package]
+name = "par-fractal-web"
+version = "0.10.0"
+edition = "2024"
+rust-version = "1.99"
+description = "WASM entry point for Par Fractal (trunk cdylib)"
+license = "MIT"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+par-fractal = { path = "..", default-features = false, features = ["web"] }
+wasm-bindgen = "0.2.126"
+wasm-bindgen-futures = "0.4.76"
+winit = "0.30.13"
+web-sys = "0.3"
+console_log = "1"
+console_error_panic_hook = "0.1"
+log = "0.4"

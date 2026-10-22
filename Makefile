@@ -568,7 +568,7 @@ web-install:
 
 web-build:
 	@echo "Building WASM bundle..."
-	trunk build --release
+	cd web && trunk build --release
 	@echo ""
 	@echo "======================================================================"
 	@echo "  Web build complete!"
@@ -584,11 +584,11 @@ web-serve:
 	@echo "Starting development server..."
 	@echo "Open http://127.0.0.1:8080 in your browser"
 	@echo ""
-	trunk serve
+	cd web && trunk serve
 
 web-clean:
 	@echo "Cleaning web build artifacts..."
-	rm -rf dist/
+	rm -rf web/dist/
 	@echo "Web build artifacts cleaned."
 
 web-deploy:

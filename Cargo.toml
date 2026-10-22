@@ -30,8 +30,13 @@ exclude = [
     "dist/",
 ]
 
+# ARC-024: rlib only — the web/WASM cdylib lives in the `web/` workspace
+# member, so a native `cargo build` no longer produces a dylib.
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["rlib"]
+
+[workspace]
+members = ["web"]
 
 [features]
 default = ["native"]

@@ -23,16 +23,15 @@
 //!   camera, and recording actions
 //! - `platform` — platform-specific helpers
 //! - `video_recorder` — ffmpeg-backed video capture (native targets only)
-//! - `web_main` — WASM web entry point (only compiled on `wasm32`)
 //!
 //! For the system design and data flow see `docs/ARCHITECTURE.md`; for the
 //! feature catalog see `docs/FEATURES.md`.
 //!
 //! # Crate types
 //!
-//! The crate builds both as an `rlib` (for consumption from crates.io as a
-//! Rust library) and as a `cdylib` (for the web/WASM build loaded from
-//! JavaScript). The native binary entry point lives in `src/main.rs`.
+//! The crate builds as an `rlib`. The native binary entry point lives in
+//! `src/main.rs`; the web/WASM cdylib that trunk bundles is the `web/`
+//! workspace member (ARC-024), so native builds produce no dylib.
 
 /// Application state, the winit event loop, and orchestration of input,
 /// update, render, and capture.
@@ -66,10 +65,6 @@ pub mod ui;
 /// ffmpeg-backed video capture (native targets only).
 #[cfg(not(target_arch = "wasm32"))]
 pub mod video_recorder;
-
-/// WASM web entry point (only compiled on `wasm32`).
-#[cfg(target_arch = "wasm32")]
-pub mod web_main;
 
 // Re-export commonly used types
 

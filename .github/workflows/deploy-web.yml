@@ -53,14 +53,16 @@ jobs:
 
       - name: Build WASM
         run: trunk build --release --public-url /
+        working-directory: web
 
       - name: Add CNAME for custom domain
         run: echo "par-fractal.pardev.net" > dist/CNAME
+        working-directory: web
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v5
         with:
-          path: dist
+          path: web/dist
 
       - name: Deploy to GitHub Pages
         id: deployment

@@ -17,6 +17,7 @@
 *.so
 *.dylib
 /dist/
+/web/dist/
 
 # Testing
 *.profdata
