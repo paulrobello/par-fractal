@@ -1,6 +1,7 @@
 // Module declarations
 mod camera_transition;
 mod input;
+mod julia_preview;
 mod refine;
 mod render;
 mod update;

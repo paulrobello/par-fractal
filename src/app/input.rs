@@ -727,6 +727,12 @@ impl App {
                 let current_pos = (position.x as f32, position.y as f32);
                 self.cursor_pos = current_pos; // Always track cursor position
 
+                // Issue #1: the preview inset's c tracks the cursor, so a
+                // move must wake the render-on-demand loop (ARC-006).
+                if self.julia_preview_visible() {
+                    self.mark_scene_dirty();
+                }
+
                 // Don't handle CursorMoved if we have active touches
                 // (touch events generate their own cursor movements on web)
                 if self.active_touches.is_empty() && self.mouse_pressed && !self.shift_pressed {

@@ -239,6 +239,11 @@ impl App {
             encoder
         };
 
+        // Issue #1: draw the Julia-under-cursor preview inset. We are past
+        // the screenshot/recording encoder fork, so captures stay
+        // fractal-only while the presented frame gets the overlay.
+        self.render_julia_preview_pass(&mut encoder, &view);
+
         // Render UI into `view` (encodes the egui draw lists into `encoder`),
         // returning the actions the user triggered and whether any of them
         // mutated scene state. Then apply the side effects.
@@ -685,6 +690,23 @@ impl App {
         // — `egui_ctx()` holds an immutable borrow on `self.egui_state`).
         let mut ui_mutated_scene = false;
         let mut actions = UiActions::default();
+        // Issue #1: snapshot the inset's frame data BEFORE the UI closure
+        // (the closure borrows pieces of `self`). Same rect + mapping as the
+        // GPU pass, so the egui frame tracks the inset exactly.
+        let julia_preview_frame = if self.julia_preview_visible() {
+            Some((
+                self.julia_preview_rect(),
+                super::julia_preview::cursor_to_complex(
+                    self.cursor_pos,
+                    (self.renderer.size.width, self.renderer.size.height),
+                    self.fractal_params.settings.center_2d,
+                    self.fractal_params.settings.zoom_2d,
+                ),
+            ))
+        } else {
+            None
+        };
+
         let mut full_output = self.egui_state.egui_ctx().run_ui(raw_input, |ctx| {
             #[cfg(not(target_arch = "wasm32"))]
             let is_rec = self.video_recorder.is_recording();
@@ -698,6 +720,34 @@ impl App {
                 self.camera.target,
                 is_rec,
             );
+
+            // Issue #1: inset border + live c label, painted above the wgpu
+            // inset. `julia_preview_frame` was snapshotted before this
+            // closure from the same rect helper the GPU pass uses.
+            if let Some(([x, y, w, h], c)) = julia_preview_frame {
+                let rect = egui::Rect::from_min_size(egui::pos2(x, y), egui::vec2(w, h));
+                let painter = ctx.debug_painter();
+                painter.rect_stroke(
+                    rect,
+                    0.0,
+                    egui::Stroke::new(
+                        1.0,
+                        egui::Color32::from_rgba_unmultiplied(255, 255, 255, 130),
+                    ),
+                    egui::StrokeKind::Outside,
+                );
+                let label = match c {
+                    Some([re, im]) => format!("c = ({re:+.4}, {im:+.4})"),
+                    None => "c = ?".to_string(),
+                };
+                painter.text(
+                    egui::pos2(rect.left(), rect.top() - 4.0),
+                    egui::Align2::LEFT_BOTTOM,
+                    label,
+                    egui::FontId::proportional(11.0),
+                    egui::Color32::from_rgba_unmultiplied(255, 255, 255, 200),
+                );
+            }
 
             // ARC-006: snapshot which UI actions mutate scene state BEFORE the
             // handlers consume the Options, so we can mark the scene dirty in

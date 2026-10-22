@@ -371,6 +371,18 @@ impl Renderer {
         });
     }
 
+    /// Issue #1: rewrite the Julia preview inset's uniform buffer for this
+    /// frame. `c` is the cursor's complex coordinate. Clones the main
+    /// uniform set — already updated by [`Self::update`] — so iteration
+    /// count, palette, and color settings match the main view.
+    pub fn update_julia_preview(&mut self, c: [f64; 2]) {
+        let mut u = self.uniforms;
+        u.set_for_julia_preview(glam::Vec2::new(c[0] as f32, c[1] as f32));
+        let bytes = write_uniform_bytes(&u);
+        self.queue
+            .write_buffer(&self.julia_preview_uniform_buffer, 0, &bytes);
+    }
+
     /// ENH-001 Phase A step 5: drop the active orbit so the shader's
     /// perturbation branch turns off on the next frame.
     ///

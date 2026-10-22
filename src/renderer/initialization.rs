@@ -387,6 +387,78 @@ impl Renderer {
             multiview_mask: None,
         });
 
+        // Issue #1 Julia-under-cursor preview: dedicated uniform buffer +
+        // bind group for the inset pass. Same layout as the main uniform
+        // set; starts with defaults, rewritten each visible frame by
+        // `update_julia_preview`.
+        let julia_preview_uniform_buffer =
+            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Julia Preview Uniform Buffer"),
+                contents: &write_uniform_bytes(&Uniforms::new()),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            });
+        let julia_preview_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &uniform_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: julia_preview_uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: orbit_buffer.buffer.as_entire_binding(),
+                },
+            ],
+            label: Some("julia_preview_bind_group"),
+        });
+
+        // Inset pipeline — same 2D entry point as `pipeline_2d`, but the
+        // target format is the surface's: the inset draws into the
+        // swap-chain view after the post chain, where `pipeline_2d`'s
+        // Rgba16Float target would not validate.
+        let julia_preview_pipeline =
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                cache: None,
+                label: Some("Render Pipeline (2D Julia Preview)"),
+                layout: Some(&render_pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: Some("vs_main"),
+                    buffers: &[Some(wgpu::VertexBufferLayout {
+                        array_stride: std::mem::size_of::<[f32; 2]>() as wgpu::BufferAddress,
+                        step_mode: wgpu::VertexStepMode::Vertex,
+                        attributes: &wgpu::vertex_attr_array![0 => Float32x2],
+                    })],
+                    compilation_options: Default::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: Some("fs_main_2d"),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: surface_format,
+                        blend: Some(wgpu::BlendState::REPLACE),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                    compilation_options: Default::default(),
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleStrip,
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: None,
+                    polygon_mode: wgpu::PolygonMode::Fill,
+                    unclipped_depth: false,
+                    conservative: false,
+                },
+                depth_stencil: None,
+                multisample: wgpu::MultisampleState {
+                    count: 1,
+                    mask: !0,
+                    alpha_to_coverage_enabled: false,
+                },
+                multiview_mask: None,
+            });
+
         // Fullscreen quad vertices
         let vertices: &[f32] = &[-1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0];
 
@@ -1078,6 +1150,9 @@ impl Renderer {
 
             // ENH-003: render at native resolution until LOD drops the active
             // quality level (or a capture path overrides it).
+            julia_preview_pipeline,
+            julia_preview_uniform_buffer,
+            julia_preview_bind_group,
             scene_render_scale: 1.0,
             render_scale_override: None,
             refining: false,

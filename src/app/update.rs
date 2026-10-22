@@ -254,6 +254,19 @@ impl App {
         // must both operate on the whole scene_texture).
         self.renderer.refining = self.refine_state.is_some();
         self.renderer.update(&self.camera, &self.fractal_params);
+
+        // Issue #1: refresh the preview inset's uniforms — c = the complex
+        // coordinate under the cursor. No-op unless the inset is visible.
+        if self.julia_preview_visible()
+            && let Some(c) = super::julia_preview::cursor_to_complex(
+                self.cursor_pos,
+                (self.renderer.size.width, self.renderer.size.height),
+                self.fractal_params.settings.center_2d,
+                self.fractal_params.settings.zoom_2d,
+            )
+        {
+            self.renderer.update_julia_preview(c);
+        }
     }
 
     /// ENH-001 Phase A step 5: drive the perturbation reference-orbit worker.

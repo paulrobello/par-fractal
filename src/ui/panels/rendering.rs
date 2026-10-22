@@ -468,6 +468,18 @@ impl UI {
                                             actions.changed = true;
                                         }
 
+                                        // Issue #1: live Julia-under-cursor preview toggle.
+                                        actions.changed |= ui
+                                            .checkbox(
+                                                &mut self.ui_state.julia_preview_enabled,
+                                                "Julia preview",
+                                            )
+                                            .on_hover_text(
+                                                "Live preview of the Julia set at the point under \
+                                                the cursor while browsing the Mandelbrot set (2D).",
+                                            )
+                                            .changed();
+
                                         // Accumulation controls for strange attractors and Buddhabrot
                                         if params.settings.fractal_type.uses_accumulation() {
                                             // Ensure accumulation is always enabled for these fractal types

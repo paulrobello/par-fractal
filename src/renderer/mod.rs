@@ -79,6 +79,16 @@ pub struct Renderer {
     pub(crate) vertex_buffer: wgpu::Buffer,
     pub(crate) uniform_buffer: wgpu::Buffer,
     pub(crate) uniform_bind_group: wgpu::BindGroup,
+    /// Issue #1 Julia-under-cursor preview: dedicated uniform buffer + bind
+    /// group for the inset pass, sharing the main bind-group layout (the
+    /// orbit-buffer binding reads a placeholder; `orbit_len = 0` in the
+    /// inset uniforms keeps perturbation off).
+    pub(crate) julia_preview_uniform_buffer: wgpu::Buffer,
+    pub(crate) julia_preview_bind_group: wgpu::BindGroup,
+    /// Inset pipeline: same shader module / 2D entry point as `pipeline_2d`
+    /// but targeting the surface format — the inset draws after the post
+    /// chain, straight into the swap-chain view.
+    pub(crate) julia_preview_pipeline: wgpu::RenderPipeline,
     /// ENH-001 Phase A step 3: storage buffer for the perturbation reference
     /// orbit. Bound at `@group(0) @binding(1)` so it shares group 0 with
     /// the uniforms. Step 5 (CPU driver) uploads a real orbit here; before

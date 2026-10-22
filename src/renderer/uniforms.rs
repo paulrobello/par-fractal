@@ -606,6 +606,32 @@ impl Uniforms {
         uniforms
     }
 
+    /// Julia preview inset zoom (issue #1, `app::julia_preview`): a 2D view
+    /// spans `2 / zoom` complex units, so 0.4 frames |z| ≤ 2.5 — the full
+    /// Julia "home" region.
+    pub(crate) const INSET_ZOOM: f32 = 0.4;
+
+    /// Issue #1: re-target a copy of the main uniform set for the Julia
+    /// preview inset. Call on a fresh `self.uniforms` copy AFTER the main
+    /// `update()`, so iterations / palette / color settings are inherited.
+    /// Forces the plain-f32 Julia 2D path at the given `c` with a fixed
+    /// overview framing (center 0, |z| ≤ 2.5) and a square aspect to match
+    /// the inset viewport; perturbation and high-precision paths stay off.
+    pub(crate) fn set_for_julia_preview(&mut self, c: glam::Vec2) {
+        self.fractal_type = 1; // Julia
+        self.render_mode = 0; // 2D
+        self.julia_c = c;
+        self.center = glam::Vec2::ZERO;
+        self.zoom = Self::INSET_ZOOM;
+        self.aspect_ratio = glam::Vec4::new(1.0, 0.0, 0.0, 0.0);
+        self.perturbation_enabled = 0;
+        self.orbit_len = 0;
+        self.ref_escaped_at = 0;
+        self.high_precision = 0;
+        self.center_hi = glam::Vec2::ZERO;
+        self.center_lo = glam::Vec2::ZERO;
+    }
+
     /// ENH-001 Phase A step 5: populate the perturbation uniforms for an
     /// active orbit + the current view.
     ///

@@ -35,6 +35,12 @@ pub struct UIState {
     /// the field still deserialize.
     #[serde(default)]
     pub show_gpu_profile: bool,
+    /// Issue #1: live Julia-under-cursor preview inset (Mandelbrot2D).
+    /// Defaulted (enabled) so older settings without the key load with the
+    /// feature on — it is discoverable-by-default and only affects
+    /// Mandelbrot2D views.
+    #[serde(default = "default_julia_preview_enabled")]
+    pub julia_preview_enabled: bool,
 }
 
 pub(super) fn default_dof_samples() -> u32 {
@@ -115,6 +121,11 @@ impl Default for UIState {
             show_fps: false,
             show_camera_info: false,
             show_gpu_profile: false,
+            julia_preview_enabled: true,
         }
     }
+}
+
+pub(super) fn default_julia_preview_enabled() -> bool {
+    true
 }
