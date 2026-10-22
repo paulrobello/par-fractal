@@ -16,7 +16,7 @@ use crate::fractal::FractalParams;
 use crate::platform::Capture;
 use crate::platform::web::WebCapture;
 use crate::renderer::Renderer;
-use crate::renderer::uniforms::{BlurUniforms, write_uniform_bytes};
+use crate::renderer::uniforms::write_uniform_bytes;
 use std::sync::{Arc, Mutex};
 
 /// State shared between the map_async callback and the async task
@@ -409,14 +409,7 @@ pub fn render_high_resolution_web(
         pass.draw(0..4, 0..1);
     }
 
-    // Update blur direction to vertical (ENH-008: reuse renderer's BlurUniforms)
-    let blur_v = BlurUniforms::new([0.0, 1.0]);
-    let blur_v_bytes = write_uniform_bytes(&blur_v);
-    renderer
-        .queue
-        .write_buffer(&renderer.blur_uniform_buffer, 0, &blur_v_bytes);
-
-    // Pass 4: Vertical blur
+    // Pass 4: Vertical blur (ARC-022: bind group carries its own (0,1) buffer)
     {
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("HR Blur V"),
@@ -440,13 +433,6 @@ pub fn render_high_resolution_web(
         pass.set_vertex_buffer(0, renderer.postprocess_vertex_buffer.slice(..));
         pass.draw(0..4, 0..1);
     }
-
-    // Restore blur direction to horizontal for normal rendering
-    let blur_h = BlurUniforms::new([1.0, 0.0]);
-    let blur_h_bytes = write_uniform_bytes(&blur_h);
-    renderer
-        .queue
-        .write_buffer(&renderer.blur_uniform_buffer, 0, &blur_h_bytes);
 
     // Pass 5: Composite (scene + bloom + color grading + vignette)
     {

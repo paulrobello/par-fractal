@@ -7,7 +7,6 @@
 //! readback wait, and the filesystem save path (PNG + optional auto-open).
 
 use super::App;
-use crate::renderer::uniforms::{BlurUniforms, write_uniform_bytes};
 
 /// Capture and recording methods
 impl App {
@@ -481,14 +480,7 @@ impl App {
             pass.draw(0..4, 0..1);
         }
 
-        // Update blur direction to vertical (ENH-008: reuse renderer's BlurUniforms)
-        let blur_v = BlurUniforms::new([0.0, 1.0]);
-        let blur_v_bytes = write_uniform_bytes(&blur_v);
-        self.renderer
-            .queue
-            .write_buffer(&self.renderer.blur_uniform_buffer, 0, &blur_v_bytes);
-
-        // Pass 4: Vertical blur
+        // Pass 4: Vertical blur (ARC-022: bind group carries its own (0,1) buffer)
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("HR Blur V"),
@@ -512,13 +504,6 @@ impl App {
             pass.set_vertex_buffer(0, self.renderer.postprocess_vertex_buffer.slice(..));
             pass.draw(0..4, 0..1);
         }
-
-        // Restore blur direction to horizontal for normal rendering
-        let blur_h = BlurUniforms::new([1.0, 0.0]);
-        let blur_h_bytes = write_uniform_bytes(&blur_h);
-        self.renderer
-            .queue
-            .write_buffer(&self.renderer.blur_uniform_buffer, 0, &blur_h_bytes);
 
         // Pass 5: Composite (scene + bloom + color grading + vignette)
         {

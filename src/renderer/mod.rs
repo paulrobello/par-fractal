@@ -116,7 +116,8 @@ pub struct Renderer {
 
     // Post-processing uniforms
     pub bloom_uniform_buffer: wgpu::Buffer,
-    pub blur_uniform_buffer: wgpu::Buffer,
+    // ARC-022: the blur direction buffers are not Renderer fields — each
+    // bind group keeps its own (1,0)/(0,1) buffer alive from init.
     pub composite_uniform_buffer: wgpu::Buffer,
 
     // Bind groups

@@ -32,7 +32,7 @@ fn usage() -> ! {
         "usage:\n  \
          imgdiff <a.png> <b.png> [--mae M] [--frac F] [--min-corr R]\n  \
          imgdiff render-ref <kind> <cx> <cy> <zoom> <iters> <WxH> <out.png>\n  \
-         imgdiff gen-preset <id> <FractalType> <cx> <cy> <zoom> <iters> <color_mode>"
+         imgdiff gen-preset <id> <FractalType> <cx> <cy> <zoom> <iters> <color_mode> [bloom]"
     );
     std::process::exit(2);
 }
@@ -253,7 +253,7 @@ fn run_render_ref(args: &[String]) -> ExitCode {
 // ---------------------------------------------------------------------------
 
 fn run_gen_preset(args: &[String]) -> ExitCode {
-    if args.len() != 7 {
+    if args.len() != 7 && args.len() != 8 {
         usage();
     }
     let id = &args[0];
@@ -263,6 +263,9 @@ fn run_gen_preset(args: &[String]) -> ExitCode {
     let zoom: f64 = args[4].parse().unwrap_or_else(|_| usage());
     let iters: u32 = args[5].parse().unwrap_or_else(|_| usage());
     let color_mode: u32 = args[6].parse().unwrap_or_else(|_| usage());
+    // ARC-022: optional trailing `bloom` flag (1 = enable bloom) so the
+    // golden layer can pin post-processing output, not just the fractal pass.
+    let bloom = args.len() == 8 && args[7] == "1";
 
     let mut params = par_fractal::FractalParams::default();
     params.switch_fractal(ft);
@@ -270,6 +273,7 @@ fn run_gen_preset(args: &[String]) -> ExitCode {
     params.settings.zoom_2d = zoom;
     params.settings.max_iterations = iters;
     params.settings.color_mode = int_to_color_mode(color_mode);
+    params.settings.bloom_enabled = bloom;
 
     let preset = par_fractal::Preset {
         name: id.clone(),

@@ -459,11 +459,25 @@ impl Renderer {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
+        // ARC-022: one buffer per blur direction. The two blur bind groups
+        // previously shared a single buffer flipped by per-frame
+        // write_buffer calls — which all landed BEFORE the encoder submits,
+        // so both passes read whichever direction was written last
+        // (interactive blurred vertically twice, hi-res captures
+        // horizontally twice).
         let blur_h_uniforms = BlurUniforms::new([1.0, 0.0]); // Horizontal
-        let blur_bytes = write_uniform_bytes(&blur_h_uniforms);
-        let blur_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Blur Uniform Buffer"),
-            contents: &blur_bytes,
+        let blur_h_bytes = write_uniform_bytes(&blur_h_uniforms);
+        let blur_h_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Blur H Uniform Buffer"),
+            contents: &blur_h_bytes,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        let blur_v_uniforms = BlurUniforms::new([0.0, 1.0]); // Vertical
+        let blur_v_bytes = write_uniform_bytes(&blur_v_uniforms);
+        let blur_v_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Blur V Uniform Buffer"),
+            contents: &blur_v_bytes,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -936,17 +950,17 @@ impl Renderer {
             layout: &uniform_layout,
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,
-                resource: blur_uniform_buffer.as_entire_binding(),
+                resource: blur_h_uniform_buffer.as_entire_binding(),
             }],
         });
 
-        // For vertical blur, we'll need to update the buffer before use
+        // ARC-022: binds its own (0,1) buffer — no per-frame direction flips.
         let blur_v_params_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Blur V Params Bind Group"),
             layout: &uniform_layout,
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,
-                resource: blur_uniform_buffer.as_entire_binding(),
+                resource: blur_v_uniform_buffer.as_entire_binding(),
             }],
         });
 
@@ -1023,7 +1037,7 @@ impl Renderer {
             copy_pipeline,
 
             bloom_uniform_buffer,
-            blur_uniform_buffer,
+
             composite_uniform_buffer,
 
             scene_bind_group,

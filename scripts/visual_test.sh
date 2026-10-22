@@ -81,7 +81,7 @@ render_row() {
          --screenshot-path "$out_png" --screenshot-delay "$SETTLE_S" --exit-delay "$EXIT_S"
 }
 
-while read -r id kind ftype cx cy zoom iters color_mode size; do
+while read -r id kind ftype cx cy zoom iters color_mode size bloom; do
   # Skip comments and blank lines.
   case "$id" in
     ''|\#*) continue ;;
@@ -93,7 +93,7 @@ while read -r id kind ftype cx cy zoom iters color_mode size; do
   golden_png="$GOLDEN_DIR/$id.png"
 
   # 1. preset
-  "$IMGDIFF" gen-preset "$id" "$ftype" "$cx" "$cy" "$zoom" "$iters" "$color_mode" \
+  "$IMGDIFF" gen-preset "$id" "$ftype" "$cx" "$cy" "$zoom" "$iters" "$color_mode" $bloom \
     || { echo "  FAIL: gen-preset"; fail=1; continue; }
 
   # 2. run the app (non-fatal: a crash is a row failure, not a script abort).

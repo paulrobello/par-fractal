@@ -44,3 +44,4 @@ mandel-seahorse-1e5    mandelbrot    Mandelbrot2D    -0.7436438870  0.1318259042
 mandel-seahorse-1e8    mandelbrot    Mandelbrot2D    -0.7436438870  0.1318259042   1e8   1000   2           256x256
 tricorn-full           tricorn       Tricorn2D       -0.5           0              1     256    2           256x256
 ship-full              burning_ship  BurningShip2D   -0.5           -0.5           1     256    2           256x256
+bloom-shallow          mandelbrot    Mandelbrot2D    -0.5           0              1     256    2           256x256   1

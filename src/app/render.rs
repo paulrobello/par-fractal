@@ -3,7 +3,7 @@ use crate::fractal::FractalParams;
 use crate::renderer::compute::{
     AccumulationDisplayUniforms, AttractorComputeUniforms, BuddhabrotComputeUniforms,
 };
-use crate::renderer::uniforms::{BlurUniforms, write_uniform_bytes};
+use crate::renderer::uniforms::write_uniform_bytes;
 use crate::ui::UiActions;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -708,16 +708,8 @@ impl App {
                 render_pass.draw(0..4, 0..1);
             }
 
-            // Update blur buffer to vertical direction for next pass. ENH-008:
-            // reuse the renderer's `BlurUniforms` (encase) instead of a local
-            // bytemuck copy — one source of truth for the WGSL layout.
-            let blur_v = BlurUniforms::new([0.0, 1.0]); // Vertical
-            let blur_v_bytes = write_uniform_bytes(&blur_v);
-            self.renderer
-                .queue
-                .write_buffer(&self.renderer.blur_uniform_buffer, 0, &blur_v_bytes);
-
-            // Pass 4: Vertical blur
+            // Pass 4: Vertical blur (ARC-022: its bind group already carries
+            // the (0,1) direction buffer — no per-frame write_buffer flips)
             {
                 let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("Blur Vertical Pass"),
