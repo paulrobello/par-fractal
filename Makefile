@@ -7,7 +7,7 @@
 VERSION := $(shell grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
 
 .PHONY: help build build-release run run-release test check clean clippy clippy-fix fmt fmt-check \
-        install-deps doc checkall pre-commit-install pre-commit-uninstall pre-commit-run \
+        install-deps doc checkall checkall-ci pre-commit-install pre-commit-uninstall pre-commit-run \
         pre-commit-update lint deploy release cache-clean typecheck \
         visual-test visual-bless profile profile-cpu \
         web-install web-build web-serve web-clean web-deploy \
@@ -53,6 +53,8 @@ help:
 	@echo "  check              - Check the code for errors without building"
 	@echo "  c                  - Shortcut for check"
 	@echo "  checkall           - Run ALL checks: format, lint, tests (auto-fix all)"
+	@echo "  checkall-ci        - CI-parity gate: fmt-check, clippy -D warnings,"
+	@echo "                       tests, release build, wasm check, cargo audit"
 	@echo ""
 	@echo "Pre-commit Hooks:"
 	@echo "  pre-commit-install   - Install pre-commit hooks"
@@ -230,6 +232,19 @@ checkall: test lint web-check
 	@echo "  ✓ Rust tests"
 	@echo "  ✓ Rust format (auto-fixed)"
 	@echo "  ✓ Rust lint (clippy auto-fixed)"
+	@echo ""
+
+# Two-tier gate convention (Rules/two-tier-make-gate-convention): `checkall`
+# is the fast auto-fixing iteration gate; `checkall-ci` is the CI-parity gate
+# mirroring everything ci.yml enforces — fmt CHECK (non-mutating), clippy
+# -D warnings (non-mutating), tests, release build, wasm check, cargo audit.
+# ci.yml is manual-dispatch-only, so a green `checkall-ci` is the push-safe
+# verdict locally; never report done/push-safe from `checkall` alone.
+checkall-ci: fmt-check clippy test build-release web-check audit
+	@echo ""
+	@echo "======================================================================"
+	@echo "  CI-parity gate passed (push-safe)"
+	@echo "======================================================================"
 	@echo ""
 
 # ============================================================================
