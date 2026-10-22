@@ -5,6 +5,17 @@ use super::super::{UI, UiActions};
 use crate::fractal::{FractalParams, Preset, PresetCategory, PresetGallery};
 use glam::Vec3;
 
+fn preset_matches_filter(preset: &Preset, category: PresetCategory, search_lower: &str) -> bool {
+    let category_match = category == PresetCategory::All || preset.category == category;
+    let search_match = if search_lower.is_empty() {
+        true
+    } else {
+        preset.name.to_lowercase().contains(search_lower)
+            || preset.description.to_lowercase().contains(search_lower)
+    };
+    category_match && search_match
+}
+
 impl UI {
     /// Render the "Presets" collapsing header.
     /// Needs `camera_pos` / `camera_target` because preset save captures them.
@@ -52,20 +63,8 @@ impl UI {
                 let search_lower = self.preset_search.to_lowercase();
                 let filtered_builtin: Vec<&Preset> = builtin_presets
                     .iter()
-                    .filter(|p| {
-                        // Filter by category
-                        let category_match = self.preset_category_filter == PresetCategory::All
-                            || p.category == self.preset_category_filter;
-
-                        // Filter by search text
-                        let search_match = if search_lower.is_empty() {
-                            true
-                        } else {
-                            p.name.to_lowercase().contains(&search_lower)
-                                || p.description.to_lowercase().contains(&search_lower)
-                        };
-
-                        category_match && search_match
+                    .filter(|preset| {
+                        preset_matches_filter(preset, self.preset_category_filter, &search_lower)
                     })
                     .collect();
 

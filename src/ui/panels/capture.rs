@@ -11,6 +11,56 @@ use super::super::VideoFormat;
 #[cfg(target_arch = "wasm32")]
 use super::super::VideoFormat;
 
+fn render_classic_resolutions(ui: &mut egui::Ui, actions: &mut UiActions) {
+    ui.horizontal(|ui| {
+        if ui
+            .button("640x480 (VGA)")
+            .on_hover_text("Render at VGA resolution (4:3)")
+            .clicked()
+        {
+            actions.hires_render_resolution = Some((640, 480));
+        }
+        if ui
+            .button("800x600 (SVGA)")
+            .on_hover_text("Render at SVGA resolution (4:3)")
+            .clicked()
+        {
+            actions.hires_render_resolution = Some((800, 600));
+        }
+        if ui
+            .button("1024x768 (XGA)")
+            .on_hover_text("Render at XGA resolution (4:3)")
+            .clicked()
+        {
+            actions.hires_render_resolution = Some((1024, 768));
+        }
+    });
+
+    ui.horizontal(|ui| {
+        if ui
+            .button("1280x960")
+            .on_hover_text("Render at 1280x960 (4:3)")
+            .clicked()
+        {
+            actions.hires_render_resolution = Some((1280, 960));
+        }
+        if ui
+            .button("1400x1050")
+            .on_hover_text("Render at 1400x1050 (4:3)")
+            .clicked()
+        {
+            actions.hires_render_resolution = Some((1400, 1050));
+        }
+        if ui
+            .button("1600x1200 (UXGA)")
+            .on_hover_text("Render at UXGA resolution (4:3)")
+            .clicked()
+        {
+            actions.hires_render_resolution = Some((1600, 1200));
+        }
+    });
+}
+
 impl UI {
     /// Render the Capture & Recording window. Owned by this module per AUDIT QA-009.
     pub fn render_capture_window(
@@ -118,54 +168,7 @@ impl UI {
                     .on_hover_text("Render at custom resolutions");
                 ui.label("Standard resolutions:");
 
-                // Classic 4:3 resolutions
-                ui.horizontal(|ui| {
-                    if ui
-                        .button("640x480 (VGA)")
-                        .on_hover_text("Render at VGA resolution (4:3)")
-                        .clicked()
-                    {
-                        actions.hires_render_resolution = Some((640, 480));
-                    }
-                    if ui
-                        .button("800x600 (SVGA)")
-                        .on_hover_text("Render at SVGA resolution (4:3)")
-                        .clicked()
-                    {
-                        actions.hires_render_resolution = Some((800, 600));
-                    }
-                    if ui
-                        .button("1024x768 (XGA)")
-                        .on_hover_text("Render at XGA resolution (4:3)")
-                        .clicked()
-                    {
-                        actions.hires_render_resolution = Some((1024, 768));
-                    }
-                });
-
-                ui.horizontal(|ui| {
-                    if ui
-                        .button("1280x960")
-                        .on_hover_text("Render at 1280x960 (4:3)")
-                        .clicked()
-                    {
-                        actions.hires_render_resolution = Some((1280, 960));
-                    }
-                    if ui
-                        .button("1400x1050")
-                        .on_hover_text("Render at 1400x1050 (4:3)")
-                        .clicked()
-                    {
-                        actions.hires_render_resolution = Some((1400, 1050));
-                    }
-                    if ui
-                        .button("1600x1200 (UXGA)")
-                        .on_hover_text("Render at UXGA resolution (4:3)")
-                        .clicked()
-                    {
-                        actions.hires_render_resolution = Some((1600, 1200));
-                    }
-                });
+                render_classic_resolutions(ui, actions);
 
                 ui.add_space(4.0);
                 ui.label("HD & modern resolutions:");

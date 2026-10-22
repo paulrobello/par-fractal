@@ -6,6 +6,27 @@ use super::super::{UI, UiActions};
 use crate::fractal::{CustomPalette, CustomPaletteGallery, FractalParams};
 use glam::Vec3;
 
+fn color_mode_label(mode: crate::fractal::ColorMode) -> &'static str {
+    match mode {
+        crate::fractal::ColorMode::Palette => "Palette",
+        crate::fractal::ColorMode::RaySteps => "Ray Steps / Iterations",
+        crate::fractal::ColorMode::Normals => "Normals (3D)",
+        crate::fractal::ColorMode::OrbitTrapXYZ => "Orbit Trap XYZ",
+        crate::fractal::ColorMode::OrbitTrapRadial => "Orbit Trap Radial",
+        crate::fractal::ColorMode::WorldPosition => "World Position",
+        crate::fractal::ColorMode::LocalPosition => "Local Position",
+        crate::fractal::ColorMode::AmbientOcclusion => "Ambient Occlusion (3D)",
+        crate::fractal::ColorMode::PerChannel => "Per-Channel (Custom RGB)",
+        crate::fractal::ColorMode::DistanceField => "🔍 Distance Field (Debug)",
+        crate::fractal::ColorMode::Depth => "🔍 Depth (Debug)",
+        crate::fractal::ColorMode::Convergence => "🔍 Convergence (Debug)",
+        crate::fractal::ColorMode::LightingOnly => "🔍 Lighting Only (Debug)",
+        crate::fractal::ColorMode::ShadowMap => "🔍 Shadow Map (Debug)",
+        crate::fractal::ColorMode::CameraDistanceLOD => "🔍 Camera Distance LOD (Debug)",
+        crate::fractal::ColorMode::DistanceGrayscale => "🔍 Distance Grayscale (Debug)",
+    }
+}
+
 impl UI {
     /// Render the "Color & Visualization" collapsing header.
     pub fn render_color_viz_panel(
@@ -20,24 +41,7 @@ impl UI {
                                 ui.label("Color Mode:")
                                     .on_hover_text("Choose how colors are applied to the fractal");
                                 actions.changed |= egui::ComboBox::from_id_salt("color_mode")
-                                    .selected_text(match params.settings.color_mode {
-                                        crate::fractal::ColorMode::Palette => "Palette",
-                                        crate::fractal::ColorMode::RaySteps => "Ray Steps / Iterations",
-                                        crate::fractal::ColorMode::Normals => "Normals (3D)",
-                                        crate::fractal::ColorMode::OrbitTrapXYZ => "Orbit Trap XYZ",
-                                        crate::fractal::ColorMode::OrbitTrapRadial => "Orbit Trap Radial",
-                                        crate::fractal::ColorMode::WorldPosition => "World Position",
-                                        crate::fractal::ColorMode::LocalPosition => "Local Position",
-                                        crate::fractal::ColorMode::AmbientOcclusion => "Ambient Occlusion (3D)",
-                                        crate::fractal::ColorMode::PerChannel => "Per-Channel (Custom RGB)",
-                                        crate::fractal::ColorMode::DistanceField => "🔍 Distance Field (Debug)",
-                                        crate::fractal::ColorMode::Depth => "🔍 Depth (Debug)",
-                                        crate::fractal::ColorMode::Convergence => "🔍 Convergence (Debug)",
-                                        crate::fractal::ColorMode::LightingOnly => "🔍 Lighting Only (Debug)",
-                                        crate::fractal::ColorMode::ShadowMap => "🔍 Shadow Map (Debug)",
-                                        crate::fractal::ColorMode::CameraDistanceLOD => "🔍 Camera Distance LOD (Debug)",
-                                        crate::fractal::ColorMode::DistanceGrayscale => "🔍 Distance Grayscale (Debug)",
-                                    })
+                                    .selected_text(color_mode_label(params.settings.color_mode))
                                     .show_ui(ui, |ui| {
                                         let mut changed_local = false;
                                         changed_local |= ui.selectable_value(&mut params.settings.color_mode, crate::fractal::ColorMode::Palette, "Palette").changed();
