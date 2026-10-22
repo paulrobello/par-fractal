@@ -151,14 +151,107 @@ impl UI {
     }
 
     /// Execute a command action and return (changed, result_message)
-    pub fn execute_command(
+    /// QA-035: parameter/rendering commands — extracted from
+    /// `execute_command` (complexity 52). Returns `None` when the action
+    /// is not one of this group's.
+    /// QA-035: iteration/power/orbit-speed adjusters and the reset
+    /// requests, extracted from `execute_param_command`.
+    #[allow(unused_assignments)] // the changed/message match-arm pattern assigns per arm
+    fn execute_adjust_command(
         &mut self,
-        action: CommandAction,
+        action: &CommandAction,
         params: &mut FractalParams,
-    ) -> (bool, Option<String>) {
+    ) -> Option<(bool, Option<String>)> {
         let mut changed = false;
         let mut message = None;
+        let action = action.clone();
+        match action {
+            CommandAction::IncrementIterations => {
+                use crate::fractal::RenderMode;
+                match params.settings.render_mode {
+                    RenderMode::TwoD => {
+                        params.settings.max_iterations =
+                            (params.settings.max_iterations + 32).min(2048);
+                        message = Some(format!(
+                            "Max iterations: {}",
+                            params.settings.max_iterations
+                        ));
+                    }
+                    RenderMode::ThreeD => {
+                        params.settings.max_steps = (params.settings.max_steps + 10).min(500);
+                        message = Some(format!("Max steps: {}", params.settings.max_steps));
+                    }
+                }
+                changed = true;
+            }
+            CommandAction::DecrementIterations => {
+                use crate::fractal::RenderMode;
+                match params.settings.render_mode {
+                    RenderMode::TwoD => {
+                        params.settings.max_iterations =
+                            params.settings.max_iterations.saturating_sub(32).max(32);
+                        message = Some(format!(
+                            "Max iterations: {}",
+                            params.settings.max_iterations
+                        ));
+                    }
+                    RenderMode::ThreeD => {
+                        params.settings.max_steps =
+                            params.settings.max_steps.saturating_sub(10).max(30);
+                        message = Some(format!("Max steps: {}", params.settings.max_steps));
+                    }
+                }
+                changed = true;
+            }
+            CommandAction::IncrementPower => {
+                params.settings.power = (params.settings.power + 0.5).min(16.0);
+                changed = true;
+                message = Some(format!("Power: {:.1}", params.settings.power));
+            }
+            CommandAction::DecrementPower => {
+                params.settings.power = (params.settings.power - 0.5).max(2.0);
+                changed = true;
+                message = Some(format!("Power: {:.1}", params.settings.power));
+            }
+            CommandAction::IncrementOrbitSpeed => {
+                params.settings.orbit_speed = (params.settings.orbit_speed + 0.1).min(5.0);
+                message = Some(format!("Orbit speed: {:.2}", params.settings.orbit_speed));
+            }
+            CommandAction::DecrementOrbitSpeed => {
+                params.settings.orbit_speed = (params.settings.orbit_speed - 0.1).max(0.1);
+                message = Some(format!("Orbit speed: {:.2}", params.settings.orbit_speed));
+            }
+            CommandAction::ResetView => {
+                // QA-033: request the reset; App applies it through the same
+                // shared `App::reset_view` path the panel buttons and the R
+                // key use (per-type 2D view / framed 3D camera, stale
+                // precise center cleared).
+                self.pending_reset_view = true;
+                message = Some("View reset".to_string());
+            }
+            CommandAction::ResetAll => {
+                // QA-033: same routing as ResetView — through
+                // `App::reset_all`, not a direct params mutation here.
+                self.pending_reset_all = true;
+                message = Some("All settings reset to defaults".to_string());
+            }
+            _ => return None,
+        }
+        Some((changed, message))
+    }
 
+    #[allow(unused_assignments)] // the changed/message match-arm pattern assigns per arm
+    fn execute_param_command(
+        &mut self,
+        action: &CommandAction,
+        params: &mut FractalParams,
+    ) -> Option<(bool, Option<String>)> {
+        if let Some(result) = self.execute_adjust_command(action, params) {
+            return Some(result);
+        }
+        let mut changed = false;
+        let mut message = None;
+        let action = action.clone();
         match action {
             CommandAction::SetFractalType(ftype) => {
                 params.switch_fractal(ftype);
@@ -278,29 +371,6 @@ impl UI {
                     if new_value { "ON" } else { "OFF" }
                 ));
             }
-            CommandAction::ToggleUI => {
-                self.show_ui = !self.show_ui;
-                message = Some(format!("UI: {}", if self.show_ui { "ON" } else { "OFF" }));
-            }
-            CommandAction::ToggleStats => {
-                self.show_performance_overlay = !self.show_performance_overlay;
-                message = Some(format!(
-                    "Performance Overlay: {}",
-                    if self.show_performance_overlay {
-                        "ON"
-                    } else {
-                        "OFF"
-                    }
-                ));
-            }
-            CommandAction::ToggleFPS => {
-                self.show_fps = !self.show_fps;
-                self.ui_state.show_fps = self.show_fps;
-                message = Some(format!(
-                    "FPS Counter: {}",
-                    if self.show_fps { "ON" } else { "OFF" }
-                ));
-            }
             CommandAction::CyclePalette => {
                 params.next_palette();
                 changed = true;
@@ -324,82 +394,6 @@ impl UI {
                     params.settings.procedural_palette.name()
                 ));
             }
-            CommandAction::IncrementIterations => {
-                use crate::fractal::RenderMode;
-                match params.settings.render_mode {
-                    RenderMode::TwoD => {
-                        params.settings.max_iterations =
-                            (params.settings.max_iterations + 32).min(2048);
-                        message = Some(format!(
-                            "Max iterations: {}",
-                            params.settings.max_iterations
-                        ));
-                    }
-                    RenderMode::ThreeD => {
-                        params.settings.max_steps = (params.settings.max_steps + 10).min(500);
-                        message = Some(format!("Max steps: {}", params.settings.max_steps));
-                    }
-                }
-                changed = true;
-            }
-            CommandAction::DecrementIterations => {
-                use crate::fractal::RenderMode;
-                match params.settings.render_mode {
-                    RenderMode::TwoD => {
-                        params.settings.max_iterations =
-                            params.settings.max_iterations.saturating_sub(32).max(32);
-                        message = Some(format!(
-                            "Max iterations: {}",
-                            params.settings.max_iterations
-                        ));
-                    }
-                    RenderMode::ThreeD => {
-                        params.settings.max_steps =
-                            params.settings.max_steps.saturating_sub(10).max(30);
-                        message = Some(format!("Max steps: {}", params.settings.max_steps));
-                    }
-                }
-                changed = true;
-            }
-            CommandAction::IncrementPower => {
-                params.settings.power = (params.settings.power + 0.5).min(16.0);
-                changed = true;
-                message = Some(format!("Power: {:.1}", params.settings.power));
-            }
-            CommandAction::DecrementPower => {
-                params.settings.power = (params.settings.power - 0.5).max(2.0);
-                changed = true;
-                message = Some(format!("Power: {:.1}", params.settings.power));
-            }
-            CommandAction::IncrementOrbitSpeed => {
-                params.settings.orbit_speed = (params.settings.orbit_speed + 0.1).min(5.0);
-                message = Some(format!("Orbit speed: {:.2}", params.settings.orbit_speed));
-            }
-            CommandAction::DecrementOrbitSpeed => {
-                params.settings.orbit_speed = (params.settings.orbit_speed - 0.1).max(0.1);
-                message = Some(format!("Orbit speed: {:.2}", params.settings.orbit_speed));
-            }
-            CommandAction::ResetView => {
-                // QA-033: request the reset; App applies it through the same
-                // shared `App::reset_view` path the panel buttons and the R
-                // key use (per-type 2D view / framed 3D camera, stale
-                // precise center cleared).
-                self.pending_reset_view = true;
-                message = Some("View reset".to_string());
-            }
-            CommandAction::ResetAll => {
-                // QA-033: same routing as ResetView — through
-                // `App::reset_all`, not a direct params mutation here.
-                self.pending_reset_all = true;
-                message = Some("All settings reset to defaults".to_string());
-            }
-            CommandAction::CycleTheme => {
-                self.dark_theme = !self.dark_theme;
-                message = Some(format!(
-                    "Theme: {}",
-                    if self.dark_theme { "Dark" } else { "Light" }
-                ));
-            }
             CommandAction::LoadPreset(name) => match PresetGallery::load_preset(&name) {
                 Ok(preset) => {
                     *params = FractalParams::from_settings(preset.settings);
@@ -413,6 +407,49 @@ impl UI {
             // These commands need additional UI dialogs or are handled elsewhere
             CommandAction::SavePreset => {
                 message = Some("Open the Presets panel to save".to_string());
+            }
+            _ => return None,
+        }
+        Some((changed, message))
+    }
+
+    /// QA-035: app/UI-state commands (extracted; see
+    /// [`Self::execute_param_command`]).
+    #[allow(unused_assignments)] // the changed/message match-arm pattern assigns per arm
+    fn execute_app_command(&mut self, action: &CommandAction) -> Option<(bool, Option<String>)> {
+        let changed = false;
+        let mut message = None;
+        let action = action.clone();
+        match action {
+            CommandAction::ToggleUI => {
+                self.show_ui = !self.show_ui;
+                message = Some(format!("UI: {}", if self.show_ui { "ON" } else { "OFF" }));
+            }
+            CommandAction::ToggleStats => {
+                self.show_performance_overlay = !self.show_performance_overlay;
+                message = Some(format!(
+                    "Performance Overlay: {}",
+                    if self.show_performance_overlay {
+                        "ON"
+                    } else {
+                        "OFF"
+                    }
+                ));
+            }
+            CommandAction::ToggleFPS => {
+                self.show_fps = !self.show_fps;
+                self.ui_state.show_fps = self.show_fps;
+                message = Some(format!(
+                    "FPS Counter: {}",
+                    if self.show_fps { "ON" } else { "OFF" }
+                ));
+            }
+            CommandAction::CycleTheme => {
+                self.dark_theme = !self.dark_theme;
+                message = Some(format!(
+                    "Theme: {}",
+                    if self.dark_theme { "Dark" } else { "Light" }
+                ));
             }
             CommandAction::ExportSettings => {
                 message = Some("Open the Settings panel to export".to_string());
@@ -429,11 +466,28 @@ impl UI {
             CommandAction::Screenshot => {
                 message = Some("Screenshot feature not exposed to command palette yet".to_string());
             }
-            _ => {}
+            _ => return None,
         }
+        Some((changed, message))
+    }
 
-        // Note: History tracking is handled by the UI's existing undo/redo system
+    pub fn execute_command(
+        &mut self,
+        action: CommandAction,
+        params: &mut FractalParams,
+    ) -> (bool, Option<String>) {
+        // QA-035: three-group dispatch keeps every match under the
+        // complexity budget.
+        if let Some(result) = self.execute_param_command(&action, params) {
+            return result;
+        }
+        if let Some(result) = self.execute_app_command(&action) {
+            return result;
+        }
+        // Note: History tracking is handled by the UI's existing undo/redo
+        // system. Actions outside the two groups above are not palette
+        // commands — nothing to do.
 
-        (changed, message)
+        (false, None)
     }
 }

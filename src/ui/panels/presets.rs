@@ -105,66 +105,7 @@ impl UI {
                 }
 
                 ui.separator();
-                ui.heading("Save Current as Preset");
-
-                ui.horizontal(|ui| {
-                    ui.label("Name:");
-                    ui.text_edit_singleline(&mut self.preset_name);
-                });
-
-                ui.horizontal(|ui| {
-                    ui.label("Description:");
-                    ui.text_edit_singleline(&mut self.preset_description);
-                });
-
-                ui.horizontal(|ui| {
-                    ui.label("Category:");
-                    egui::ComboBox::from_id_salt("preset_category_combo")
-                        .selected_text(self.preset_category.as_str())
-                        .show_ui(ui, |ui| {
-                            for category in PresetCategory::all_categories() {
-                                if category != PresetCategory::All {
-                                    ui.selectable_value(
-                                        &mut self.preset_category,
-                                        category,
-                                        category.as_str(),
-                                    );
-                                }
-                            }
-                        });
-                });
-
-                if ui.button("Save Preset").clicked() && !self.preset_name.is_empty() {
-                    let preset = Preset::from_current(
-                        self.preset_name.clone(),
-                        self.preset_description.clone(),
-                        self.preset_category,
-                        params,
-                        camera_pos,
-                        camera_target,
-                    );
-
-                    // Sanitize filename
-                    let filename = self
-                        .preset_name
-                        .replace(|c: char| !c.is_alphanumeric() && c != '_' && c != '-', "_");
-
-                    if let Err(e) = PresetGallery::save_preset(&preset, &filename) {
-                        log::error!("Failed to save preset: {}", e);
-                    } else {
-                        // Refresh user presets list
-                        self.user_presets = PresetGallery::list_user_presets().unwrap_or_default();
-                        self.preset_name.clear();
-                        self.preset_description.clear();
-                    }
-                }
-
-                // Refresh user presets list periodically
-                if self.last_preset_list_update.elapsed().as_secs() > 2 {
-                    self.user_presets = PresetGallery::list_user_presets().unwrap_or_default();
-                    self.last_preset_list_update = web_time::Instant::now();
-                }
-
+                self.render_save_preset_editor(ui, params, camera_pos, camera_target);
                 if !self.user_presets.is_empty() {
                     ui.separator();
                     ui.heading("User Presets");
@@ -334,5 +275,75 @@ impl UI {
                 });
             });
         self.ui_state.presets_open = response.openness > 0.0;
+    }
+
+    /// QA-035: the Save-Current-as-Preset editor, extracted from
+    /// `render_presets_panel` (complexity 50).
+    fn render_save_preset_editor(
+        &mut self,
+        ui: &mut egui::Ui,
+        params: &mut FractalParams,
+        camera_pos: Vec3,
+        camera_target: Vec3,
+    ) {
+        ui.heading("Save Current as Preset");
+
+        ui.horizontal(|ui| {
+            ui.label("Name:");
+            ui.text_edit_singleline(&mut self.preset_name);
+        });
+
+        ui.horizontal(|ui| {
+            ui.label("Description:");
+            ui.text_edit_singleline(&mut self.preset_description);
+        });
+
+        ui.horizontal(|ui| {
+            ui.label("Category:");
+            egui::ComboBox::from_id_salt("preset_category_combo")
+                .selected_text(self.preset_category.as_str())
+                .show_ui(ui, |ui| {
+                    for category in PresetCategory::all_categories() {
+                        if category != PresetCategory::All {
+                            ui.selectable_value(
+                                &mut self.preset_category,
+                                category,
+                                category.as_str(),
+                            );
+                        }
+                    }
+                });
+        });
+
+        if ui.button("Save Preset").clicked() && !self.preset_name.is_empty() {
+            let preset = Preset::from_current(
+                self.preset_name.clone(),
+                self.preset_description.clone(),
+                self.preset_category,
+                params,
+                camera_pos,
+                camera_target,
+            );
+
+            // Sanitize filename
+            let filename = self
+                .preset_name
+                .replace(|c: char| !c.is_alphanumeric() && c != '_' && c != '-', "_");
+
+            if let Err(e) = PresetGallery::save_preset(&preset, &filename) {
+                log::error!("Failed to save preset: {}", e);
+            } else {
+                // Refresh user presets list
+                self.user_presets = PresetGallery::list_user_presets().unwrap_or_default();
+                self.preset_name.clear();
+                self.preset_description.clear();
+            }
+        }
+
+        // Refresh user presets list periodically
+        if self.last_preset_list_update.elapsed().as_secs() > 2 {
+            self.user_presets = PresetGallery::list_user_presets().unwrap_or_default();
+            self.last_preset_list_update = web_time::Instant::now();
+        }
     }
 }

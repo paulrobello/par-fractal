@@ -73,7 +73,7 @@ make run-windows-vulkan  # Force Vulkan (Windows)
 ### CLI Options
 
 Complete flag reference: [docs/FEATURES.md → CLI Options](docs/FEATURES.md#cli-options)
-(source of truth: `print_help` in `src/main.rs`). The flags the agent loop uses most:
+(source of truth: the `Cli` struct in `src/cli.rs`, ENH-003). The flags the agent loop uses most:
 `--clear-settings`, `--preset <name>`, `--quality <level>`, `--list-presets`,
 `--screenshot-delay <s>`, `--screenshot-path <path>`, `--exit-delay <s>`,
 `--window-size <WxH>`, `--switch-after <type> <s>`, `--camera-pos <x,y,z>`.
@@ -218,8 +218,9 @@ Each 3D fractal must provide a distance estimator function for ray marching. Dis
 Debug builds are significantly slower. Always use `make r` (release mode) for actual rendering work.
 
 **GPU Selection:**
-- Settings saved in `~/.config/par-fractal/settings.yaml` (Linux/macOS)
-- Can specify preferred GPU index via preferences
+- Settings location: see [Configuration Files](#configuration-files) below (macOS:
+  `~/Library/Application Support/com.fractal.par-fractal/`)
+- Preferred GPU index lives in `preferences.yaml`
 - Automatically selects discrete GPU when available
 
 **Quality vs Performance:**

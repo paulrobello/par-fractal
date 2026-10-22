@@ -410,199 +410,210 @@ impl UI {
                                         });
                                     }
 
-                                    // Custom Palette Editor
-                                    ui.separator();
-                                    ui.collapsing("Custom Palette Editor", |ui| {
-                                        ui.label("Create your own color palettes")
-                                            .on_hover_text("Design custom 8-color gradients");
-
-                                        // Color picker for each of the 8 palette colors
-                                        for i in 0..8 {
-                                            ui.horizontal(|ui| {
-                                                ui.label(format!("Color {}:", i + 1));
-                                                if ui.color_edit_button_rgb(&mut self.custom_palette_colors[i])
-                                                    .on_hover_text(format!("Edit color {} of the palette", i + 1))
-                                                    .changed() {
-                                                    // Color changed, could auto-update preview if needed
-                                                }
-                                            });
-                                        }
-
-                                        ui.separator();
-                                        ui.label("Preview:");
-                                        ui.horizontal(|ui| {
-                                            for color in &self.custom_palette_colors {
-                                                let color32 = egui::Color32::from_rgb(
-                                                    (color[0] * 255.0) as u8,
-                                                    (color[1] * 255.0) as u8,
-                                                    (color[2] * 255.0) as u8,
-                                                );
-                                                let (rect, _response) = ui.allocate_exact_size(
-                                                    egui::vec2(20.0, 20.0),
-                                                    egui::Sense::hover()
-                                                );
-                                                ui.painter().rect_filled(rect, 2.0, color32);
-                                            }
-                                        });
-
-                                        ui.separator();
-                                        ui.horizontal(|ui| {
-                                            ui.label("Palette Name:");
-                                            ui.text_edit_singleline(&mut self.custom_palette_name);
-                                        });
-
-                                        ui.horizontal(|ui| {
-                                            if ui.button("💾 Save Custom")
-                                                .on_hover_text("Save this palette for later use")
-                                                .clicked()
-                                                && !self.custom_palette_name.is_empty()
-                                            {
-                                                let colors = [
-                                                    Vec3::from_array(self.custom_palette_colors[0]),
-                                                    Vec3::from_array(self.custom_palette_colors[1]),
-                                                    Vec3::from_array(self.custom_palette_colors[2]),
-                                                    Vec3::from_array(self.custom_palette_colors[3]),
-                                                    Vec3::from_array(self.custom_palette_colors[4]),
-                                                    Vec3::from_array(self.custom_palette_colors[5]),
-                                                    Vec3::from_array(self.custom_palette_colors[6]),
-                                                    Vec3::from_array(self.custom_palette_colors[7]),
-                                                ];
-                                                let custom_palette = CustomPalette::new(
-                                                    self.custom_palette_name.clone(),
-                                                    colors,
-                                                );
-
-                                                // Sanitize filename
-                                                let filename = self.custom_palette_name.replace(|c: char| !c.is_alphanumeric() && c != '_' && c != '-', "_");
-
-                                                if let Err(e) = CustomPaletteGallery::save_palette(&custom_palette, &filename) {
-                                                    log::error!("Failed to save custom palette: {}", e);
-                                                } else {
-                                                    // Refresh custom palette list
-                                                    self.custom_palettes = CustomPaletteGallery::list_palettes().unwrap_or_default();
-                                                    self.custom_palette_name.clear();
-                                                }
-                                            }
-
-                                            if ui.button("📋 Copy from Current")
-                                                .on_hover_text("Copy colors from the currently selected palette")
-                                                .clicked() {
-                                                for i in 0..8 {
-                                                    self.custom_palette_colors[i] = params.settings.palette.colors[i].to_array();
-                                                }
-                                            }
-                                        });
-
-                                        // Import palette from file
-                                        ui.separator();
-                                        ui.label("Import Palette:")
-                                            .on_hover_text("Import from .pal (JASC-PAL) or plain text RGB files");
-                                        ui.horizontal(|ui| {
-                                            ui.label("File path:");
-                                            ui.text_edit_singleline(&mut self.palette_import_path)
-                                                .on_hover_text("Enter path to .pal file or text file with RGB values (one per line)");
-                                        });
-
-                                        ui.horizontal(|ui| {
-                                            if ui.button("📥 Import")
-                                                .on_hover_text("Import palette from the specified file")
-                                                .clicked() {
-                                                let path = std::path::Path::new(&self.palette_import_path);
-                                                match CustomPalette::from_pal_file(path) {
-                                                    Ok(imported) => {
-                                                        // Apply imported colors to editor
-                                                        let (_name, colors) = imported.to_color_palette();
-                                                        for (i, color) in colors.iter().enumerate() {
-                                                            self.custom_palette_colors[i] = color.to_array();
-                                                        }
-                                                        // Pre-fill the name
-                                                        if self.custom_palette_name.is_empty() {
-                                                            self.custom_palette_name = imported.name.clone();
-                                                        }
-                                                        self.palette_import_message = Some(format!("✓ Imported '{}' successfully!", imported.name));
-                                                    }
-                                                    Err(e) => {
-                                                        self.palette_import_message = Some(format!("✗ Error: {}", e));
-                                                    }
-                                                }
-                                            }
-
-                                            if ui.small_button("Clear")
-                                                .on_hover_text("Clear the import path")
-                                                .clicked() {
-                                                self.palette_import_path.clear();
-                                                self.palette_import_message = None;
-                                            }
-                                        });
-
-                                        // Show import status message
-                                        if let Some(ref msg) = self.palette_import_message {
-                                            ui.label(msg);
-                                        }
-
-                                        ui.label("Supported formats:")
-                                            .on_hover_text("JASC-PAL (.pal), plain text RGB (0-255 or 0.0-1.0)");
-                                        ui.label("  • JASC-PAL: Standard .pal format")
-                                            .on_hover_text("First line: JASC-PAL, Second: 0100, Third: color count, then RGB values (0-255)");
-                                        ui.label("  • Plain text: One RGB per line")
-                                            .on_hover_text("Format: R G B (space or comma separated, 0-255 or 0.0-1.0)");
-
-                                        // Refresh custom palette list periodically
-                                        if self.last_custom_palette_list_update.elapsed().as_secs() > 2 {
-                                            self.custom_palettes = CustomPaletteGallery::list_palettes().unwrap_or_default();
-                                            self.last_custom_palette_list_update = web_time::Instant::now();
-                                        }
-
-                                        if !self.custom_palettes.is_empty() {
-                                            ui.separator();
-                                            ui.label("Saved Custom Palettes:")
-                                                .on_hover_text("Click to load, right-click to delete");
-
-                                            egui::ScrollArea::vertical()
-                                                .id_salt("custom_palettes_scroll")
-                                                .max_height(120.0)
-                                                .show(ui, |ui| {
-                                                    let custom_palettes_clone = self.custom_palettes.clone();
-                                                    for palette_name in custom_palettes_clone.iter() {
-                                                        ui.horizontal(|ui| {
-                                                            if ui.button(palette_name)
-                                                                .on_hover_text("Click to load this custom palette")
-                                                                .clicked()
-                                                                && let Ok(custom_palette) = CustomPaletteGallery::load_palette(palette_name) {
-                                                                    // Apply the custom palette to the current params.
-                                                                    // ARC-025: also snapshot the colors into the
-                                                                    // persisted custom-palette fields so the
-                                                                    // customization survives reload (previously
-                                                                    // only the in-memory palette slot was mutated
-                                                                    // and from_settings rebuilt the built-in).
-                                                                    let (_name, colors) = custom_palette.to_color_palette();
-                                                                    params.settings.palette.colors = colors;
-                                                                    params.settings.custom_palette =
-                                                                        Some(colors.map(|c| c.to_array()));
-                                                                    params.settings.custom_palette_active = true;
-                                                                    actions.changed = true;
-                                                                }
-                                                            if ui.small_button("🗑")
-                                                                .on_hover_text("Delete this custom palette")
-                                                                .clicked() {
-                                                                self.custom_palette_to_delete = Some(palette_name.clone());
-                                                            }
-                                                        });
-                                                    }
-                                                });
-                                        }
-
-                                        // Handle custom palette deletion
-                                        if let Some(ref palette_name) = self.custom_palette_to_delete {
-                                            if let Err(e) = CustomPaletteGallery::delete_palette(palette_name) {
-                                                log::error!("Failed to delete custom palette: {}", e);
-                                            }
-                                            self.custom_palettes = CustomPaletteGallery::list_palettes().unwrap_or_default();
-                                            self.custom_palette_to_delete = None;
-                                        }
-                                    });
+                                    self.render_custom_palette_editor(ui, params, actions);
                                 }
                             });
         self.ui_state.color_viz_open = response.openness > 0.0;
+    }
+
+    /// QA-035: custom-palette editor + import + saved-palette list,
+    /// extracted from `render_color_viz_panel` (complexity 66).
+    fn render_custom_palette_editor(
+        &mut self,
+        ui: &mut egui::Ui,
+        params: &mut FractalParams,
+        actions: &mut UiActions,
+    ) {
+        // Custom Palette Editor
+        ui.separator();
+        ui.collapsing("Custom Palette Editor", |ui| {
+                                ui.label("Create your own color palettes")
+                                    .on_hover_text("Design custom 8-color gradients");
+
+                                // Color picker for each of the 8 palette colors
+                                for i in 0..8 {
+                                    ui.horizontal(|ui| {
+                                        ui.label(format!("Color {}:", i + 1));
+                                        if ui.color_edit_button_rgb(&mut self.custom_palette_colors[i])
+                                            .on_hover_text(format!("Edit color {} of the palette", i + 1))
+                                            .changed() {
+                                            // Color changed, could auto-update preview if needed
+                                        }
+                                    });
+                                }
+
+                                ui.separator();
+                                ui.label("Preview:");
+                                ui.horizontal(|ui| {
+                                    for color in &self.custom_palette_colors {
+                                        let color32 = egui::Color32::from_rgb(
+                                            (color[0] * 255.0) as u8,
+                                            (color[1] * 255.0) as u8,
+                                            (color[2] * 255.0) as u8,
+                                        );
+                                        let (rect, _response) = ui.allocate_exact_size(
+                                            egui::vec2(20.0, 20.0),
+                                            egui::Sense::hover()
+                                        );
+                                        ui.painter().rect_filled(rect, 2.0, color32);
+                                    }
+                                });
+
+                                ui.separator();
+                                ui.horizontal(|ui| {
+                                    ui.label("Palette Name:");
+                                    ui.text_edit_singleline(&mut self.custom_palette_name);
+                                });
+
+                                ui.horizontal(|ui| {
+                                    if ui.button("💾 Save Custom")
+                                        .on_hover_text("Save this palette for later use")
+                                        .clicked()
+                                        && !self.custom_palette_name.is_empty()
+                                    {
+                                        let colors = [
+                                            Vec3::from_array(self.custom_palette_colors[0]),
+                                            Vec3::from_array(self.custom_palette_colors[1]),
+                                            Vec3::from_array(self.custom_palette_colors[2]),
+                                            Vec3::from_array(self.custom_palette_colors[3]),
+                                            Vec3::from_array(self.custom_palette_colors[4]),
+                                            Vec3::from_array(self.custom_palette_colors[5]),
+                                            Vec3::from_array(self.custom_palette_colors[6]),
+                                            Vec3::from_array(self.custom_palette_colors[7]),
+                                        ];
+                                        let custom_palette = CustomPalette::new(
+                                            self.custom_palette_name.clone(),
+                                            colors,
+                                        );
+
+                                        // Sanitize filename
+                                        let filename = self.custom_palette_name.replace(|c: char| !c.is_alphanumeric() && c != '_' && c != '-', "_");
+
+                                        if let Err(e) = CustomPaletteGallery::save_palette(&custom_palette, &filename) {
+                                            log::error!("Failed to save custom palette: {}", e);
+                                        } else {
+                                            // Refresh custom palette list
+                                            self.custom_palettes = CustomPaletteGallery::list_palettes().unwrap_or_default();
+                                            self.custom_palette_name.clear();
+                                        }
+                                    }
+
+                                    if ui.button("📋 Copy from Current")
+                                        .on_hover_text("Copy colors from the currently selected palette")
+                                        .clicked() {
+                                        for i in 0..8 {
+                                            self.custom_palette_colors[i] = params.settings.palette.colors[i].to_array();
+                                        }
+                                    }
+                                });
+
+                                // Import palette from file
+                                ui.separator();
+                                ui.label("Import Palette:")
+                                    .on_hover_text("Import from .pal (JASC-PAL) or plain text RGB files");
+                                ui.horizontal(|ui| {
+                                    ui.label("File path:");
+                                    ui.text_edit_singleline(&mut self.palette_import_path)
+                                        .on_hover_text("Enter path to .pal file or text file with RGB values (one per line)");
+                                });
+
+                                ui.horizontal(|ui| {
+                                    if ui.button("📥 Import")
+                                        .on_hover_text("Import palette from the specified file")
+                                        .clicked() {
+                                        let path = std::path::Path::new(&self.palette_import_path);
+                                        match CustomPalette::from_pal_file(path) {
+                                            Ok(imported) => {
+                                                // Apply imported colors to editor
+                                                let (_name, colors) = imported.to_color_palette();
+                                                for (i, color) in colors.iter().enumerate() {
+                                                    self.custom_palette_colors[i] = color.to_array();
+                                                }
+                                                // Pre-fill the name
+                                                if self.custom_palette_name.is_empty() {
+                                                    self.custom_palette_name = imported.name.clone();
+                                                }
+                                                self.palette_import_message = Some(format!("✓ Imported '{}' successfully!", imported.name));
+                                            }
+                                            Err(e) => {
+                                                self.palette_import_message = Some(format!("✗ Error: {}", e));
+                                            }
+                                        }
+                                    }
+
+                                    if ui.small_button("Clear")
+                                        .on_hover_text("Clear the import path")
+                                        .clicked() {
+                                        self.palette_import_path.clear();
+                                        self.palette_import_message = None;
+                                    }
+                                });
+
+                                // Show import status message
+                                if let Some(ref msg) = self.palette_import_message {
+                                    ui.label(msg);
+                                }
+
+                                ui.label("Supported formats:")
+                                    .on_hover_text("JASC-PAL (.pal), plain text RGB (0-255 or 0.0-1.0)");
+                                ui.label("  • JASC-PAL: Standard .pal format")
+                                    .on_hover_text("First line: JASC-PAL, Second: 0100, Third: color count, then RGB values (0-255)");
+                                ui.label("  • Plain text: One RGB per line")
+                                    .on_hover_text("Format: R G B (space or comma separated, 0-255 or 0.0-1.0)");
+
+                                // Refresh custom palette list periodically
+                                if self.last_custom_palette_list_update.elapsed().as_secs() > 2 {
+                                    self.custom_palettes = CustomPaletteGallery::list_palettes().unwrap_or_default();
+                                    self.last_custom_palette_list_update = web_time::Instant::now();
+                                }
+
+                                if !self.custom_palettes.is_empty() {
+                                    ui.separator();
+                                    ui.label("Saved Custom Palettes:")
+                                        .on_hover_text("Click to load, right-click to delete");
+
+                                    egui::ScrollArea::vertical()
+                                        .id_salt("custom_palettes_scroll")
+                                        .max_height(120.0)
+                                        .show(ui, |ui| {
+                                            let custom_palettes_clone = self.custom_palettes.clone();
+                                            for palette_name in custom_palettes_clone.iter() {
+                                                ui.horizontal(|ui| {
+                                                    if ui.button(palette_name)
+                                                        .on_hover_text("Click to load this custom palette")
+                                                        .clicked()
+                                                        && let Ok(custom_palette) = CustomPaletteGallery::load_palette(palette_name) {
+                                                            // Apply the custom palette to the current params.
+                                                            // ARC-025: also snapshot the colors into the
+                                                            // persisted custom-palette fields so the
+                                                            // customization survives reload (previously
+                                                            // only the in-memory palette slot was mutated
+                                                            // and from_settings rebuilt the built-in).
+                                                            let (_name, colors) = custom_palette.to_color_palette();
+                                                            params.settings.palette.colors = colors;
+                                                            params.settings.custom_palette =
+                                                                Some(colors.map(|c| c.to_array()));
+                                                            params.settings.custom_palette_active = true;
+                                                            actions.changed = true;
+                                                        }
+                                                    if ui.small_button("🗑")
+                                                        .on_hover_text("Delete this custom palette")
+                                                        .clicked() {
+                                                        self.custom_palette_to_delete = Some(palette_name.clone());
+                                                    }
+                                                });
+                                            }
+                                        });
+                                }
+
+                                // Handle custom palette deletion
+                                if let Some(ref palette_name) = self.custom_palette_to_delete {
+                                    if let Err(e) = CustomPaletteGallery::delete_palette(palette_name) {
+                                        log::error!("Failed to delete custom palette: {}", e);
+                                    }
+                                    self.custom_palettes = CustomPaletteGallery::list_palettes().unwrap_or_default();
+                                    self.custom_palette_to_delete = None;
+                                }
+                            });
     }
 }

@@ -70,450 +70,9 @@ impl App {
                 },
             ..
         } = event
+            && self.handle_key_shortcut(*keycode)
         {
-            match keycode {
-                KeyCode::KeyH => {
-                    self.ui.show_ui = !self.ui.show_ui;
-                    return true;
-                }
-                KeyCode::KeyF => {
-                    self.ui.show_fps = !self.ui.show_fps;
-                    self.ui.ui_state.show_fps = self.ui.show_fps;
-                    return true;
-                }
-                KeyCode::KeyV => {
-                    self.ui.show_performance_overlay = !self.ui.show_performance_overlay;
-                    return true;
-                }
-                KeyCode::KeyZ => {
-                    // ENH-002: Ctrl/Cmd+Z undo, Ctrl/Cmd+Shift+Z redo. Cmd on
-                    // macOS, Ctrl elsewhere (same convention as Ctrl+K).
-                    #[cfg(target_os = "macos")]
-                    let modifier_pressed =
-                        self.egui_state.egui_ctx().input(|i| i.modifiers.command);
-                    #[cfg(not(target_os = "macos"))]
-                    let modifier_pressed = self.egui_state.egui_ctx().input(|i| i.modifiers.ctrl);
-
-                    if modifier_pressed {
-                        let shift = self.egui_state.egui_ctx().input(|i| i.modifiers.shift);
-                        let applied = if shift {
-                            self.apply_redo()
-                        } else {
-                            self.apply_undo()
-                        };
-                        if applied {
-                            log::info!("{} via keyboard", if shift { "Redo" } else { "Undo" });
-                        }
-                        return true;
-                    }
-                }
-                KeyCode::KeyY => {
-                    // ENH-002: Ctrl/Cmd+Y is the canonical redo binding.
-                    #[cfg(target_os = "macos")]
-                    let modifier_pressed =
-                        self.egui_state.egui_ctx().input(|i| i.modifiers.command);
-                    #[cfg(not(target_os = "macos"))]
-                    let modifier_pressed = self.egui_state.egui_ctx().input(|i| i.modifiers.ctrl);
-
-                    if modifier_pressed && self.apply_redo() {
-                        log::info!("Redo via keyboard");
-                        return true;
-                    }
-                }
-                KeyCode::KeyR => {
-                    self.reset_view();
-                    self.mark_scene_dirty();
-                    return true;
-                }
-                // 2D Fractals (1-7)
-                KeyCode::Digit1 => {
-                    self.fractal_params
-                        .switch_fractal(FractalType::Mandelbrot2D);
-                    self.mark_scene_dirty();
-                    return true;
-                }
-                KeyCode::Digit2 => {
-                    self.fractal_params.switch_fractal(FractalType::Julia2D);
-                    self.mark_scene_dirty();
-                    return true;
-                }
-                KeyCode::Digit3 => {
-                    self.fractal_params
-                        .switch_fractal(FractalType::Sierpinski2D);
-                    self.mark_scene_dirty();
-                    return true;
-                }
-                KeyCode::Digit4 => {
-                    self.fractal_params
-                        .switch_fractal(FractalType::BurningShip2D);
-                    self.mark_scene_dirty();
-                    return true;
-                }
-                KeyCode::Digit5 => {
-                    self.fractal_params.switch_fractal(FractalType::Tricorn2D);
-                    self.mark_scene_dirty();
-                    return true;
-                }
-                KeyCode::Digit6 => {
-                    self.fractal_params.switch_fractal(FractalType::Phoenix2D);
-                    self.mark_scene_dirty();
-                    return true;
-                }
-                KeyCode::Digit7 => {
-                    self.fractal_params.switch_fractal(FractalType::Celtic2D);
-                    self.mark_scene_dirty();
-                    return true;
-                }
-                KeyCode::Digit8 => {
-                    self.fractal_params.switch_fractal(FractalType::Newton2D);
-                    self.mark_scene_dirty();
-                    return true;
-                }
-                KeyCode::Digit9 => {
-                    self.fractal_params.switch_fractal(FractalType::Lyapunov2D);
-                    self.mark_scene_dirty();
-                    return true;
-                }
-                KeyCode::Digit0 => {
-                    self.fractal_params.switch_fractal(FractalType::Nova2D);
-                    self.mark_scene_dirty();
-                    return true;
-                }
-                // Magnet and Collatz: use UI (no hotkey due to limited keys)
-                // 3D Fractals (F1-F9)
-                KeyCode::F1 => {
-                    self.fractal_params
-                        .switch_fractal(FractalType::Mandelbulb3D);
-                    self.reset_view();
-                    self.mark_scene_dirty();
-                    return true;
-                }
-                KeyCode::F2 => {
-                    self.fractal_params
-                        .switch_fractal(FractalType::MengerSponge3D);
-                    self.reset_view();
-                    self.mark_scene_dirty();
-                    return true;
-                }
-                KeyCode::F3 => {
-                    self.fractal_params
-                        .switch_fractal(FractalType::SierpinskiPyramid3D);
-                    self.reset_view();
-                    self.mark_scene_dirty();
-                    return true;
-                }
-                KeyCode::F4 => {
-                    self.fractal_params.switch_fractal(FractalType::JuliaSet3D);
-                    self.reset_view();
-                    self.mark_scene_dirty();
-                    return true;
-                }
-                KeyCode::F5 => {
-                    self.fractal_params.switch_fractal(FractalType::Mandelbox3D);
-                    self.reset_view();
-                    self.mark_scene_dirty();
-                    return true;
-                }
-                KeyCode::F6 => {
-                    self.fractal_params
-                        .switch_fractal(FractalType::OctahedralIFS3D);
-                    self.reset_view();
-                    self.mark_scene_dirty();
-                    return true;
-                }
-                KeyCode::F7 => {
-                    self.fractal_params
-                        .switch_fractal(FractalType::IcosahedralIFS3D);
-                    self.reset_view();
-                    self.mark_scene_dirty();
-                    return true;
-                }
-                KeyCode::F8 => {
-                    self.fractal_params
-                        .switch_fractal(FractalType::ApollonianGasket3D);
-                    self.reset_view();
-                    self.mark_scene_dirty();
-                    return true;
-                }
-                KeyCode::F9 => {
-                    self.fractal_params.switch_fractal(FractalType::Kleinian3D);
-                    self.reset_view();
-                    self.mark_scene_dirty();
-                    return true;
-                }
-                KeyCode::F10 => {
-                    self.fractal_params
-                        .switch_fractal(FractalType::HybridMandelbulbJulia3D);
-                    self.reset_view();
-                    self.mark_scene_dirty();
-                    return true;
-                }
-                // QuaternionCubic3D: accessible via UI only (no F12 - reserved for screenshot)
-                KeyCode::KeyP => {
-                    let pre = self.begin_change();
-                    if self.shift_pressed {
-                        // Shift+P: Cycle procedural palette
-                        use crate::fractal::ProceduralPalette;
-                        let all_options: Vec<ProceduralPalette> =
-                            std::iter::once(ProceduralPalette::None)
-                                .chain(ProceduralPalette::ALL.iter().copied())
-                                .collect();
-                        let current_idx = all_options
-                            .iter()
-                            .position(|p| *p == self.fractal_params.settings.procedural_palette)
-                            .unwrap_or(0);
-                        let next_idx = (current_idx + 1) % all_options.len();
-                        self.fractal_params.settings.procedural_palette = all_options[next_idx];
-                        self.ui.show_toast(format!(
-                            "Procedural: {}",
-                            self.fractal_params.settings.procedural_palette.name()
-                        ));
-                    } else {
-                        // P: Cycle static palette
-                        self.fractal_params.next_palette();
-                        self.ui.show_toast(format!(
-                            "Palette: {}",
-                            self.fractal_params.settings.palette.name
-                        ));
-                    }
-                    self.commit_change(pre);
-                    return true;
-                }
-                KeyCode::F12 => {
-                    self.save_screenshot = true;
-                    self.mark_scene_dirty();
-                    log::info!("Screenshot queued...");
-                    return true;
-                }
-                KeyCode::KeyO => {
-                    let pre = self.begin_change();
-                    self.fractal_params.settings.auto_orbit =
-                        !self.fractal_params.settings.auto_orbit;
-                    self.commit_change(pre);
-                    log::info!(
-                        "Auto-orbit: {}",
-                        if self.fractal_params.settings.auto_orbit {
-                            "ON"
-                        } else {
-                            "OFF"
-                        }
-                    );
-                    return true;
-                }
-                KeyCode::BracketLeft => {
-                    let pre = self.begin_change();
-                    self.fractal_params.settings.orbit_speed =
-                        (self.fractal_params.settings.orbit_speed - 0.1).max(0.1);
-                    self.commit_change(pre);
-                    log::info!(
-                        "Orbit speed: {:.2}",
-                        self.fractal_params.settings.orbit_speed
-                    );
-                    return true;
-                }
-                KeyCode::BracketRight => {
-                    let pre = self.begin_change();
-                    self.fractal_params.settings.orbit_speed =
-                        (self.fractal_params.settings.orbit_speed + 0.1).min(5.0);
-                    self.commit_change(pre);
-                    log::info!(
-                        "Orbit speed: {:.2}",
-                        self.fractal_params.settings.orbit_speed
-                    );
-                    return true;
-                }
-                KeyCode::Minus => {
-                    let pre = self.begin_change();
-                    match self.fractal_params.settings.render_mode {
-                        RenderMode::TwoD => {
-                            self.fractal_params.settings.max_iterations = self
-                                .fractal_params
-                                .settings
-                                .max_iterations
-                                .saturating_sub(32)
-                                .max(32);
-                            log::info!(
-                                "Max iterations: {}",
-                                self.fractal_params.settings.max_iterations
-                            );
-                        }
-                        RenderMode::ThreeD => {
-                            self.fractal_params.settings.max_steps = self
-                                .fractal_params
-                                .settings
-                                .max_steps
-                                .saturating_sub(10)
-                                .max(30);
-                            log::info!("Max steps: {}", self.fractal_params.settings.max_steps);
-                        }
-                    }
-                    self.commit_change(pre);
-                    return true;
-                }
-                KeyCode::Equal => {
-                    let pre = self.begin_change();
-                    match self.fractal_params.settings.render_mode {
-                        RenderMode::TwoD => {
-                            self.fractal_params.settings.max_iterations =
-                                (self.fractal_params.settings.max_iterations + 32).min(2048);
-                            log::info!(
-                                "Max iterations: {}",
-                                self.fractal_params.settings.max_iterations
-                            );
-                        }
-                        RenderMode::ThreeD => {
-                            self.fractal_params.settings.max_steps =
-                                (self.fractal_params.settings.max_steps + 10).min(500);
-                            log::info!("Max steps: {}", self.fractal_params.settings.max_steps);
-                        }
-                    }
-                    self.commit_change(pre);
-                    return true;
-                }
-                KeyCode::Comma => {
-                    let pre = self.begin_change();
-                    self.fractal_params.settings.power =
-                        (self.fractal_params.settings.power - 0.5).max(2.0);
-                    self.commit_change(pre);
-                    log::info!("Power: {:.1}", self.fractal_params.settings.power);
-                    return true;
-                }
-                KeyCode::Period => {
-                    let pre = self.begin_change();
-                    self.fractal_params.settings.power =
-                        (self.fractal_params.settings.power + 0.5).min(16.0);
-                    self.commit_change(pre);
-                    log::info!("Power: {:.1}", self.fractal_params.settings.power);
-                    return true;
-                }
-                KeyCode::KeyL => {
-                    let pre = self.begin_change();
-                    self.fractal_params.settings.ambient_occlusion =
-                        !self.fractal_params.settings.ambient_occlusion;
-                    self.commit_change(pre);
-                    log::info!(
-                        "Ambient Occlusion: {}",
-                        if self.fractal_params.settings.ambient_occlusion {
-                            "ON"
-                        } else {
-                            "OFF"
-                        }
-                    );
-                    return true;
-                }
-                KeyCode::KeyT => {
-                    let pre = self.begin_change();
-                    self.fractal_params.settings.depth_of_field =
-                        !self.fractal_params.settings.depth_of_field;
-                    self.commit_change(pre);
-                    log::info!(
-                        "Depth of Field: {}",
-                        if self.fractal_params.settings.depth_of_field {
-                            "ON"
-                        } else {
-                            "OFF"
-                        }
-                    );
-                    return true;
-                }
-                KeyCode::KeyG => {
-                    let pre = self.begin_change();
-                    if self.shift_pressed {
-                        // Shift+G: toggle ENH-006 GPU profile HUD overlay
-                        // (mirrors the Shift+D LOD-debug-visualization pattern).
-                        self.ui.show_gpu_profile = !self.ui.show_gpu_profile;
-                        self.ui.ui_state.show_gpu_profile = self.ui.show_gpu_profile;
-                        log::info!(
-                            "GPU Profile Overlay: {}",
-                            if self.ui.show_gpu_profile {
-                                "ON"
-                            } else {
-                                "OFF"
-                            }
-                        );
-                        return true;
-                    }
-                    self.fractal_params.settings.show_floor =
-                        !self.fractal_params.settings.show_floor;
-                    self.commit_change(pre);
-                    log::info!(
-                        "Floor: {}",
-                        if self.fractal_params.settings.show_floor {
-                            "ON"
-                        } else {
-                            "OFF"
-                        }
-                    );
-                    return true;
-                }
-                KeyCode::KeyB => {
-                    let pre = self.begin_change();
-                    // Cycle shadow mode: 0 -> 1 -> 2 -> 0
-                    self.fractal_params.settings.shadow_mode =
-                        (self.fractal_params.settings.shadow_mode + 1) % 3;
-                    let mode_name = match self.fractal_params.settings.shadow_mode {
-                        0 => "OFF",
-                        1 => "HARD",
-                        _ => "SOFT",
-                    };
-                    self.commit_change(pre);
-                    log::info!("Shadow Mode: {}", mode_name);
-                    return true;
-                }
-                KeyCode::KeyI => {
-                    // Toggle LOD system on/off
-                    self.fractal_params.lod.lod_config.enabled =
-                        !self.fractal_params.lod.lod_config.enabled;
-                    self.mark_scene_dirty();
-                    log::info!(
-                        "LOD System: {}",
-                        if self.fractal_params.lod.lod_config.enabled {
-                            "ON"
-                        } else {
-                            "OFF"
-                        }
-                    );
-                    return true;
-                }
-                KeyCode::KeyD => {
-                    // Shift+D toggles LOD debug visualization
-                    if self.shift_pressed {
-                        self.fractal_params.lod.lod_config.debug_visualization =
-                            !self.fractal_params.lod.lod_config.debug_visualization;
-                        self.mark_scene_dirty();
-                        log::info!(
-                            "LOD Debug Visualization: {}",
-                            if self.fractal_params.lod.lod_config.debug_visualization {
-                                "ON"
-                            } else {
-                                "OFF"
-                            }
-                        );
-                        return true;
-                    }
-                }
-                KeyCode::Slash => {
-                    // Open command palette with '/'
-                    self.ui.command_palette.open();
-                    log::info!("Command Palette opened");
-                    return true;
-                }
-                KeyCode::KeyK => {
-                    // Ctrl+K also opens command palette (VS Code style)
-                    #[cfg(target_os = "macos")]
-                    let modifier_pressed =
-                        self.egui_state.egui_ctx().input(|i| i.modifiers.command);
-                    #[cfg(not(target_os = "macos"))]
-                    let modifier_pressed = self.egui_state.egui_ctx().input(|i| i.modifiers.ctrl);
-
-                    if modifier_pressed {
-                        self.ui.command_palette.open();
-                        log::info!("Command Palette opened");
-                        return true;
-                    }
-                }
-                _ => {}
-            }
+            return true;
         }
 
         // Handle mode-specific input only if egui doesn't block it
@@ -546,6 +105,472 @@ impl App {
         } else {
             false
         }
+    }
+
+    /// QA-035: fractal-type hotkeys (digits + function keys).
+    fn handle_fractal_hotkey(&mut self, keycode: KeyCode) -> Option<bool> {
+        match keycode {
+            KeyCode::Digit1 => {
+                self.fractal_params
+                    .switch_fractal(FractalType::Mandelbrot2D);
+                self.mark_scene_dirty();
+                Some(true)
+            }
+            KeyCode::Digit2 => {
+                self.fractal_params.switch_fractal(FractalType::Julia2D);
+                self.mark_scene_dirty();
+                Some(true)
+            }
+            KeyCode::Digit3 => {
+                self.fractal_params
+                    .switch_fractal(FractalType::Sierpinski2D);
+                self.mark_scene_dirty();
+                Some(true)
+            }
+            KeyCode::Digit4 => {
+                self.fractal_params
+                    .switch_fractal(FractalType::BurningShip2D);
+                self.mark_scene_dirty();
+                Some(true)
+            }
+            KeyCode::Digit5 => {
+                self.fractal_params.switch_fractal(FractalType::Tricorn2D);
+                self.mark_scene_dirty();
+                Some(true)
+            }
+            KeyCode::Digit6 => {
+                self.fractal_params.switch_fractal(FractalType::Phoenix2D);
+                self.mark_scene_dirty();
+                Some(true)
+            }
+            KeyCode::Digit7 => {
+                self.fractal_params.switch_fractal(FractalType::Celtic2D);
+                self.mark_scene_dirty();
+                Some(true)
+            }
+            KeyCode::Digit8 => {
+                self.fractal_params.switch_fractal(FractalType::Newton2D);
+                self.mark_scene_dirty();
+                Some(true)
+            }
+            KeyCode::Digit9 => {
+                self.fractal_params.switch_fractal(FractalType::Lyapunov2D);
+                self.mark_scene_dirty();
+                Some(true)
+            }
+            KeyCode::Digit0 => {
+                self.fractal_params.switch_fractal(FractalType::Nova2D);
+                self.mark_scene_dirty();
+                Some(true)
+            }
+            // Magnet and Collatz: use UI (no hotkey due to limited keys)
+            // 3D Fractals (F1-F9)
+            KeyCode::F1 => {
+                self.fractal_params
+                    .switch_fractal(FractalType::Mandelbulb3D);
+                self.reset_view();
+                self.mark_scene_dirty();
+                Some(true)
+            }
+            KeyCode::F2 => {
+                self.fractal_params
+                    .switch_fractal(FractalType::MengerSponge3D);
+                self.reset_view();
+                self.mark_scene_dirty();
+                Some(true)
+            }
+            KeyCode::F3 => {
+                self.fractal_params
+                    .switch_fractal(FractalType::SierpinskiPyramid3D);
+                self.reset_view();
+                self.mark_scene_dirty();
+                Some(true)
+            }
+            KeyCode::F4 => {
+                self.fractal_params.switch_fractal(FractalType::JuliaSet3D);
+                self.reset_view();
+                self.mark_scene_dirty();
+                Some(true)
+            }
+            KeyCode::F5 => {
+                self.fractal_params.switch_fractal(FractalType::Mandelbox3D);
+                self.reset_view();
+                self.mark_scene_dirty();
+                Some(true)
+            }
+            KeyCode::F6 => {
+                self.fractal_params
+                    .switch_fractal(FractalType::OctahedralIFS3D);
+                self.reset_view();
+                self.mark_scene_dirty();
+                Some(true)
+            }
+            KeyCode::F7 => {
+                self.fractal_params
+                    .switch_fractal(FractalType::IcosahedralIFS3D);
+                self.reset_view();
+                self.mark_scene_dirty();
+                Some(true)
+            }
+            KeyCode::F8 => {
+                self.fractal_params
+                    .switch_fractal(FractalType::ApollonianGasket3D);
+                self.reset_view();
+                self.mark_scene_dirty();
+                Some(true)
+            }
+            KeyCode::F9 => {
+                self.fractal_params.switch_fractal(FractalType::Kleinian3D);
+                self.reset_view();
+                self.mark_scene_dirty();
+                Some(true)
+            }
+            KeyCode::F10 => {
+                self.fractal_params
+                    .switch_fractal(FractalType::HybridMandelbulbJulia3D);
+                self.reset_view();
+                self.mark_scene_dirty();
+                Some(true)
+            }
+            // QuaternionCubic3D: accessible via UI only (no F12 - reserved for screenshot)
+            // Every arm above diverges; the catch-all IS the fall-through.
+            _ => None,
+        }
+    }
+
+    /// QA-035: parameter-mutation hotkeys (the ARC-025 commit_change arms).
+    fn handle_parameter_hotkey(&mut self, keycode: KeyCode) -> Option<bool> {
+        match keycode {
+            KeyCode::KeyO => {
+                let pre = self.begin_change();
+                self.fractal_params.settings.auto_orbit = !self.fractal_params.settings.auto_orbit;
+                self.commit_change(pre);
+                log::info!(
+                    "Auto-orbit: {}",
+                    if self.fractal_params.settings.auto_orbit {
+                        "ON"
+                    } else {
+                        "OFF"
+                    }
+                );
+                return Some(true);
+            }
+            KeyCode::BracketLeft => {
+                let pre = self.begin_change();
+                self.fractal_params.settings.orbit_speed =
+                    (self.fractal_params.settings.orbit_speed - 0.1).max(0.1);
+                self.commit_change(pre);
+                log::info!(
+                    "Orbit speed: {:.2}",
+                    self.fractal_params.settings.orbit_speed
+                );
+                return Some(true);
+            }
+            KeyCode::BracketRight => {
+                let pre = self.begin_change();
+                self.fractal_params.settings.orbit_speed =
+                    (self.fractal_params.settings.orbit_speed + 0.1).min(5.0);
+                self.commit_change(pre);
+                log::info!(
+                    "Orbit speed: {:.2}",
+                    self.fractal_params.settings.orbit_speed
+                );
+                return Some(true);
+            }
+            KeyCode::Minus => {
+                let pre = self.begin_change();
+                match self.fractal_params.settings.render_mode {
+                    RenderMode::TwoD => {
+                        self.fractal_params.settings.max_iterations = self
+                            .fractal_params
+                            .settings
+                            .max_iterations
+                            .saturating_sub(32)
+                            .max(32);
+                        log::info!(
+                            "Max iterations: {}",
+                            self.fractal_params.settings.max_iterations
+                        );
+                    }
+                    RenderMode::ThreeD => {
+                        self.fractal_params.settings.max_steps = self
+                            .fractal_params
+                            .settings
+                            .max_steps
+                            .saturating_sub(10)
+                            .max(30);
+                        log::info!("Max steps: {}", self.fractal_params.settings.max_steps);
+                    }
+                }
+                self.commit_change(pre);
+                return Some(true);
+            }
+            KeyCode::Equal => {
+                let pre = self.begin_change();
+                match self.fractal_params.settings.render_mode {
+                    RenderMode::TwoD => {
+                        self.fractal_params.settings.max_iterations =
+                            (self.fractal_params.settings.max_iterations + 32).min(2048);
+                        log::info!(
+                            "Max iterations: {}",
+                            self.fractal_params.settings.max_iterations
+                        );
+                    }
+                    RenderMode::ThreeD => {
+                        self.fractal_params.settings.max_steps =
+                            (self.fractal_params.settings.max_steps + 10).min(500);
+                        log::info!("Max steps: {}", self.fractal_params.settings.max_steps);
+                    }
+                }
+                self.commit_change(pre);
+                return Some(true);
+            }
+            KeyCode::Comma => {
+                let pre = self.begin_change();
+                self.fractal_params.settings.power =
+                    (self.fractal_params.settings.power - 0.5).max(2.0);
+                self.commit_change(pre);
+                log::info!("Power: {:.1}", self.fractal_params.settings.power);
+                return Some(true);
+            }
+            KeyCode::Period => {
+                let pre = self.begin_change();
+                self.fractal_params.settings.power =
+                    (self.fractal_params.settings.power + 0.5).min(16.0);
+                self.commit_change(pre);
+                log::info!("Power: {:.1}", self.fractal_params.settings.power);
+                return Some(true);
+            }
+            KeyCode::KeyL => {
+                let pre = self.begin_change();
+                self.fractal_params.settings.ambient_occlusion =
+                    !self.fractal_params.settings.ambient_occlusion;
+                self.commit_change(pre);
+                log::info!(
+                    "Ambient Occlusion: {}",
+                    if self.fractal_params.settings.ambient_occlusion {
+                        "ON"
+                    } else {
+                        "OFF"
+                    }
+                );
+                return Some(true);
+            }
+            KeyCode::KeyT => {
+                let pre = self.begin_change();
+                self.fractal_params.settings.depth_of_field =
+                    !self.fractal_params.settings.depth_of_field;
+                self.commit_change(pre);
+                log::info!(
+                    "Depth of Field: {}",
+                    if self.fractal_params.settings.depth_of_field {
+                        "ON"
+                    } else {
+                        "OFF"
+                    }
+                );
+                return Some(true);
+            }
+            KeyCode::KeyG => {
+                let pre = self.begin_change();
+                if self.shift_pressed {
+                    // Shift+G: toggle ENH-006 GPU profile HUD overlay
+                    // (mirrors the Shift+D LOD-debug-visualization pattern).
+                    self.ui.show_gpu_profile = !self.ui.show_gpu_profile;
+                    self.ui.ui_state.show_gpu_profile = self.ui.show_gpu_profile;
+                    log::info!(
+                        "GPU Profile Overlay: {}",
+                        if self.ui.show_gpu_profile {
+                            "ON"
+                        } else {
+                            "OFF"
+                        }
+                    );
+                    return Some(true);
+                }
+                self.fractal_params.settings.show_floor = !self.fractal_params.settings.show_floor;
+                self.commit_change(pre);
+                log::info!(
+                    "Floor: {}",
+                    if self.fractal_params.settings.show_floor {
+                        "ON"
+                    } else {
+                        "OFF"
+                    }
+                );
+                return Some(true);
+            }
+            KeyCode::KeyB => {
+                let pre = self.begin_change();
+                // Cycle shadow mode: 0 -> 1 -> 2 -> 0
+                self.fractal_params.settings.shadow_mode =
+                    (self.fractal_params.settings.shadow_mode + 1) % 3;
+                let mode_name = match self.fractal_params.settings.shadow_mode {
+                    0 => "OFF",
+                    1 => "HARD",
+                    _ => "SOFT",
+                };
+                self.commit_change(pre);
+                log::info!("Shadow Mode: {}", mode_name);
+                return Some(true);
+            }
+            KeyCode::KeyI => {
+                // Toggle LOD system on/off
+                self.fractal_params.lod.lod_config.enabled =
+                    !self.fractal_params.lod.lod_config.enabled;
+                self.mark_scene_dirty();
+                log::info!(
+                    "LOD System: {}",
+                    if self.fractal_params.lod.lod_config.enabled {
+                        "ON"
+                    } else {
+                        "OFF"
+                    }
+                );
+                return Some(true);
+            }
+            KeyCode::KeyD => {
+                // Shift+D toggles LOD debug visualization
+                if self.shift_pressed {
+                    self.fractal_params.lod.lod_config.debug_visualization =
+                        !self.fractal_params.lod.lod_config.debug_visualization;
+                    self.mark_scene_dirty();
+                    log::info!(
+                        "LOD Debug Visualization: {}",
+                        if self.fractal_params.lod.lod_config.debug_visualization {
+                            "ON"
+                        } else {
+                            "OFF"
+                        }
+                    );
+                    return Some(true);
+                }
+            }
+            _ => return None,
+        }
+        Some(true)
+    }
+
+    /// QA-035: remaining global shortcuts (UI toggles, palette,
+    /// undo/redo, command palette). Returns `true` when consumed.
+    fn handle_key_shortcut(&mut self, keycode: KeyCode) -> bool {
+        if let Some(consumed) = self.handle_fractal_hotkey(keycode) {
+            return consumed;
+        }
+        if let Some(consumed) = self.handle_parameter_hotkey(keycode) {
+            return consumed;
+        }
+        match keycode {
+            KeyCode::KeyH => {
+                self.ui.show_ui = !self.ui.show_ui;
+                return true;
+            }
+            KeyCode::KeyF => {
+                self.ui.show_fps = !self.ui.show_fps;
+                self.ui.ui_state.show_fps = self.ui.show_fps;
+                return true;
+            }
+            KeyCode::KeyV => {
+                self.ui.show_performance_overlay = !self.ui.show_performance_overlay;
+                return true;
+            }
+            KeyCode::KeyZ => {
+                // ENH-002: Ctrl/Cmd+Z undo, Ctrl/Cmd+Shift+Z redo. Cmd on
+                // macOS, Ctrl elsewhere (same convention as Ctrl+K).
+                #[cfg(target_os = "macos")]
+                let modifier_pressed = self.egui_state.egui_ctx().input(|i| i.modifiers.command);
+                #[cfg(not(target_os = "macos"))]
+                let modifier_pressed = self.egui_state.egui_ctx().input(|i| i.modifiers.ctrl);
+
+                if modifier_pressed {
+                    let shift = self.egui_state.egui_ctx().input(|i| i.modifiers.shift);
+                    let applied = if shift {
+                        self.apply_redo()
+                    } else {
+                        self.apply_undo()
+                    };
+                    if applied {
+                        log::info!("{} via keyboard", if shift { "Redo" } else { "Undo" });
+                    }
+                    return true;
+                }
+            }
+            KeyCode::KeyY => {
+                // ENH-002: Ctrl/Cmd+Y is the canonical redo binding.
+                #[cfg(target_os = "macos")]
+                let modifier_pressed = self.egui_state.egui_ctx().input(|i| i.modifiers.command);
+                #[cfg(not(target_os = "macos"))]
+                let modifier_pressed = self.egui_state.egui_ctx().input(|i| i.modifiers.ctrl);
+
+                if modifier_pressed && self.apply_redo() {
+                    log::info!("Redo via keyboard");
+                    return true;
+                }
+            }
+            KeyCode::KeyR => {
+                self.reset_view();
+                self.mark_scene_dirty();
+                return true;
+            }
+            // 2D Fractals (1-7)
+            KeyCode::KeyP => {
+                let pre = self.begin_change();
+                if self.shift_pressed {
+                    // Shift+P: Cycle procedural palette
+                    use crate::fractal::ProceduralPalette;
+                    let all_options: Vec<ProceduralPalette> =
+                        std::iter::once(ProceduralPalette::None)
+                            .chain(ProceduralPalette::ALL.iter().copied())
+                            .collect();
+                    let current_idx = all_options
+                        .iter()
+                        .position(|p| *p == self.fractal_params.settings.procedural_palette)
+                        .unwrap_or(0);
+                    let next_idx = (current_idx + 1) % all_options.len();
+                    self.fractal_params.settings.procedural_palette = all_options[next_idx];
+                    self.ui.show_toast(format!(
+                        "Procedural: {}",
+                        self.fractal_params.settings.procedural_palette.name()
+                    ));
+                } else {
+                    // P: Cycle static palette
+                    self.fractal_params.next_palette();
+                    self.ui.show_toast(format!(
+                        "Palette: {}",
+                        self.fractal_params.settings.palette.name
+                    ));
+                }
+                self.commit_change(pre);
+                return true;
+            }
+            KeyCode::F12 => {
+                self.save_screenshot = true;
+                self.mark_scene_dirty();
+                log::info!("Screenshot queued...");
+                return true;
+            }
+            KeyCode::Slash => {
+                // Open command palette with '/'
+                self.ui.command_palette.open();
+                log::info!("Command Palette opened");
+                return true;
+            }
+            KeyCode::KeyK => {
+                // Ctrl+K also opens command palette (VS Code style)
+                #[cfg(target_os = "macos")]
+                let modifier_pressed = self.egui_state.egui_ctx().input(|i| i.modifiers.command);
+                #[cfg(not(target_os = "macos"))]
+                let modifier_pressed = self.egui_state.egui_ctx().input(|i| i.modifiers.ctrl);
+
+                if modifier_pressed {
+                    self.ui.command_palette.open();
+                    log::info!("Command Palette opened");
+                    return true;
+                }
+            }
+            _ => {}
+        }
+        false
     }
 
     fn handle_2d_input(&mut self, event: &WindowEvent) -> bool {
