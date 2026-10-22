@@ -41,6 +41,11 @@ use crate::fractal::{FractalType, RenderMode};
 /// perturbation first); HP remains the deep-zoom path for the other 2D types.
 pub const PERTURBATION_LOG2_GATE: f64 = 13.3;
 
+/// SEC-010: worker-death retries are capped. After this many consecutive
+/// panicking spawns (no successful orbit, no view change between them),
+/// the driver stops retrying until the view changes.
+const MAX_WORKER_DEATHS: u32 = 5;
+
 /// True when perturbation should engage for this view.
 ///
 /// Eligible for every 2D escape-time type that maps to a [`FractalKind`]
@@ -110,6 +115,15 @@ pub struct PerturbationDriver {
     /// True while a worker is in flight. Drives the "computing…" toast and
     /// suppresses respawns.
     pub computing: bool,
+    /// SEC-010: consecutive worker deaths (channel Disconnected) since the
+    /// last successful orbit or view change. Past [`MAX_WORKER_DEATHS`],
+    /// retries stop until the view changes.
+    #[cfg(not(target_arch = "wasm32"))]
+    worker_deaths: u32,
+    /// SEC-010: earliest instant the next retry may spawn. `None` when no
+    /// backoff is active.
+    #[cfg(not(target_arch = "wasm32"))]
+    retry_after: Option<std::time::Instant>,
 }
 
 impl Default for PerturbationDriver {
@@ -128,6 +142,10 @@ impl PerturbationDriver {
             last_view: None,
             dirty: true,
             computing: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            worker_deaths: 0,
+            #[cfg(not(target_arch = "wasm32"))]
+            retry_after: None,
         }
     }
 
@@ -165,6 +183,14 @@ impl PerturbationDriver {
         let changed = self.last_view.as_ref() != Some(&sig);
         if changed {
             self.dirty = true;
+            // SEC-010: a genuine view change is a fresh user request — clear
+            // the death counter and any pending backoff so the retry cap
+            // can't permanently silence a newly requested orbit.
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                self.worker_deaths = 0;
+                self.retry_after = None;
+            }
         }
         self.last_view = Some(sig);
     }
@@ -197,6 +223,14 @@ impl PerturbationDriver {
         {
             if !self.dirty || self.computing {
                 return false;
+            }
+            // SEC-010: a worker death schedules a delayed retry; inside the
+            // backoff window the spawn is held while the card stays dirty.
+            if let Some(t) = self.retry_after {
+                if std::time::Instant::now() < t {
+                    return false;
+                }
+                self.retry_after = None;
             }
             // Below the gate: don't waste CPU on an orbit we won't use. Stay
             // dirty so the first frame past the gate spawns immediately.
@@ -308,19 +342,42 @@ impl PerturbationDriver {
                 Ok(orbit) => {
                     self.pending = None;
                     self.computing = false;
+                    // SEC-010: a successful orbit clears the death counter
+                    // and any pending backoff.
+                    self.worker_deaths = 0;
+                    self.retry_after = None;
                     Some(orbit)
                 }
                 Err(std::sync::mpsc::TryRecvError::Empty) => None,
                 Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-                    // Worker panicked before sending. Reset so the next
-                    // eligible frame retries instead of silently sticking
-                    // the driver in the "computing" state forever.
+                    // Worker panicked before sending. SEC-010: retries are
+                    // backed off (exponential, capped at 60s) and capped —
+                    // the old path set dirty=true unconditionally, so a
+                    // worker that dies on a hostile view retried EVERY
+                    // eligible frame, burning CPU on the UI thread.
                     self.pending = None;
                     self.computing = false;
-                    self.dirty = true;
-                    log::error!(
-                        "perturbation reference-orbit worker thread died; will retry next frame"
-                    );
+                    self.worker_deaths += 1;
+                    if self.worker_deaths > MAX_WORKER_DEATHS {
+                        // Cap reached: stop retrying until the view changes
+                        // (note_view resets the counter on a real change).
+                        self.dirty = false;
+                        log::error!(
+                            "perturbation worker died {} times; suspending retries until the view changes",
+                            MAX_WORKER_DEATHS
+                        );
+                    } else {
+                        let backoff_secs = 1u64 << (self.worker_deaths - 1).min(6); // 1, 2, 4 .. 64 → capped below
+                        self.retry_after = Some(
+                            std::time::Instant::now()
+                                + std::time::Duration::from_secs(backoff_secs.min(60)),
+                        );
+                        self.dirty = true;
+                        log::error!(
+                            "perturbation reference-orbit worker thread died ({}, retry in {backoff_secs}s)",
+                            self.worker_deaths
+                        );
+                    }
                     None
                 }
             }

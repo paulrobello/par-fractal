@@ -329,10 +329,18 @@ impl FractalParams {
             clamp_finite_f64(settings.center_2d[0], -1e15, 1e15, 0.0),
             clamp_finite_f64(settings.center_2d[1], -1e15, 1e15, 0.0),
         ];
-        // ENH-001 Phase C: precise center passes through verbatim (the driver
-        // parses + validates at orbit time; an unparseable string falls back to
-        // the f64 path). No clamp — the whole point is arbitrary precision.
-        let center_2d_precise = settings.center_2d_precise;
+        // ENH-001 Phase C: precise center. SEC-010: a pair that fails
+        // `parse_center_decimal` (malformed, oversized, or out-of-range) is
+        // dropped to `None` at the trust boundary instead of passing through
+        // verbatim — the fallback then uses the clamped f64 center. Valid
+        // pairs pass through verbatim (the whole point is arbitrary
+        // precision); the driver still re-parses at orbit time.
+        let center_2d_precise = settings.center_2d_precise.and_then(|p| {
+            use crate::deep_zoom::orbit::parse_center_decimal;
+            let ok =
+                parse_center_decimal(&p[0], 64).is_ok() && parse_center_decimal(&p[1], 64).is_ok();
+            ok.then_some(p)
+        });
         let procedural_brightness = [
             clamp_finite_f32(settings.procedural_brightness[0], -1e6, 1e6, 0.5),
             clamp_finite_f32(settings.procedural_brightness[1], -1e6, 1e6, 0.5),
@@ -457,7 +465,16 @@ impl FractalParams {
                 attractor_log_scale,
             },
             lod: LodRuntime {
-                lod_config: settings.lod_config,
+                // SEC-011: clamp every quality preset at the trust boundary —
+                // an `iteration_scale` > 1.0 saturates the `u32` cast in
+                // `effective_2d_max_iterations`, defeating SEC-001's budget.
+                lod_config: {
+                    let mut lod = settings.lod_config;
+                    for preset in &mut lod.quality_presets {
+                        *preset = preset.sanitized();
+                    }
+                    lod
+                },
                 lod_state: LODState::default(),
             },
             accum: AccumulationState {

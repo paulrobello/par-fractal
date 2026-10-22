@@ -312,7 +312,13 @@ impl UI {
                                         != clamped.settings.attractor_iterations_per_frame
                                     || raw.shadow_samples != clamped.settings.shadow_samples
                                     || raw.dof_samples != clamped.settings.dof_samples
-                                    || raw.zoom_2d != clamped.settings.zoom_2d;
+                                    || raw.zoom_2d != clamped.settings.zoom_2d
+                                    // SEC-010/SEC-011: the precise-center pair and
+                                    // the LOD presets are also sanitized at the
+                                    // trust boundary; flag those too.
+                                    || raw.center_2d_precise
+                                        != clamped.settings.center_2d_precise
+                                    || raw.lod_config != clamped.lod.lod_config;
                                 if was_clamped {
                                     self.show_toast(
                                         "Preset values out of range were clamped".to_string(),

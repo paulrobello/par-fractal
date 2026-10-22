@@ -149,15 +149,56 @@ pub struct ReferenceOrbit {
 /// orbit walk. This is the entry point that frees the reference orbit's center
 /// from f64 precision, keeping it valid past the ~1e11 f64 ceiling.
 ///
-/// Returns `Err(message)` on malformed input (the caller — UI / settings loader
-/// — surfaces the message); never panics.
+/// Returns `Err(message)` on malformed or out-of-range input (the caller —
+/// UI / settings loader — surfaces the message); never panics.
 pub fn parse_center_decimal(s: &str, precision_bits: usize) -> Result<FBig, String> {
+    // SEC-010: lexical pre-checks run BEFORE `DBig::from_str` — a string like
+    // `1e9223372036854775807` panics inside dashu's exponent parser, so the
+    // guards must fire on raw bytes first.
+    if s.len() > CENTER_INPUT_MAX_LEN {
+        return Err(format!(
+            "center string is {} characters; the limit is {CENTER_INPUT_MAX_LEN}",
+            s.len()
+        ));
+    }
+    if let Some(n) = exponent_digit_count(s)
+        && n > 4
+    {
+        return Err(format!(
+            "center exponent has {n} digits; the limit is 4 (range 1e-9999..=1e9999)"
+        ));
+    }
     let p = precision_bits.max(53);
     let decimal = DBig::from_str(s).map_err(|e| format!("{e}"))?;
+    // SEC-010: a legitimate fractal view center is small; cap the magnitude so
+    // absurd (but lexically narrow) values like `1e9999` cannot make the
+    // `to_binary` conversion burn CPU on the UI thread.
+    let threshold = DBig::from_str("1e15").expect("constant literal parses");
+    if decimal.clone().abs() > threshold {
+        return Err(format!(
+            "center magnitude exceeds 1e15 (|{s}| is out of range)"
+        ));
+    }
     // Base-10 → base-2 with Zero rounding (the orbit `FBig`'s mode); the
     // `.with_precision` then pins the exact target mantissa width.
     let binary = decimal.to_binary().value();
     Ok(binary.with_precision(p).value())
+}
+
+/// SEC-010: longest accepted center string, in characters. A legitimate
+/// deep-zoom center carries ~30–100 significant digits; 4096 leaves generous
+/// headroom while bounding the parse cost.
+const CENTER_INPUT_MAX_LEN: usize = 4096;
+
+/// SEC-010: count the significant digits in the string's decimal exponent
+/// (`Some(n)` when an `e`/`E` is present), ignoring the sign and leading
+/// zeros: `1e+00005` has 1 significant exponent digit. Only ASCII digits are
+/// counted, so a malformed exponent (`1e--5`) falls through to
+/// `DBig::from_str`'s own error path instead of being rejected here.
+fn exponent_digit_count(s: &str) -> Option<usize> {
+    let exp = s.split_once(['e', 'E'])?.1;
+    let digits = exp.trim_start_matches(['+', '-']).trim_start_matches('0');
+    Some(digits.chars().filter(|c| c.is_ascii_digit()).count())
 }
 
 /// Compute the reference orbit at center `(center_re, center_im)` from f64
@@ -950,5 +991,63 @@ mod tests {
             f64_best.reference_offset, prec_best.reference_offset,
             "same delta_c_origin offset"
         );
+    }
+
+    // ==================== SEC-010 ====================
+
+    /// SEC-010: strings over the lexical length cap are rejected before any
+    /// parse, so a hostile preset cannot feed megabyte coordinate strings to
+    /// `DBig::from_str` on the UI thread.
+    #[test]
+    fn parse_center_rejects_overlong_strings() {
+        let long = "0.".to_string() + &"1".repeat(4097);
+        let err = parse_center_decimal(&long, 64).unwrap_err();
+        assert!(err.contains("limit"), "unexpected message: {err}");
+        // At the cap, a well-formed string parses fine.
+        let ok_len = "0.".to_string() + &"1".repeat(4090);
+        assert!(parse_center_decimal(&ok_len, 64).is_ok());
+    }
+
+    /// SEC-010: exponents wider than 4 significant digits are rejected
+    /// lexically — including `1e92233...` which would PANIC inside dashu's
+    /// exponent parser. That panic is the regression this guards.
+    #[test]
+    fn parse_center_rejects_wide_exponents_without_panicking() {
+        // The audit's panic repro: must return Err, not panic.
+        let e = parse_center_decimal("1e9223372036854775807", 64).unwrap_err();
+        assert!(e.contains("exponent"), "unexpected message: {e}");
+        for s in ["1e100000", "1e+10000", "-2.5e99999"] {
+            assert!(parse_center_decimal(s, 64).is_err(), "{s} must be rejected");
+        }
+    }
+
+    /// SEC-010: leading zeros in the exponent don't count as significant
+    /// digits, and valid notation passes: plain, exponent, signed.
+    #[test]
+    fn parse_center_accepts_valid_inputs() {
+        for s in [
+            "-0.743643887037158704752191506114774",
+            "1.5e-10",
+            "1e+5",
+            "1e0010",
+            "0",
+            "-0",
+        ] {
+            assert!(parse_center_decimal(s, 64).is_ok(), "{s} must parse");
+        }
+        // Leading zeros collapse the exponent to a narrow one.
+        assert!(parse_center_decimal("1e00005", 64).is_ok());
+    }
+
+    /// SEC-010: magnitude above 1e15 is rejected post-parse.
+    #[test]
+    fn parse_center_rejects_absurd_magnitude() {
+        assert!(parse_center_decimal("1e16", 64).is_err());
+        assert!(parse_center_decimal("-9e20", 64).is_err());
+        // Just inside the cap is fine.
+        assert!(parse_center_decimal("1e15", 64).is_ok());
+        assert!(parse_center_decimal("-1e15", 64).is_ok());
+        // Tiny magnitudes are fine.
+        assert!(parse_center_decimal("1e-9999", 64).is_ok());
     }
 }

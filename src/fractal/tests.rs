@@ -653,3 +653,41 @@ fn fractal_scale_defaults_survive_the_ui_slider() {
         );
     }
 }
+
+/// SEC-010: a `center_2d_precise` pair that fails `parse_center_decimal`
+/// (malformed, over-long, or out-of-range) is dropped to `None` at the
+/// trust boundary instead of passing through to the orbit worker; a valid
+/// pair survives verbatim.
+#[test]
+fn from_settings_drops_invalid_precise_center() {
+    let make = |precise: Option<[String; 2]>| {
+        let mut settings = FractalParams::default().to_settings();
+        settings.center_2d_precise = precise;
+        FractalParams::from_settings(settings)
+    };
+
+    // Invalid pairs drop to None.
+    for bad in [
+        Some(["1e9223372036854775807".to_string(), "0.5".to_string()]),
+        Some(["not a number".to_string(), "0.5".to_string()]),
+        Some(["-0.75".to_string(), "1e99999".to_string()]),
+        Some(["-0.75".to_string(), "1e16".to_string()]), // magnitude cap
+    ] {
+        let params = make(bad);
+        assert!(
+            params.settings.center_2d_precise.is_none(),
+            "invalid precise center must drop to None"
+        );
+    }
+
+    // A valid pair survives verbatim.
+    let good = [
+        "-0.743643887037158704752191506114774".to_string(),
+        "0.13182590420533".to_string(),
+    ];
+    let params = make(Some(good.clone()));
+    assert_eq!(params.settings.center_2d_precise, Some(good));
+
+    // None stays None.
+    assert!(make(None).settings.center_2d_precise.is_none());
+}

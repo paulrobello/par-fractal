@@ -31,6 +31,11 @@ pub fn zoom_iteration_bonus(zoom_2d: f64) -> u32 {
 /// produces a blank render). 3D returns the user value unchanged — 3D cost
 /// is dominated by `max_steps`, not iterations.
 ///
+/// SEC-011: the result is capped at the deterministic perturbation budget
+/// (`perturbation_max_iterations`), so a preset that smuggled an
+/// `iteration_scale` > 1.0 past the trust boundary cannot saturate the `u32`
+/// cast into billions of iterations per pixel.
+///
 /// The CPU reference orbit (ENH-001 Phase A step 5) MUST be computed against
 /// this same value: if it diverges, the shader's `orbit_len` either
 /// under-serves the per-pixel loop (pixels needing more iterations than the
@@ -43,7 +48,7 @@ pub(crate) fn effective_2d_max_iterations(params: &FractalParams) -> u32 {
         let zoom_bonus = zoom_iteration_bonus(params.settings.zoom_2d);
         let scaled =
             ((params.settings.max_iterations + zoom_bonus) as f32 * q.iteration_scale) as u32;
-        scaled.max(16)
+        scaled.max(16).min(perturbation_max_iterations(params))
     } else {
         params.settings.max_iterations
     }
@@ -1025,5 +1030,29 @@ mod numeric_tests {
         // Zero-size surface (before first resize) must not panic or produce NaN.
         let z = scene_uv_scale_for(0.5, 0, 0);
         assert!(z[0].is_finite() && z[1].is_finite());
+    }
+
+    /// SEC-011: even when params are built directly (bypassing
+    /// `from_settings`' sanitization) with an absurd `iteration_scale`, the
+    /// effective 2D budget must never exceed the deterministic perturbation
+    /// budget — the `u32` cast must not saturate.
+    #[test]
+    fn effective_2d_budget_never_exceeds_perturbation_budget() {
+        use crate::fractal::RenderMode;
+        let mut params = FractalParams::default();
+        params.settings.render_mode = RenderMode::TwoD;
+        params.settings.max_iterations = 100_000; // SEC-001 ceiling
+        params.settings.zoom_2d = 1e30; // SEC-001 ceiling
+        params.lod.lod_config.enabled = true;
+        params.lod.lod_config.quality_presets[0].iteration_scale = 1e30;
+
+        let effective = effective_2d_max_iterations(&params);
+        let budget = perturbation_max_iterations(&params);
+        assert!(
+            effective <= budget,
+            "effective budget {effective} exceeded perturbation budget {budget}"
+        );
+        // And it must be a sane number, not a saturated u32::MAX.
+        assert!(effective < 1_000_000, "saturated: {effective}");
     }
 }

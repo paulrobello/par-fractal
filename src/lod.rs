@@ -56,7 +56,7 @@ pub enum LODProfile {
 }
 
 /// Quality level preset with all rendering parameters
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct QualityLevel {
     /// Ray marching max iterations
     pub max_steps: u32,
@@ -167,6 +167,37 @@ impl QualityLevel {
             iteration_scale: lerp_f32(self.iteration_scale, other.iteration_scale, t),
         }
     }
+
+    /// SEC-011: clamp a preset that arrived from an untrusted file (YAML
+    /// settings, JSON import, web localStorage) to the safe operating range.
+    /// `iteration_scale` above 1.0 would saturate the `u32` cast in
+    /// `effective_2d_max_iterations` (u32::MAX iterations per pixel, defeating
+    /// SEC-001's `max_iterations` clamp); `render_scale` outside [0.25, 1]
+    /// breaks the viewport sub-rect math; the counts mirror SEC-001's
+    /// ceilings; NaN/Inf floats are replaced with the ultra defaults.
+    pub fn sanitized(self) -> Self {
+        Self {
+            max_steps: self.max_steps.clamp(1, 2_000),
+            min_distance: clamp_finite(self.min_distance, 1e-7, 1.0, 0.00035),
+            shadow_samples: self.shadow_samples.min(512),
+            shadow_step_factor: clamp_finite(self.shadow_step_factor, 0.0, 1e6, 0.6),
+            ao_step_size: clamp_finite(self.ao_step_size, 1e-7, 1e6, 0.12),
+            dof_samples: self.dof_samples.min(64),
+            render_scale: clamp_finite(self.render_scale, 0.25, 1.0, 1.0),
+            iteration_scale: clamp_finite(self.iteration_scale, 0.0, 1.0, 1.0),
+        }
+    }
+}
+
+/// SEC-011: `f32::clamp` propagates NaN, so a hostile `NaN` in a preset field
+/// would survive the clamp and reach the shader uniforms. Non-finite values
+/// fall back to the same default `FractalParams::from_settings` would pick.
+fn clamp_finite(v: f32, min: f32, max: f32, default: f32) -> f32 {
+    if v.is_finite() {
+        v.clamp(min, max)
+    } else {
+        default
+    }
 }
 
 impl Default for QualityLevel {
@@ -176,7 +207,7 @@ impl Default for QualityLevel {
 }
 
 /// Main LOD configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LODConfig {
     /// Enable/disable LOD system
     pub enabled: bool,
@@ -756,5 +787,34 @@ mod tests {
         state.update_transition(0.3, 0.3);
         assert_eq!(state.transition_progress, 1.0);
         assert_eq!(state.current_level, 2);
+    }
+
+    /// SEC-011: a hostile preset's iteration_scale must not survive the
+    /// trust boundary, and NaN/Inf floats must not propagate through clamp.
+    #[test]
+    fn sanitized_clamps_hostile_values() {
+        let hostile = QualityLevel {
+            max_steps: u32::MAX,
+            min_distance: f32::NAN,
+            shadow_samples: u32::MAX,
+            shadow_step_factor: f32::NEG_INFINITY,
+            ao_step_size: f32::INFINITY,
+            dof_samples: u32::MAX,
+            render_scale: 1e30,
+            iteration_scale: 1e30,
+        };
+        let s = hostile.sanitized();
+        assert_eq!(s.max_steps, 2_000);
+        assert_eq!(s.shadow_samples, 512);
+        assert_eq!(s.dof_samples, 64);
+        assert_eq!(s.iteration_scale, 1.0); // 1e30 clamped, not saturated through
+        assert_eq!(s.render_scale, 1.0);
+        assert_eq!(s.min_distance, 0.00035); // NaN → default
+        assert_eq!(s.shadow_step_factor, 0.6); // -inf → default
+        assert_eq!(s.ao_step_size, 0.12); // +inf → default
+
+        // Presets within range pass through unchanged.
+        let clean = QualityLevel::high();
+        assert_eq!(clean.sanitized(), clean);
     }
 }
