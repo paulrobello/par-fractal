@@ -12,6 +12,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > as dated staging sections and will be retagged at release time. Do not link
 > compare-URLs for them until the tags exist.
 
+### Added
+- **Live Julia-under-cursor preview while browsing the Mandelbrot set** — the
+  last open item from issue #1. A square inset in the top-right corner renders
+  the Julia set whose `c` is the complex coordinate under the mouse. It tracks
+  pan and zoom-at-cursor exactly (the point under the cursor is invariant by
+  construction, pinned by a unit test against `zoom_at`), hides while the
+  cursor is over any UI, and draws beneath egui windows so open overlays cover
+  it cleanly. Toggled from the "Julia preview" checkbox in the 2D navigation
+  panel; the state persists with the rest of the UI state and is never
+  overwritten by presets. The inset reuses the 2D fragment path with a
+  dedicated uniform buffer (fixed |z| ≤ 2.5 framing, perturbation and
+  high-precision paths off) and renders after the capture fork, so screenshots
+  and video stay fractal-only.
+
 ### Fixed
 - **The 3D attractors rendered many times oversized, with the camera buried
   inside them.** Lorenz was the worst — ~10x — and its saved settings offered no

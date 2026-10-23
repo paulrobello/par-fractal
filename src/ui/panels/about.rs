@@ -60,6 +60,11 @@ impl UI {
                 // truth). Keep the two in sync — one bullet per CHANGELOG
                 // section headline. 0.9.0/0.10.0 are staged but NOT tagged or
                 // published (see the CHANGELOG Unreleased note).
+                ui.collapsing("What's New (unreleased — 0.11.0 staging)", |ui| {
+                    ui.label("• Live Julia-under-cursor preview while browsing the Mandelbrot set");
+                    ui.label("• 3D attractor fixes: correct framing/scale for Lorenz, Chip, Quadruptwo, Rossler, Sierpinski Gasket, Mandelbox and others");
+                });
+
                 ui.collapsing("What's New (unreleased — 0.10.0 staging)", |ui| {
                     ui.label("• Perturbation deep-zoom: effectively infinite zoom (1e8+) on the Mandelbrot family");
                     ui.label("• Precise decimal center + 10ⁿ zoom readout in the 2D panel");

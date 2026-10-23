@@ -34,6 +34,7 @@ See the [Quick Start Guide](docs/QUICKSTART.md) for detailed instructions.
 - **GPU-Accelerated** - Efficient WebGPU rendering for 2D and 3D fractals
 - **35 Fractal Types** - 20 2D and 15 3D fractals including Mandelbrot, Julia, Buddhabrot, Mandelbulb, Menger Sponge, strange attractors, and more
 - **Deep Zoom (Perturbation)** - Arbitrary-precision reference orbit plus per-pixel delta recurrence enables effectively infinite zoom (tested past 1e8) on the Mandelbrot family without precision collapse
+- **Julia Preview** - Live inset rendering the Julia set for the point under the cursor while browsing the Mandelbrot set
 - **Variable Power** - Adjustable exponent (z^n + c) for 6 escape-time fractals: Multibrot, Multicorn, Multi-ship, and more
 - **Advanced Rendering** - PBR shading, ambient occlusion, soft shadows, depth of field
 - **Real-time Interaction** - Smooth pan/zoom, camera controls, parameter adjustment
