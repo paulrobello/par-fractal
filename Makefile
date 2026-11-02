@@ -222,7 +222,7 @@ check:
 # ARC-020: house-convention alias (`make typecheck` == `make check`).
 typecheck: check
 
-checkall: test lint web-check
+checkall: lint test web-check
 	@echo ""
 	@echo "======================================================================"
 	@echo "  All code quality checks passed!"
