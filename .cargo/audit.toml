@@ -10,15 +10,6 @@
 # ttf-parser 0.25.1 is unmaintained; transitive via winit -> ab_glyph.
 # Tracking upstream; nothing for par-fractal to do until winit/ab_glyph releases.
 # See https://rustsec.org/advisories/RUSTSEC-2026-0192
-#
-# quick-xml 0.39.4 has two DoS advisories (RUSTSEC-2026-0194, RUSTSEC-2026-0195),
-# both fixed in >=0.41.0. We cannot bump: wayland-scanner 0.31.10 (transitive via
-# winit -> smithay-client-toolkit) pins `quick-xml = "^0.39"`. Build-time /
-# Wayland-only. Revisit when winit releases a smithay-client-toolkit bump.
-ignore = [
-    "RUSTSEC-2026-0192",
-    "RUSTSEC-2026-0194",
-    "RUSTSEC-2026-0195",
-]
+ignore = ["RUSTSEC-2026-0192"]
 informational_warnings = ["unmaintained"]
 severity_threshold = "low"
