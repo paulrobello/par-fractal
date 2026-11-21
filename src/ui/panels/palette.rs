@@ -435,10 +435,10 @@ impl UI {
                                     .on_hover_text("Design custom 8-color gradients");
 
                                 // Color picker for each of the 8 palette colors
-                                for i in 0..8 {
+                                for (i, color) in self.custom_palette_colors.iter_mut().enumerate() {
                                     ui.horizontal(|ui| {
                                         ui.label(format!("Color {}:", i + 1));
-                                        if ui.color_edit_button_rgb(&mut self.custom_palette_colors[i])
+                                        if ui.color_edit_button_rgb(color)
                                             .on_hover_text(format!("Edit color {} of the palette", i + 1))
                                             .changed() {
                                             // Color changed, could auto-update preview if needed

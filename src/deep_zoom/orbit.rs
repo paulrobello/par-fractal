@@ -555,8 +555,8 @@ mod tests {
 
         // Direct f64 walk of the same recurrence.
         let (mut zr, mut zi): (f64, f64) = (0.0, 0.0);
-        for n in 0..orbit.z.len().min(40) {
-            let (er, ei) = (orbit.z[n][0] as f64, orbit.z[n][1] as f64);
+        for (n, &[re, im]) in orbit.z.iter().take(40).enumerate() {
+            let (er, ei) = (re as f64, im as f64);
             let dr = (er - zr).abs();
             let di = (ei - zi).abs();
             // f32 mirror vs f64: bounded orbit stays O(1), so agree to ~1e-6.
